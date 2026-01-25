@@ -1,0 +1,3 @@
+{
+  "extends": "@gestaomrchrono/config/tsconfig.base.json"
+}

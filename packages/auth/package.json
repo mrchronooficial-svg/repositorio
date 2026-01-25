@@ -1,0 +1,24 @@
+{
+  "name": "@gestaomrchrono/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@gestaomrchrono/db": "*",
+    "@gestaomrchrono/env": "*",
+    "better-auth": "^1.4.9",
+    "dotenv": "^17.2.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@gestaomrchrono/config": "*",
+    "typescript": "^5"
+  }
+}

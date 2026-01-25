@@ -1,0 +1,31 @@
+{
+  "name": "gestaomrchrono",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "check-types": "npm run check-types --workspaces",
+    "dev:native": "npm run dev --workspace native",
+    "dev:web": "npm run dev --workspace web",
+    "db:push": "npm run db:push --workspace @gestaomrchrono/db",
+    "db:studio": "npm run db:studio --workspace @gestaomrchrono/db",
+    "db:generate": "npm run db:generate --workspace @gestaomrchrono/db",
+    "db:migrate": "npm run db:migrate --workspace @gestaomrchrono/db"
+  },
+  "dependencies": {
+    "@gestaomrchrono/env": "*",
+    "dotenv": "^17.2.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@gestaomrchrono/config": "*",
+    "@types/node": "^22.13.14",
+    "typescript": "^5"
+  },
+  "packageManager": "npm@11.6.2"
+}
