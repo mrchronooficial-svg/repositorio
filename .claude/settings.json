@@ -1,0 +1,65 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Grep",
+      "Glob",
+      "LS",
+      "Bash(npm run *)",
+      "Bash(npx prisma *)",
+      "Bash(npx create-better-t-stack *)",
+      "Bash(git status)",
+      "Bash(git diff)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(pwd)",
+      "Bash(echo *)",
+      "Bash(mkdir *)",
+      "Bash(touch *)",
+      "Bash(cp *)",
+      "Bash(mv *)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -r *)",
+      "Bash(DROP TABLE *)",
+      "Bash(DELETE FROM *)",
+      "Bash(TRUNCATE *)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/secrets/**)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)"
+    ],
+    "ask": [
+      "Write",
+      "Edit",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(rm *)"
+    ]
+  },
+  "env": {
+    "EDITOR": "code",
+    "NODE_ENV": "development"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATHS\" =~ \\.(ts|tsx|js|jsx)$ ]]; then echo '✓ Arquivo TypeScript/JavaScript modificado'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
