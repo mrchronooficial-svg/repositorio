@@ -1,8 +1,7 @@
 import { auth } from "@gestaomrchrono/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-
-import { authClient } from "@/lib/auth-client";
+import prisma from "@gestaomrchrono/db";
 
 import Dashboard from "./dashboard";
 
@@ -15,11 +14,20 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  return (
-    <div>
-      <h1>Dashboard</h1>
-      <p>Welcome {session.user.name}</p>
-      <Dashboard session={session} />
-    </div>
-  );
+  // Buscar dados completos do usuário incluindo nível
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      nivel: true,
+    },
+  });
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  return <Dashboard user={user} />;
 }
