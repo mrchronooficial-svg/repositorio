@@ -89,3 +89,27 @@ export function formatDateTime(date: Date | string | null | undefined): string {
     timeStyle: "short",
   }).format(d);
 }
+
+/**
+ * Formata data relativa: há 2 dias, há 1 hora
+ */
+export function formatRelativeDate(date: Date | string | null | undefined): string {
+  if (!date) return "-";
+  const d = typeof date === "string" ? new Date(date) : date;
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+  if (diffDays > 0) {
+    return `há ${diffDays} dia${diffDays > 1 ? "s" : ""}`;
+  }
+  if (diffHours > 0) {
+    return `há ${diffHours} hora${diffHours > 1 ? "s" : ""}`;
+  }
+  if (diffMinutes > 0) {
+    return `há ${diffMinutes} minuto${diffMinutes > 1 ? "s" : ""}`;
+  }
+  return "agora";
+}
