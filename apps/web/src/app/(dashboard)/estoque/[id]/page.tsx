@@ -1,0 +1,421 @@
+"use client";
+
+import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  Edit,
+  Archive,
+  Trash2,
+  RotateCcw,
+  RefreshCw,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Breadcrumbs } from "@/components/layout/breadcrumbs";
+import { StatusBadge } from "@/components/status-badge";
+import { HistoricoStatus } from "@/components/historico-status";
+import { StatusDialog } from "@/components/dialogs/status-dialog";
+import { trpc } from "@/utils/trpc";
+import { usePermissions } from "@/hooks/use-permissions";
+import { formatCurrency, formatDate } from "@/lib/formatters";
+import { ORIGEM_TIPO_LABELS, ORIGEM_CANAL_LABELS } from "@/lib/constants";
+import { toast } from "sonner";
+
+export default function PecaDetalhesPage() {
+  const params = useParams();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { podeVerValores, podeExcluir, isAdmin } = usePermissions();
+
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+
+  const id = params.id as string;
+
+  const queryOptions = trpc.peca.getById.queryOptions({ id });
+  const { data: peca, isLoading } = useQuery({
+    ...queryOptions,
+    enabled: !!id,
+  });
+
+  const refetch = () => {
+    queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+  };
+
+  const archiveMutation = useMutation({
+    ...trpc.peca.archive.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Peca arquivada com sucesso!");
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const restoreMutation = useMutation({
+    ...trpc.peca.restore.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Peca restaurada com sucesso!");
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    ...trpc.peca.delete.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Peca excluida permanentemente!");
+      router.push("/estoque");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (!peca) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-xl font-semibold">Peca nao encontrada</h2>
+        <Button
+          variant="link"
+          onClick={() => router.push("/estoque")}
+          className="mt-4"
+        >
+          Voltar para estoque
+        </Button>
+      </div>
+    );
+  }
+
+  const handleArchive = () => {
+    if (confirm("Tem certeza que deseja arquivar esta peca?")) {
+      archiveMutation.mutate({ id });
+    }
+  };
+
+  const handleRestore = () => {
+    restoreMutation.mutate({ id });
+  };
+
+  const handleDelete = () => {
+    if (
+      confirm(
+        "ATENCAO: Esta acao e irreversivel. Tem certeza que deseja excluir permanentemente esta peca?"
+      )
+    ) {
+      deleteMutation.mutate({ id });
+    }
+  };
+
+  return (
+    <div>
+      <Breadcrumbs
+        items={[
+          { label: "Estoque", href: "/estoque" },
+          { label: peca.sku },
+        ]}
+      />
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push("/estoque")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold font-mono">{peca.sku}</h1>
+              {peca.arquivado && (
+                <span className="text-sm bg-gray-200 text-gray-600 px-2 py-1 rounded">
+                  Arquivada
+                </span>
+              )}
+            </div>
+            <p className="text-muted-foreground">
+              {peca.marca} {peca.modelo}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          {!peca.arquivado && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setStatusDialogOpen(true)}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Alterar Status
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/estoque/${id}/editar`)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
+              {podeExcluir && (
+                <Button
+                  variant="outline"
+                  onClick={handleArchive}
+                  disabled={archiveMutation.isPending}
+                >
+                  <Archive className="h-4 w-4 mr-2" />
+                  Arquivar
+                </Button>
+              )}
+            </>
+          )}
+          {peca.arquivado && podeExcluir && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleRestore}
+                disabled={restoreMutation.isPending}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Restaurar
+              </Button>
+              {isAdmin && (
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Excluir
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna principal */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Galeria de fotos */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Fotos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {peca.fotos.length === 0 ? (
+                <p className="text-muted-foreground">Nenhuma foto cadastrada</p>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {peca.fotos.map((foto, index) => (
+                    <img
+                      key={foto.id}
+                      src={foto.url}
+                      alt={`Foto ${index + 1}`}
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Dados do relogio */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Dados do Relogio</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Marca</p>
+                <p className="font-medium">{peca.marca}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Modelo</p>
+                <p className="font-medium">{peca.modelo}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Ano</p>
+                <p className="font-medium">{peca.ano || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Tamanho Caixa</p>
+                <p className="font-medium">{peca.tamanhoCaixa}mm</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Material Caixa</p>
+                <p className="font-medium">{peca.materialCaixa || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Material Pulseira</p>
+                <p className="font-medium">{peca.materialPulseira || "-"}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Valores e Origem */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Valores e Origem</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {podeVerValores ? (
+                <>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Compra</p>
+                    <p className="font-medium">
+                      {formatCurrency(Number(peca.valorCompra))}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Estimado</p>
+                    <p className="font-medium">
+                      {formatCurrency(Number(peca.valorEstimadoVenda))}
+                    </p>
+                  </div>
+                  {peca.valorRepasse && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Valor Repasse
+                      </p>
+                      <p className="font-medium">
+                        {formatCurrency(Number(peca.valorRepasse))}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="col-span-3">
+                  <p className="text-sm text-muted-foreground">
+                    Valores ocultos para seu nivel de acesso
+                  </p>
+                </div>
+              )}
+              <div>
+                <p className="text-sm text-muted-foreground">Tipo Origem</p>
+                <p className="font-medium">
+                  {ORIGEM_TIPO_LABELS[peca.origemTipo]}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Canal</p>
+                <p className="font-medium">
+                  {peca.origemCanal
+                    ? ORIGEM_CANAL_LABELS[peca.origemCanal]
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Data Cadastro</p>
+                <p className="font-medium">{formatDate(peca.createdAt)}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Fornecedor */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Fornecedor</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div
+                className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
+                onClick={() => router.push(`/fornecedores/${peca.fornecedor.id}`)}
+              >
+                <p className="font-medium">{peca.fornecedor.nome}</p>
+                <p className="text-sm text-muted-foreground">
+                  {peca.fornecedor.cidade}/{peca.fornecedor.estado}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Coluna lateral */}
+        <div className="space-y-6">
+          {/* Status atual */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Status</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <StatusBadge type="peca" status={peca.status} />
+                {!peca.arquivado && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setStatusDialogOpen(true)}
+                  >
+                    Alterar
+                  </Button>
+                )}
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Localizacao</p>
+                <p className="font-medium">{peca.localizacao}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Venda (se vendida) */}
+          {peca.venda && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Venda</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div
+                  className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
+                  onClick={() => router.push(`/vendas/${peca.venda!.id}`)}
+                >
+                  <p className="font-medium">
+                    {peca.venda.cliente?.nome || "Cliente"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(peca.venda.dataVenda)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Historico */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Historico</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HistoricoStatus historico={peca.historicoStatus} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Dialog de status */}
+      <StatusDialog
+        open={statusDialogOpen}
+        onOpenChange={setStatusDialogOpen}
+        pecaId={id}
+        currentStatus={peca.status}
+        currentLocalizacao={peca.localizacao}
+        onSuccess={refetch}
+      />
+    </div>
+  );
+}
