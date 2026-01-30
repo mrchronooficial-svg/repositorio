@@ -35,8 +35,9 @@ export default function ParametrosPage() {
     }
   }, [configs]);
 
+  const updateMutationOptions = trpc.configuracao.updateMany.mutationOptions();
   const updateMutation = useMutation({
-    ...trpc.configuracao.updateMany.mutationOptions(),
+    mutationFn: updateMutationOptions.mutationFn,
     onSuccess: () => {
       toast.success("Configuracoes salvas com sucesso!");
       queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
@@ -46,8 +47,9 @@ export default function ParametrosPage() {
     },
   });
 
+  const resetMutationOptions = trpc.configuracao.resetToDefaults.mutationOptions();
   const resetMutation = useMutation({
-    ...trpc.configuracao.resetToDefaults.mutationOptions(),
+    mutationFn: resetMutationOptions.mutationFn,
     onSuccess: () => {
       toast.success("Configuracoes restauradas para os valores padrao!");
       queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
