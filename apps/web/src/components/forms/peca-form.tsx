@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FotoUpload } from "./foto-upload";
+import { FornecedorModal } from "./fornecedor-modal";
 import { trpc } from "@/utils/trpc";
 import { toast } from "sonner";
 
@@ -58,6 +59,42 @@ const defaultData: PecaData = {
   fotos: [],
 };
 
+// Opcoes de materiais
+const materiaisCaixa = [
+  "Aco Inoxidavel",
+  "Ouro Amarelo",
+  "Ouro Rosa",
+  "Ouro Branco",
+  "Platina",
+  "Titanio",
+  "Bronze",
+  "Prata",
+  "Ceramica",
+  "Carbono",
+  "Plastico/Resina",
+  "Aco com Ouro",
+  "Outro",
+];
+
+const materiaisPulseira = [
+  "Aco Inoxidavel",
+  "Couro",
+  "Borracha/Silicone",
+  "Nylon/NATO",
+  "Ouro Amarelo",
+  "Ouro Rosa",
+  "Ouro Branco",
+  "Titanio",
+  "Tecido",
+  "Ceramica",
+  "Aco com Ouro",
+  "Jubilee",
+  "Oyster",
+  "President",
+  "Milanese",
+  "Outro",
+];
+
 export function PecaForm({ initialData, isEditing }: PecaFormProps) {
   const router = useRouter();
   const [data, setData] = useState<PecaData>({
@@ -67,6 +104,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
   const [errors, setErrors] = useState<Partial<Record<keyof PecaData, string>>>({});
   const [fornecedorSearch, setFornecedorSearch] = useState("");
   const [showFornecedorList, setShowFornecedorList] = useState(false);
+  const [showFornecedorModal, setShowFornecedorModal] = useState(false);
 
   const { data: localizacoes } = useQuery(trpc.peca.getLocalizacoes.queryOptions());
 
@@ -133,15 +171,21 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
     if (!data.tamanhoCaixa || isNaN(parseFloat(data.tamanhoCaixa))) {
       newErrors.tamanhoCaixa = "Tamanho da caixa e obrigatorio";
     }
-    if (!data.valorCompra || isNaN(parseFloat(data.valorCompra))) {
-      newErrors.valorCompra = "Valor de compra e obrigatorio";
+
+    // Valor de compra so e obrigatorio se for COMPRA (nao consignacao)
+    if (data.origemTipo === "COMPRA") {
+      if (!data.valorCompra || isNaN(parseFloat(data.valorCompra))) {
+        newErrors.valorCompra = "Valor de compra e obrigatorio";
+      }
     }
+
     if (!data.valorEstimadoVenda || isNaN(parseFloat(data.valorEstimadoVenda))) {
       newErrors.valorEstimadoVenda = "Valor estimado e obrigatorio";
     }
     if (!data.fornecedorId) newErrors.fornecedorId = "Fornecedor e obrigatorio";
     if (data.fotos.length === 0) newErrors.fotos = "Minimo 1 foto obrigatoria";
 
+    // Valor de repasse so e obrigatorio se for CONSIGNACAO
     if (data.origemTipo === "CONSIGNACAO") {
       if (!data.valorRepasse || isNaN(parseFloat(data.valorRepasse))) {
         newErrors.valorRepasse = "Valor de repasse e obrigatorio para consignacao";
@@ -167,7 +211,8 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       tamanhoCaixa: parseFloat(data.tamanhoCaixa),
       materialCaixa: data.materialCaixa || undefined,
       materialPulseira: data.materialPulseira || undefined,
-      valorCompra: parseFloat(data.valorCompra),
+      // Consignacao nao tem valor de compra, usa 0
+      valorCompra: data.origemTipo === "CONSIGNACAO" ? 0 : parseFloat(data.valorCompra),
       valorEstimadoVenda: parseFloat(data.valorEstimadoVenda),
       origemTipo: data.origemTipo,
       origemCanal: data.origemCanal || undefined,
@@ -290,22 +335,40 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="materialCaixa">Material Caixa</Label>
-              <Input
-                id="materialCaixa"
+              <Select
                 value={data.materialCaixa}
-                onChange={(e) => handleChange("materialCaixa", e.target.value)}
-                placeholder="Ex: Aco, Ouro"
-              />
+                onValueChange={(value) => handleChange("materialCaixa", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materiaisCaixa.map((material) => (
+                    <SelectItem key={material} value={material}>
+                      {material}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="materialPulseira">Material Pulseira</Label>
-              <Input
-                id="materialPulseira"
+              <Select
                 value={data.materialPulseira}
-                onChange={(e) => handleChange("materialPulseira", e.target.value)}
-                placeholder="Ex: Couro, Aco"
-              />
+                onValueChange={(value) => handleChange("materialPulseira", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materiaisPulseira.map((material) => (
+                    <SelectItem key={material} value={material}>
+                      {material}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>
@@ -319,15 +382,24 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="valorCompra">Valor de Compra (R$) *</Label>
+              <Label htmlFor="valorCompra">
+                Valor de Compra (R$) {data.origemTipo === "COMPRA" && "*"}
+              </Label>
               <Input
                 id="valorCompra"
                 type="number"
                 step="0.01"
-                value={data.valorCompra}
+                value={data.origemTipo === "CONSIGNACAO" ? "" : data.valorCompra}
                 onChange={(e) => handleChange("valorCompra", e.target.value)}
-                placeholder="0,00"
+                placeholder={data.origemTipo === "CONSIGNACAO" ? "N/A - Consignacao" : "0,00"}
+                disabled={data.origemTipo === "CONSIGNACAO"}
+                className={data.origemTipo === "CONSIGNACAO" ? "bg-muted" : ""}
               />
+              {data.origemTipo === "CONSIGNACAO" && (
+                <p className="text-xs text-muted-foreground">
+                  Em consignacao nao ha valor de compra
+                </p>
+              )}
               {errors.valorCompra && (
                 <p className="text-sm text-red-500">{errors.valorCompra}</p>
               )}
@@ -373,7 +445,13 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
               <Label htmlFor="origemTipo">Tipo de Origem *</Label>
               <Select
                 value={data.origemTipo}
-                onValueChange={(value) => handleChange("origemTipo", value)}
+                onValueChange={(value) => {
+                  handleChange("origemTipo", value);
+                  // Limpar valor de compra se for consignacao
+                  if (value === "CONSIGNACAO") {
+                    handleChange("valorCompra", "");
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -485,7 +563,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
                 type="button"
                 variant="link"
                 className="p-0 h-auto"
-                onClick={() => router.push("/fornecedores/novo")}
+                onClick={() => setShowFornecedorModal(true)}
               >
                 + Cadastrar novo fornecedor
               </Button>
@@ -497,6 +575,17 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Fornecedor */}
+      <FornecedorModal
+        open={showFornecedorModal}
+        onOpenChange={setShowFornecedorModal}
+        onSuccess={(fornecedor) => {
+          handleChange("fornecedorId", fornecedor.id);
+          setShowFornecedorList(false);
+          setFornecedorSearch("");
+        }}
+      />
 
       {/* Botoes */}
       <div className="flex justify-end gap-4">

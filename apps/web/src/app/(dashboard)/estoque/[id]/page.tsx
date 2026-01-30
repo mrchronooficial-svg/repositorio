@@ -10,6 +10,8 @@ import {
   Trash2,
   RotateCcw,
   RefreshCw,
+  DollarSign,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +20,7 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StatusBadge } from "@/components/status-badge";
 import { HistoricoStatus } from "@/components/historico-status";
 import { StatusDialog } from "@/components/dialogs/status-dialog";
+import { PagamentoFornecedorDialog } from "@/components/dialogs/pagamento-fornecedor-dialog";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, formatDate } from "@/lib/formatters";
@@ -31,6 +34,7 @@ export default function PecaDetalhesPage() {
   const { podeVerValores, podeExcluir, isAdmin } = usePermissions();
 
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
 
   const id = params.id as string;
 
@@ -373,6 +377,84 @@ export default function PecaDetalhesPage() {
             </CardContent>
           </Card>
 
+          {/* Pagamento ao Fornecedor */}
+          {podeVerValores && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base">Pagamento ao Fornecedor</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Status do pagamento */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Status:</span>
+                  <StatusBadge type="pagamento" status={peca.statusPagamentoFornecedor} size="sm" />
+                </div>
+
+                {/* Valores */}
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Devido:</span>
+                    <span className="font-medium">
+                      {peca.origemTipo === "CONSIGNACAO" && peca.status !== "VENDIDA"
+                        ? "-"
+                        : formatCurrency(Number(peca.valorCompra))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Pago:</span>
+                    <span className="font-medium text-green-600">
+                      {formatCurrency(Number(peca.valorPagoFornecedor))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t pt-1">
+                    <span className="text-muted-foreground">Restante:</span>
+                    <span className={`font-medium ${Number(peca.valorCompra) - Number(peca.valorPagoFornecedor) > 0 ? "text-orange-600" : "text-green-600"}`}>
+                      {peca.origemTipo === "CONSIGNACAO" && peca.status !== "VENDIDA"
+                        ? "-"
+                        : formatCurrency(Number(peca.valorCompra) - Number(peca.valorPagoFornecedor))}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Aviso para consignação */}
+                {peca.origemTipo === "CONSIGNACAO" && peca.status !== "VENDIDA" && (
+                  <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                    Consignacao: pagamento devido apenas apos a venda
+                  </p>
+                )}
+
+                {/* Historico de pagamentos */}
+                {peca.pagamentosFornecedor && peca.pagamentosFornecedor.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <p className="text-xs font-medium text-muted-foreground">Historico:</p>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {peca.pagamentosFornecedor.map((pag) => (
+                        <div key={pag.id} className="flex justify-between text-xs bg-muted/50 p-2 rounded">
+                          <span>{formatDate(pag.data)}</span>
+                          <span className="font-medium">{formatCurrency(Number(pag.valor))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Botao registrar pagamento */}
+                {!peca.arquivado && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setPagamentoDialogOpen(true)}
+                  >
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Registrar Pagamento
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Venda (se vendida) */}
           {peca.venda && (
             <Card>
@@ -416,6 +498,21 @@ export default function PecaDetalhesPage() {
         currentLocalizacao={peca.localizacao}
         onSuccess={refetch}
       />
+
+      {/* Dialog de pagamento ao fornecedor */}
+      {podeVerValores && (
+        <PagamentoFornecedorDialog
+          open={pagamentoDialogOpen}
+          onOpenChange={setPagamentoDialogOpen}
+          pecaId={id}
+          sku={peca.sku}
+          valorCompra={Number(peca.valorCompra) || 0}
+          valorPago={Number(peca.valorPagoFornecedor) || 0}
+          origemTipo={peca.origemTipo}
+          statusPeca={peca.status}
+          onSuccess={refetch}
+        />
+      )}
     </div>
   );
 }

@@ -165,10 +165,12 @@ export const vendaRouter = router({
         });
       }
 
-      if (peca.status !== "DISPONIVEL") {
+      // Permitir venda de peças DISPONIVEL, EM_TRANSITO ou REVISAO
+      const statusPermitidos = ["DISPONIVEL", "EM_TRANSITO", "REVISAO"];
+      if (!statusPermitidos.includes(peca.status)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Peca nao esta disponivel para venda",
+          message: "Peca nao esta disponivel para venda (status: " + peca.status + ")",
         });
       }
 

@@ -20,7 +20,7 @@ const PecaCreateSchema = z.object({
   valorRepasse: z.number().positive().optional(), // Obrigatorio se consignacao
   localizacao: z.string().default("Fornecedor"),
   fornecedorId: z.string().cuid("Fornecedor invalido"),
-  fotos: z.array(z.string().url()).min(1, "Minimo 1 foto obrigatoria"),
+  fotos: z.array(z.string().min(1)).min(1, "Minimo 1 foto obrigatoria"),
 });
 
 const PecaUpdateSchema = z.object({
@@ -51,6 +51,13 @@ const StatusUpdateSchema = z.object({
   pecaId: z.string().cuid(),
   status: z.enum(["DISPONIVEL", "EM_TRANSITO", "REVISAO", "VENDIDA", "DEFEITO", "PERDA"]),
   localizacao: z.string().optional(),
+});
+
+const PagamentoFornecedorSchema = z.object({
+  pecaId: z.string().cuid(),
+  valor: z.number().positive("Valor deve ser positivo"),
+  data: z.string().optional(), // ISO date string
+  observacao: z.string().optional(),
 });
 
 export const pecaRouter = router({
@@ -102,6 +109,66 @@ export const pecaRouter = router({
         valorCompra: podeVerValores ? peca.valorCompra : null,
         valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
         valorRepasse: podeVerValores ? peca.valorRepasse : null,
+        statusPagamentoFornecedor: podeVerValores ? peca.statusPagamentoFornecedor : null,
+      }));
+
+      return {
+        pecas: pecasFormatadas,
+        total,
+        pages: Math.ceil(total / limit),
+        page,
+      };
+    }),
+
+  // Listar pecas disponiveis para venda (todas exceto VENDIDA)
+  listParaVenda: protectedProcedure
+    .input(z.object({
+      page: z.number().int().positive().default(1),
+      limit: z.number().int().positive().max(100).default(20),
+      search: z.string().optional(),
+    }))
+    .query(async ({ input, ctx }) => {
+      const { page, limit, search } = input;
+      const skip = (page - 1) * limit;
+
+      const where = {
+        arquivado: false,
+        status: { notIn: ["VENDIDA", "DEFEITO", "PERDA"] as const },
+        ...(search && {
+          OR: [
+            { sku: { contains: search, mode: "insensitive" as const } },
+            { marca: { contains: search, mode: "insensitive" as const } },
+            { modelo: { contains: search, mode: "insensitive" as const } },
+          ],
+        }),
+      };
+
+      const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
+
+      const [pecas, total] = await Promise.all([
+        prisma.peca.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy: { createdAt: "desc" },
+          include: {
+            fotos: {
+              take: 1,
+              orderBy: { ordem: "asc" },
+            },
+            fornecedor: {
+              select: { nome: true },
+            },
+          },
+        }),
+        prisma.peca.count({ where }),
+      ]);
+
+      const pecasFormatadas = pecas.map((peca) => ({
+        ...peca,
+        valorCompra: podeVerValores ? peca.valorCompra : null,
+        valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
+        valorRepasse: podeVerValores ? peca.valorRepasse : null,
       }));
 
       return {
@@ -116,6 +183,8 @@ export const pecaRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.string().cuid() }))
     .query(async ({ input, ctx }) => {
+      const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
+
       const peca = await prisma.peca.findUnique({
         where: { id: input.id },
         include: {
@@ -132,6 +201,9 @@ export const pecaRouter = router({
               cliente: { select: { nome: true } },
             },
           },
+          pagamentosFornecedor: {
+            orderBy: { data: "desc" },
+          },
         },
       });
 
@@ -142,13 +214,14 @@ export const pecaRouter = router({
         });
       }
 
-      const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
-
       return {
         ...peca,
         valorCompra: podeVerValores ? peca.valorCompra : null,
         valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
         valorRepasse: podeVerValores ? peca.valorRepasse : null,
+        valorPagoFornecedor: podeVerValores ? peca.valorPagoFornecedor : null,
+        // Ocultar pagamentos se nao puder ver valores
+        pagamentosFornecedor: podeVerValores ? peca.pagamentosFornecedor : [],
       };
     }),
 
@@ -264,7 +337,7 @@ export const pecaRouter = router({
   updateFotos: protectedProcedure
     .input(z.object({
       pecaId: z.string().cuid(),
-      fotos: z.array(z.string().url()).min(1, "Minimo 1 foto obrigatoria"),
+      fotos: z.array(z.string().min(1)).min(1, "Minimo 1 foto obrigatoria"),
     }))
     .mutation(async ({ input, ctx }) => {
       // Deletar fotos existentes e criar novas
@@ -442,6 +515,176 @@ export const pecaRouter = router({
       "Cliente Final",
     ];
   }),
+
+  // Registrar pagamento ao fornecedor
+  registrarPagamentoFornecedor: socioOuAdminProcedure
+    .input(PagamentoFornecedorSchema)
+    .mutation(async ({ input, ctx }) => {
+      const peca = await prisma.peca.findUnique({
+        where: { id: input.pecaId },
+        select: {
+          id: true,
+          origemTipo: true,
+          valorCompra: true,
+          valorPagoFornecedor: true,
+          status: true,
+        },
+      });
+
+      if (!peca) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Peca nao encontrada",
+        });
+      }
+
+      // Para consignação, só pode pagar após a venda
+      if (peca.origemTipo === "CONSIGNACAO" && peca.status !== "VENDIDA") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Peca consignada so pode ser paga ao fornecedor apos a venda",
+        });
+      }
+
+      const valorDevido = Number(peca.valorCompra);
+      const valorJaPago = Number(peca.valorPagoFornecedor);
+      const novoValorPago = valorJaPago + input.valor;
+
+      if (novoValorPago > valorDevido) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Valor excede o devido. Devido: R$ ${valorDevido.toFixed(2)}, Ja pago: R$ ${valorJaPago.toFixed(2)}, Restante: R$ ${(valorDevido - valorJaPago).toFixed(2)}`,
+        });
+      }
+
+      // Determinar novo status
+      let novoStatus: "PAGO" | "PARCIAL" | "NAO_PAGO" = "PARCIAL";
+      if (novoValorPago >= valorDevido) {
+        novoStatus = "PAGO";
+      } else if (novoValorPago === 0) {
+        novoStatus = "NAO_PAGO";
+      }
+
+      // Criar pagamento e atualizar peca
+      const [pagamento] = await prisma.$transaction([
+        prisma.pagamentoFornecedor.create({
+          data: {
+            pecaId: input.pecaId,
+            valor: input.valor,
+            data: input.data ? new Date(input.data) : new Date(),
+            observacao: input.observacao,
+          },
+        }),
+        prisma.peca.update({
+          where: { id: input.pecaId },
+          data: {
+            valorPagoFornecedor: novoValorPago,
+            statusPagamentoFornecedor: novoStatus,
+            dataPagamentoFornecedor: new Date(),
+          },
+        }),
+      ]);
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "PAGAR_FORNECEDOR",
+        entidade: "PECA",
+        entidadeId: input.pecaId,
+        detalhes: {
+          valor: input.valor,
+          novoStatus,
+          totalPago: novoValorPago,
+        },
+      });
+
+      return pagamento;
+    }),
+
+  // Listar pagamentos ao fornecedor de uma peca
+  getPagamentosFornecedor: protectedProcedure
+    .input(z.object({ pecaId: z.string().cuid() }))
+    .query(async ({ input, ctx }) => {
+      const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
+
+      if (!podeVerValores) {
+        return [];
+      }
+
+      const pagamentos = await prisma.pagamentoFornecedor.findMany({
+        where: { pecaId: input.pecaId },
+        orderBy: { data: "desc" },
+      });
+
+      return pagamentos;
+    }),
+
+  // Excluir pagamento ao fornecedor
+  excluirPagamentoFornecedor: adminProcedure
+    .input(z.object({
+      pagamentoId: z.string().cuid(),
+      pecaId: z.string().cuid(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const pagamento = await prisma.pagamentoFornecedor.findUnique({
+        where: { id: input.pagamentoId },
+      });
+
+      if (!pagamento) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Pagamento nao encontrado",
+        });
+      }
+
+      const peca = await prisma.peca.findUnique({
+        where: { id: input.pecaId },
+        select: { valorCompra: true, valorPagoFornecedor: true },
+      });
+
+      if (!peca) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Peca nao encontrada",
+        });
+      }
+
+      const novoValorPago = Number(peca.valorPagoFornecedor) - Number(pagamento.valor);
+      const valorDevido = Number(peca.valorCompra);
+
+      // Determinar novo status
+      let novoStatus: "PAGO" | "PARCIAL" | "NAO_PAGO" = "PARCIAL";
+      if (novoValorPago >= valorDevido) {
+        novoStatus = "PAGO";
+      } else if (novoValorPago <= 0) {
+        novoStatus = "NAO_PAGO";
+      }
+
+      await prisma.$transaction([
+        prisma.pagamentoFornecedor.delete({
+          where: { id: input.pagamentoId },
+        }),
+        prisma.peca.update({
+          where: { id: input.pecaId },
+          data: {
+            valorPagoFornecedor: Math.max(0, novoValorPago),
+            statusPagamentoFornecedor: novoStatus,
+          },
+        }),
+      ]);
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "EXCLUIR_PAGAMENTO_FORNECEDOR",
+        entidade: "PECA",
+        entidadeId: input.pecaId,
+        detalhes: {
+          pagamentoId: input.pagamentoId,
+          valor: Number(pagamento.valor),
+        },
+      });
+
+      return { success: true };
+    }),
 
   // Metricas do estoque
   getMetricas: protectedProcedure.query(async ({ ctx }) => {

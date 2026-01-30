@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Loader2, Search, Check } from "lucide-react";
+import { Loader2, Search, Check, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
+import { ClienteModal } from "./cliente-modal";
 import { trpc } from "@/utils/trpc";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/formatters";
@@ -23,7 +24,7 @@ import { formatCurrency } from "@/lib/formatters";
 interface VendaData {
   pecaId: string;
   clienteId: string;
-  valorDesconto: string;
+  valorFinal: string;
   formaPagamento: "PIX" | "CREDITO_VISTA" | "CREDITO_PARCELADO";
   parcelas: string;
   pagamentoInicial: string;
@@ -32,7 +33,7 @@ interface VendaData {
 const defaultData: VendaData = {
   pecaId: "",
   clienteId: "",
-  valorDesconto: "",
+  valorFinal: "",
   formaPagamento: "PIX",
   parcelas: "",
   pagamentoInicial: "",
@@ -45,16 +46,33 @@ export function VendaForm() {
   const [clienteSearch, setClienteSearch] = useState("");
   const [showPecaList, setShowPecaList] = useState(false);
   const [showClienteList, setShowClienteList] = useState(false);
+  const [showClienteModal, setShowClienteModal] = useState(false);
 
-  // Buscar pecas disponiveis
-  const { data: pecas } = useQuery({
-    ...trpc.peca.list.queryOptions({
+  const pecaDropdownRef = useRef<HTMLDivElement>(null);
+  const clienteDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (pecaDropdownRef.current && !pecaDropdownRef.current.contains(event.target as Node)) {
+        setShowPecaList(false);
+      }
+      if (clienteDropdownRef.current && !clienteDropdownRef.current.contains(event.target as Node)) {
+        setShowClienteList(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Buscar pecas disponiveis para venda (DISPONIVEL ou EM_TRANSITO)
+  const { data: pecas, isLoading: isLoadingPecas } = useQuery({
+    ...trpc.peca.listParaVenda.queryOptions({
       page: 1,
-      limit: 10,
-      search: pecaSearch || undefined,
-      status: "DISPONIVEL",
+      limit: 20,
+      search: pecaSearch.trim() || undefined,
     }),
-    enabled: pecaSearch.length > 1,
+    enabled: showPecaList, // Busca quando o dropdown está aberto
   });
 
   // Buscar peca selecionada
@@ -64,13 +82,13 @@ export function VendaForm() {
   });
 
   // Buscar clientes
-  const { data: clientes } = useQuery({
+  const { data: clientes, isLoading: isLoadingClientes } = useQuery({
     ...trpc.cliente.list.queryOptions({
       page: 1,
-      limit: 10,
-      search: clienteSearch || undefined,
+      limit: 20,
+      search: clienteSearch.trim() || undefined,
     }),
-    enabled: clienteSearch.length > 1,
+    enabled: showClienteList, // Busca quando o dropdown está aberto
   });
 
   // Buscar cliente selecionado
@@ -97,8 +115,11 @@ export function VendaForm() {
   const valorOriginal = pecaSelecionada?.valorEstimadoVenda
     ? Number(pecaSelecionada.valorEstimadoVenda)
     : 0;
-  const desconto = parseFloat(data.valorDesconto) || 0;
-  const valorFinal = valorOriginal - desconto;
+
+  // Valor final digitado pelo usuário (ou valor original se não preenchido)
+  const valorFinal = data.valorFinal ? parseFloat(data.valorFinal) : valorOriginal;
+  // Desconto é calculado automaticamente
+  const desconto = valorOriginal - valorFinal;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,7 +137,7 @@ export function VendaForm() {
     createMutation.mutate({
       pecaId: data.pecaId,
       clienteId: data.clienteId,
-      valorDesconto: desconto || undefined,
+      valorDesconto: desconto > 0 ? desconto : undefined,
       formaPagamento: data.formaPagamento,
       parcelas: data.parcelas ? parseInt(data.parcelas, 10) : undefined,
       pagamentoInicial: data.pagamentoInicial
@@ -168,7 +189,7 @@ export function VendaForm() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 relative" ref={pecaDropdownRef}>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -183,34 +204,55 @@ export function VendaForm() {
                 />
               </div>
 
-              {showPecaList && pecas && pecas.pecas.length > 0 && (
-                <div className="border rounded-lg divide-y max-h-64 overflow-auto">
-                  {pecas.pecas.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="w-full p-3 text-left hover:bg-muted/50 flex items-center gap-3"
-                      onClick={() => {
-                        handleChange("pecaId", p.id);
-                        setShowPecaList(false);
-                        setPecaSearch("");
-                      }}
-                    >
-                      {p.fotos[0] && (
-                        <img
-                          src={p.fotos[0].url}
-                          alt={p.sku}
-                          className="w-12 h-12 object-cover rounded"
-                        />
+              {showPecaList && (
+                <div className="absolute z-50 w-full mt-1 border rounded-lg bg-popover shadow-lg max-h-72 overflow-auto">
+                  {isLoadingPecas ? (
+                    <div className="flex items-center justify-center py-8 text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      <span>Carregando peças...</span>
+                    </div>
+                  ) : pecas && pecas.pecas.length > 0 ? (
+                    <div className="divide-y">
+                      {pecas.pecas.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="w-full p-3 text-left hover:bg-accent transition-colors flex items-center gap-3"
+                          onClick={() => {
+                            handleChange("pecaId", p.id);
+                            setShowPecaList(false);
+                            setPecaSearch("");
+                          }}
+                        >
+                          {p.fotos[0] ? (
+                            <img
+                              src={p.fotos[0].url}
+                              alt={p.sku}
+                              className="w-12 h-12 object-cover rounded border"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded border bg-muted flex items-center justify-center">
+                              <Package className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-mono text-sm font-medium">{p.sku}</p>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {p.marca} {p.modelo}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <Package className="h-8 w-8 mb-2 opacity-50" />
+                      <span className="text-sm">Nenhuma peça disponível encontrada</span>
+                      {pecaSearch && (
+                        <span className="text-xs mt-1">Tente outro termo de busca</span>
                       )}
-                      <div>
-                        <p className="font-mono text-sm">{p.sku}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {p.marca} {p.modelo}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -244,7 +286,7 @@ export function VendaForm() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 relative" ref={clienteDropdownRef}>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -259,25 +301,41 @@ export function VendaForm() {
                 />
               </div>
 
-              {showClienteList && clientes && clientes.clientes.length > 0 && (
-                <div className="border rounded-lg divide-y max-h-48 overflow-auto">
-                  {clientes.clientes.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className="w-full p-3 text-left hover:bg-muted/50"
-                      onClick={() => {
-                        handleChange("clienteId", c.id);
-                        setShowClienteList(false);
-                        setClienteSearch("");
-                      }}
-                    >
-                      <p className="font-medium">{c.nome}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {c.cidade}/{c.estado}
-                      </p>
-                    </button>
-                  ))}
+              {showClienteList && (
+                <div className="absolute z-50 w-full mt-1 border rounded-lg bg-popover shadow-lg max-h-64 overflow-auto">
+                  {isLoadingClientes ? (
+                    <div className="flex items-center justify-center py-8 text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      <span>Carregando clientes...</span>
+                    </div>
+                  ) : clientes && clientes.clientes.length > 0 ? (
+                    <div className="divide-y">
+                      {clientes.clientes.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="w-full p-3 text-left hover:bg-accent transition-colors"
+                          onClick={() => {
+                            handleChange("clienteId", c.id);
+                            setShowClienteList(false);
+                            setClienteSearch("");
+                          }}
+                        >
+                          <p className="font-medium">{c.nome}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {c.cidade}/{c.estado}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <span className="text-sm">Nenhum cliente encontrado</span>
+                      {clienteSearch && (
+                        <span className="text-xs mt-1">Tente outro termo de busca</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -285,7 +343,7 @@ export function VendaForm() {
                 type="button"
                 variant="link"
                 className="p-0 h-auto"
-                onClick={() => router.push("/clientes/novo")}
+                onClick={() => setShowClienteModal(true)}
               >
                 + Cadastrar novo cliente
               </Button>
@@ -293,6 +351,17 @@ export function VendaForm() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal de Cliente */}
+      <ClienteModal
+        open={showClienteModal}
+        onOpenChange={setShowClienteModal}
+        onSuccess={(cliente) => {
+          handleChange("clienteId", cliente.id);
+          setShowClienteList(false);
+          setClienteSearch("");
+        }}
+      />
 
       {/* Valores e Pagamento */}
       <Card>
@@ -309,24 +378,48 @@ export function VendaForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="valorDesconto">Desconto (R$)</Label>
+              <Label htmlFor="valorFinal">Valor Final (R$) *</Label>
               <Input
-                id="valorDesconto"
+                id="valorFinal"
                 type="number"
                 step="0.01"
                 min="0"
-                max={valorOriginal}
-                value={data.valorDesconto}
-                onChange={(e) => handleChange("valorDesconto", e.target.value)}
-                placeholder="0,00"
+                max={valorOriginal * 2}
+                value={data.valorFinal}
+                onChange={(e) => handleChange("valorFinal", e.target.value)}
+                placeholder={valorOriginal.toFixed(2)}
               />
+              <p className="text-xs text-muted-foreground">
+                Valor negociado com o cliente
+              </p>
             </div>
 
             <div className="space-y-2">
-              <Label>Valor Final</Label>
-              <div className="p-2 bg-green-100 text-green-800 rounded text-lg font-bold">
-                {formatCurrency(valorFinal)}
+              <Label>Desconto</Label>
+              <div className={`p-2 rounded text-lg font-bold ${
+                desconto > 0
+                  ? "bg-amber-100 text-amber-800"
+                  : desconto < 0
+                    ? "bg-green-100 text-green-800"
+                    : "bg-muted text-muted-foreground"
+              }`}>
+                {desconto > 0
+                  ? `- ${formatCurrency(desconto)}`
+                  : desconto < 0
+                    ? `+ ${formatCurrency(Math.abs(desconto))}`
+                    : formatCurrency(0)
+                }
               </div>
+              {desconto > 0 && (
+                <p className="text-xs text-amber-600">
+                  {((desconto / valorOriginal) * 100).toFixed(1)}% de desconto
+                </p>
+              )}
+              {desconto < 0 && (
+                <p className="text-xs text-green-600">
+                  {((Math.abs(desconto) / valorOriginal) * 100).toFixed(1)}% acima do valor
+                </p>
+              )}
             </div>
           </div>
 
@@ -361,7 +454,7 @@ export function VendaForm() {
                   <SelectContent>
                     {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
                       <SelectItem key={n} value={n.toString()}>
-                        {n}x de {formatCurrency(valorFinal / n)}
+                        {n}x de {formatCurrency((valorFinal || valorOriginal) / n)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -377,7 +470,7 @@ export function VendaForm() {
               type="number"
               step="0.01"
               min="0"
-              max={valorFinal}
+              max={valorFinal || valorOriginal}
               value={data.pagamentoInicial}
               onChange={(e) => handleChange("pagamentoInicial", e.target.value)}
               placeholder="Deixe em branco para registrar depois"

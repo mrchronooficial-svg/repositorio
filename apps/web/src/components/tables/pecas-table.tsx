@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -8,6 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/formatters";
@@ -29,8 +34,17 @@ interface Peca {
   status: string;
   localizacao: string;
   valorEstimadoVenda: Decimal | null;
+  statusPagamentoFornecedor?: string;
+  origemTipo?: string;
   fotos: Foto[];
   fornecedor: Fornecedor;
+}
+
+interface PecaStatusInfo {
+  id: string;
+  sku: string;
+  status: string;
+  localizacao: string;
 }
 
 interface PecasTableProps {
@@ -38,6 +52,7 @@ interface PecasTableProps {
   isLoading: boolean;
   podeVerValores: boolean;
   onView: (id: string) => void;
+  onStatusClick?: (peca: PecaStatusInfo) => void;
 }
 
 export function PecasTable({
@@ -45,7 +60,10 @@ export function PecasTable({
   isLoading,
   podeVerValores,
   onView,
+  onStatusClick,
 }: PecasTableProps) {
+  const [selectedImage, setSelectedImage] = useState<{ url: string; sku: string } | null>(null);
+
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -65,15 +83,17 @@ export function PecasTable({
   }
 
   return (
+    <>
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-16">Foto</TableHead>
+          <TableHead className="w-24">Foto</TableHead>
           <TableHead>SKU</TableHead>
           <TableHead>Marca / Modelo</TableHead>
           <TableHead>Fornecedor</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Localizacao</TableHead>
+          {podeVerValores && <TableHead>Pgto. Fornecedor</TableHead>}
           {podeVerValores && <TableHead className="text-right">Valor</TableHead>}
         </TableRow>
       </TableHeader>
@@ -84,15 +104,20 @@ export function PecasTable({
             className="cursor-pointer hover:bg-muted/50"
             onClick={() => onView(peca.id)}
           >
-            <TableCell>
+            <TableCell className="py-2">
               {peca.fotos[0] ? (
                 <img
                   src={peca.fotos[0].url}
                   alt={peca.sku}
-                  className="h-12 w-12 object-cover rounded"
+                  className="h-20 w-20 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedImage({ url: peca.fotos[0].url, sku: peca.sku });
+                  }}
+                  title="Clique para ampliar"
                 />
               ) : (
-                <div className="h-12 w-12 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
+                <div className="h-20 w-20 bg-muted rounded flex items-center justify-center text-xs text-muted-foreground">
                   Sem foto
                 </div>
               )}
@@ -104,9 +129,51 @@ export function PecasTable({
             </TableCell>
             <TableCell className="text-sm">{peca.fornecedor.nome}</TableCell>
             <TableCell>
-              <StatusBadge type="peca" status={peca.status} size="sm" />
+              <div
+                className={onStatusClick ? "cursor-pointer hover:opacity-80 inline-block" : "inline-block"}
+                onClick={(e) => {
+                  if (onStatusClick) {
+                    e.stopPropagation();
+                    onStatusClick({
+                      id: peca.id,
+                      sku: peca.sku,
+                      status: peca.status,
+                      localizacao: peca.localizacao,
+                    });
+                  }
+                }}
+                title={onStatusClick ? "Clique para alterar status" : undefined}
+              >
+                <StatusBadge type="peca" status={peca.status} size="sm" />
+              </div>
             </TableCell>
             <TableCell className="text-sm">{peca.localizacao}</TableCell>
+            {podeVerValores && (
+              <TableCell>
+                {peca.origemTipo === "CONSIGNACAO" ? (
+                  // Consignação: só mostra status de repasse após a venda
+                  peca.status === "VENDIDA" ? (
+                    <StatusBadge
+                      type="repasse"
+                      status={
+                        peca.statusPagamentoFornecedor === "PAGO" ? "FEITO" :
+                        peca.statusPagamentoFornecedor === "PARCIAL" ? "PARCIAL" : "PENDENTE"
+                      }
+                      size="sm"
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">-</span>
+                  )
+                ) : (
+                  // Compra: mostra status de pagamento sempre
+                  <StatusBadge
+                    type="pagamento"
+                    status={peca.statusPagamentoFornecedor || "NAO_PAGO"}
+                    size="sm"
+                  />
+                )}
+              </TableCell>
+            )}
             {podeVerValores && (
               <TableCell className="text-right font-medium">
                 {peca.valorEstimadoVenda
@@ -118,5 +185,24 @@ export function PecasTable({
         ))}
       </TableBody>
     </Table>
+
+    {/* Modal de visualizacao da imagem */}
+    <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+      <DialogContent className="max-w-3xl p-2">
+        {selectedImage && (
+          <div className="flex flex-col items-center">
+            <img
+              src={selectedImage.url}
+              alt={selectedImage.sku}
+              className="max-h-[80vh] w-auto object-contain rounded"
+            />
+            <p className="mt-2 text-sm text-muted-foreground font-mono">
+              {selectedImage.sku}
+            </p>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

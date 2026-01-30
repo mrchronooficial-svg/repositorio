@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,18 +15,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PecasTable } from "@/components/tables/pecas-table";
+import { StatusDialog } from "@/components/dialogs/status-dialog";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/formatters";
 
+interface SelectedPeca {
+  id: string;
+  sku: string;
+  status: string;
+  localizacao: string;
+}
+
 export function EstoquePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { podeVerValores } = usePermissions();
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string | undefined>();
   const [localizacao, setLocalizacao] = useState<string | undefined>();
   const [page, setPage] = useState(1);
+
+  // Estado para o modal de status
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [selectedPeca, setSelectedPeca] = useState<SelectedPeca | null>(null);
 
   const { data, isLoading } = useQuery(
     trpc.peca.list.queryOptions({
@@ -49,6 +62,16 @@ export function EstoquePage() {
   };
 
   const temFiltros = search || status || localizacao;
+
+  const handleStatusClick = (peca: SelectedPeca) => {
+    setSelectedPeca(peca);
+    setStatusDialogOpen(true);
+  };
+
+  const handleStatusSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
+    queryClient.invalidateQueries({ queryKey: ["peca", "getMetricas"] });
+  };
 
   return (
     <div className="space-y-6">
@@ -193,6 +216,7 @@ export function EstoquePage() {
         isLoading={isLoading}
         podeVerValores={podeVerValores}
         onView={(id) => router.push(`/estoque/${id}`)}
+        onStatusClick={handleStatusClick}
       />
 
       {/* Paginacao */}
@@ -216,6 +240,18 @@ export function EstoquePage() {
             Proxima
           </Button>
         </div>
+      )}
+
+      {/* Dialog de alteracao de status */}
+      {selectedPeca && (
+        <StatusDialog
+          open={statusDialogOpen}
+          onOpenChange={setStatusDialogOpen}
+          pecaId={selectedPeca.id}
+          currentStatus={selectedPeca.status}
+          currentLocalizacao={selectedPeca.localizacao}
+          onSuccess={handleStatusSuccess}
+        />
       )}
     </div>
   );
