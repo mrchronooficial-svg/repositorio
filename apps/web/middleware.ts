@@ -16,7 +16,9 @@ export async function middleware(request: NextRequest) {
   }
 
   // Verificar cookie de sessão do Better Auth
-  const sessionCookie = request.cookies.get("better-auth.session_token");
+  // Em produção (HTTPS), o cookie tem prefixo __Secure-
+  const sessionCookie = request.cookies.get("__Secure-better-auth.session_token")
+    || request.cookies.get("better-auth.session_token");
 
   // Sem sessão, redireciona para login
   if (!sessionCookie) {
