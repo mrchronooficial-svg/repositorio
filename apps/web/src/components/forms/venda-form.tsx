@@ -7,6 +7,7 @@ import { Loader2, Search, Check, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ interface VendaData {
   formaPagamento: "PIX" | "CREDITO_VISTA" | "CREDITO_PARCELADO";
   parcelas: string;
   pagamentoInicial: string;
+  observacaoLogistica: string;
 }
 
 const defaultData: VendaData = {
@@ -37,6 +39,7 @@ const defaultData: VendaData = {
   formaPagamento: "PIX",
   parcelas: "",
   pagamentoInicial: "",
+  observacaoLogistica: "",
 };
 
 export function VendaForm() {
@@ -143,6 +146,7 @@ export function VendaForm() {
       pagamentoInicial: data.pagamentoInicial
         ? parseFloat(data.pagamentoInicial)
         : undefined,
+      observacaoLogistica: data.observacaoLogistica || undefined,
     });
   };
 
@@ -489,6 +493,28 @@ export function VendaForm() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Observacao de Logistica */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Logistica</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="observacaoLogistica">Observacao para Envio</Label>
+            <Textarea
+              id="observacaoLogistica"
+              value={data.observacaoLogistica}
+              onChange={(e) => handleChange("observacaoLogistica", e.target.value)}
+              placeholder="Ex: Cliente solicitou envio expresso, entregar em maos, etc."
+              rows={3}
+            />
+            <p className="text-xs text-muted-foreground">
+              Opcional. Esta observacao aparecera na aba de logistica.
+            </p>
+          </div>
         </CardContent>
       </Card>
 

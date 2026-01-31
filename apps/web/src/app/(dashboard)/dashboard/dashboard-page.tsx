@@ -17,6 +17,7 @@ import {
   CheckCircle,
   Banknote,
   CreditCard,
+  PackageX,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,11 @@ export function DashboardPage() {
   // Buscar dividas com fornecedores
   const { data: dividasFornecedores } = useQuery(
     trpc.dashboard.getDividasFornecedores.queryOptions()
+  );
+
+  // Buscar alertas de envio pendente
+  const { data: alertasEnvio } = useQuery(
+    trpc.logistica.getAlertasEnvio.queryOptions()
   );
 
   // Verificar alertas automaticamente
@@ -123,6 +129,30 @@ export function DashboardPage() {
               onClick={() => router.push("/estoque/novo")}
             >
               Cadastrar Peca
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Alerta de envio pendente */}
+      {alertasEnvio && alertasEnvio.vendasAtrasadas.length > 0 && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+              <PackageX className="h-5 w-5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-red-800">Envios Pendentes</p>
+              <p className="text-sm text-red-700">
+                {alertasEnvio.vendasAtrasadas.length} {alertasEnvio.vendasAtrasadas.length === 1 ? "peca vendida ha" : "pecas vendidas ha"} mais de {alertasEnvio.diasAlerta} dias sem envio.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              className="border-red-300 text-red-800 hover:bg-red-100"
+              onClick={() => router.push("/logistica")}
+            >
+              Ver Logistica
             </Button>
           </CardContent>
         </Card>

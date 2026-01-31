@@ -14,6 +14,7 @@ const VendaCreateSchema = z.object({
   formaPagamento: z.enum(["PIX", "CREDITO_VISTA", "CREDITO_PARCELADO"]),
   parcelas: z.number().int().min(1).max(12).optional(),
   pagamentoInicial: z.number().min(0).optional(),
+  observacaoLogistica: z.string().optional(),
 });
 
 const VendaListSchema = z.object({
@@ -226,6 +227,7 @@ export const vendaRouter = router({
           valorRepasseDevido,
           valorRepasseFeito: valorRepasseDevido ? 0 : null,
           statusRepasse,
+          observacaoLogistica: input.observacaoLogistica || null,
         },
       });
 

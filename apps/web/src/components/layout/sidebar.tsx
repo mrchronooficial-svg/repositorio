@@ -11,6 +11,7 @@ import {
   Settings,
   Watch,
   Crown,
+  PackageCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +37,12 @@ const menuItems = [
     href: "/vendas",
     icon: ShoppingCart,
     color: "from-sky-400 to-sky-600",
+  },
+  {
+    label: "Logistica",
+    href: "/logistica",
+    icon: PackageCheck,
+    color: "from-teal-400 to-teal-600",
   },
   {
     label: "Clientes",

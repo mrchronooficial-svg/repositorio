@@ -8,6 +8,7 @@ const CHAVES_CONFIGURACAO = [
   "LEAD_TIME_DIAS",
   "META_VENDAS_SEMANAL",
   "ALERTA_DIAS_RELOJOEIRO",
+  "dias_alerta_envio",
 ] as const;
 
 type ChaveConfiguracao = (typeof CHAVES_CONFIGURACAO)[number];
@@ -18,6 +19,7 @@ const VALORES_PADRAO: Record<ChaveConfiguracao, string> = {
   LEAD_TIME_DIAS: "20",
   META_VENDAS_SEMANAL: "10",
   ALERTA_DIAS_RELOJOEIRO: "14",
+  dias_alerta_envio: "3",
 };
 
 export const configuracaoRouter = router({

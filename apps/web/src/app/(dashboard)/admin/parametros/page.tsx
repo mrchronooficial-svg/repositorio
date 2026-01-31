@@ -21,6 +21,7 @@ export default function ParametrosPage() {
   const [leadTime, setLeadTime] = useState("");
   const [metaSemanal, setMetaSemanal] = useState("");
   const [diasRelojoeiro, setDiasRelojoeiro] = useState("");
+  const [diasAlertaEnvio, setDiasAlertaEnvio] = useState("");
 
   const queryOptions = trpc.configuracao.getAll.queryOptions();
   const { data: configs, isLoading } = useQuery(queryOptions);
@@ -32,6 +33,7 @@ export default function ParametrosPage() {
       setLeadTime(configs.LEAD_TIME_DIAS);
       setMetaSemanal(configs.META_VENDAS_SEMANAL);
       setDiasRelojoeiro(configs.ALERTA_DIAS_RELOJOEIRO);
+      setDiasAlertaEnvio(configs.dias_alerta_envio || "3");
     }
   }, [configs]);
 
@@ -87,12 +89,19 @@ export default function ParametrosPage() {
       return;
     }
 
+    const diasEnvioNum = parseInt(diasAlertaEnvio);
+    if (isNaN(diasEnvioNum) || diasEnvioNum < 1) {
+      toast.error("Dias do Alerta de Envio deve ser um numero inteiro maior que zero");
+      return;
+    }
+
     updateMutation.mutate({
       configuracoes: [
         { chave: "TAXA_MDR", valor: taxaMDR },
         { chave: "LEAD_TIME_DIAS", valor: leadTime },
         { chave: "META_VENDAS_SEMANAL", valor: metaSemanal },
         { chave: "ALERTA_DIAS_RELOJOEIRO", valor: diasRelojoeiro },
+        { chave: "dias_alerta_envio", valor: diasAlertaEnvio },
       ],
     });
   };
@@ -266,6 +275,22 @@ export default function ParametrosPage() {
                     Gerar alerta quando peca estiver em revisao ha mais de X dias
                   </p>
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="diasAlertaEnvio">
+                    Alerta de Envio Pendente (dias)
+                  </Label>
+                  <Input
+                    id="diasAlertaEnvio"
+                    type="number"
+                    min="1"
+                    value={diasAlertaEnvio}
+                    onChange={(e) => setDiasAlertaEnvio(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Gerar alerta quando peca vendida ha mais de X dias nao foi enviada
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -291,9 +316,13 @@ export default function ParametrosPage() {
                     <span className="text-muted-foreground">Meta Semanal</span>
                     <span className="font-medium">10 pecas</span>
                   </div>
-                  <div className="flex justify-between py-2">
+                  <div className="flex justify-between py-2 border-b">
                     <span className="text-muted-foreground">Alerta Relojoeiro</span>
                     <span className="font-medium">14 dias</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-muted-foreground">Alerta Envio</span>
+                    <span className="font-medium">3 dias</span>
                   </div>
                 </div>
               </CardContent>

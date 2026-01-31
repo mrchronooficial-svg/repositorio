@@ -77,6 +77,12 @@ enum TipoAlerta {
   ESTOQUE_BAIXO
   RELOJOEIRO_DEMORADO
   REPASSE_PENDENTE
+  ENVIO_PENDENTE
+}
+
+enum StatusEnvio {
+  PENDENTE
+  ENVIADO
 }
 
 // ============================================
@@ -282,6 +288,10 @@ model Venda {
   // Cancelamento/Devolução
   cancelada        Boolean        @default(false)
   dataCancelamento DateTime?
+  // Logística/Envio
+  statusEnvio        StatusEnvio   @default(PENDENTE)
+  dataEnvio          DateTime?
+  observacaoLogistica String?
   // Datas
   dataVenda DateTime @default(now())
   createdAt DateTime @default(now())
