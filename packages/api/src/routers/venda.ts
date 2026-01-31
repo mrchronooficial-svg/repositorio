@@ -67,7 +67,12 @@ export const vendaRouter = router({
           orderBy: { dataVenda: "desc" },
           include: {
             peca: {
-              select: { sku: true, marca: true, modelo: true },
+              select: {
+                sku: true,
+                marca: true,
+                modelo: true,
+                fotos: { take: 1, select: { url: true } },
+              },
             },
             cliente: {
               select: { nome: true },

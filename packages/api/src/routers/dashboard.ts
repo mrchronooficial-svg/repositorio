@@ -369,6 +369,104 @@ export const dashboardRouter = router({
     });
   }),
 
+  // Dividas com fornecedores (repasses + pagamentos de pecas compradas)
+  getDividasFornecedores: protectedProcedure.query(async ({ ctx }) => {
+    const userNivel = ctx.session.user.nivel;
+    if (userNivel === "FUNCIONARIO") {
+      return null;
+    }
+
+    // 1. Repasses pendentes (pecas consignadas que foram vendidas)
+    const repassesPendentes = await prisma.venda.findMany({
+      where: {
+        cancelada: false,
+        statusRepasse: { in: ["PENDENTE", "PARCIAL"] },
+        peca: { origemTipo: "CONSIGNACAO" },
+      },
+      select: {
+        id: true,
+        valorRepasseDevido: true,
+        valorRepasseFeito: true,
+        dataVenda: true,
+        peca: {
+          select: {
+            sku: true,
+            marca: true,
+            modelo: true,
+            fornecedor: { select: { nome: true } },
+          },
+        },
+      },
+      orderBy: { dataVenda: "asc" },
+    });
+
+    const totalRepassePendente = repassesPendentes.reduce((sum, v) => {
+      const devido = Number(v.valorRepasseDevido) || 0;
+      const feito = Number(v.valorRepasseFeito) || 0;
+      return sum + (devido - feito);
+    }, 0);
+
+    // 2. Pagamentos de pecas compradas pendentes (NAO_PAGO ou PARCIAL)
+    const pagamentosPendentes = await prisma.peca.findMany({
+      where: {
+        origemTipo: "COMPRA",
+        statusPagamentoFornecedor: { in: ["NAO_PAGO", "PARCIAL"] },
+        arquivado: false,
+      },
+      select: {
+        id: true,
+        sku: true,
+        marca: true,
+        modelo: true,
+        valorCompra: true,
+        valorPagoFornecedor: true,
+        createdAt: true,
+        fornecedor: { select: { nome: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const totalPagamentoPendente = pagamentosPendentes.reduce((sum, p) => {
+      const compra = Number(p.valorCompra) || 0;
+      const pago = Number(p.valorPagoFornecedor) || 0;
+      return sum + (compra - pago);
+    }, 0);
+
+    return {
+      repasses: {
+        total: totalRepassePendente,
+        quantidade: repassesPendentes.length,
+        itens: repassesPendentes.slice(0, 5).map((v) => ({
+          id: v.id,
+          sku: v.peca.sku,
+          marca: v.peca.marca,
+          modelo: v.peca.modelo,
+          fornecedor: v.peca.fornecedor.nome,
+          devido: Number(v.valorRepasseDevido) || 0,
+          pago: Number(v.valorRepasseFeito) || 0,
+          pendente: (Number(v.valorRepasseDevido) || 0) - (Number(v.valorRepasseFeito) || 0),
+          dataVenda: v.dataVenda,
+        })),
+      },
+      pagamentos: {
+        total: totalPagamentoPendente,
+        quantidade: pagamentosPendentes.length,
+        itens: pagamentosPendentes.slice(0, 5).map((p) => ({
+          id: p.id,
+          sku: p.sku,
+          marca: p.marca,
+          modelo: p.modelo,
+          fornecedor: p.fornecedor.nome,
+          valorCompra: Number(p.valorCompra) || 0,
+          valorPago: Number(p.valorPagoFornecedor) || 0,
+          pendente: (Number(p.valorCompra) || 0) - (Number(p.valorPagoFornecedor) || 0),
+          dataCadastro: p.createdAt,
+        })),
+      },
+      totalGeral: totalRepassePendente + totalPagamentoPendente,
+    };
+  }),
+
   // Recebiveis pendentes detalhados
   getRecebiveisPendentes: protectedProcedure.query(async ({ ctx }) => {
     const userNivel = ctx.session.user.nivel;

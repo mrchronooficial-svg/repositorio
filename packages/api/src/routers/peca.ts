@@ -13,7 +13,8 @@ const PecaCreateSchema = z.object({
   tamanhoCaixa: z.number().positive("Tamanho deve ser positivo"),
   materialCaixa: z.string().optional(),
   materialPulseira: z.string().optional(),
-  valorCompra: z.number().positive("Valor de compra deve ser positivo"),
+  // Valor de compra: positivo para COMPRA, zero permitido para CONSIGNACAO
+  valorCompra: z.number().nonnegative("Valor de compra nao pode ser negativo"),
   valorEstimadoVenda: z.number().positive("Valor estimado deve ser positivo"),
   origemTipo: z.enum(["COMPRA", "CONSIGNACAO"]),
   origemCanal: z.enum(["PESSOA_FISICA", "LEILAO_BRASIL", "EBAY"]).optional(),
@@ -21,7 +22,19 @@ const PecaCreateSchema = z.object({
   localizacao: z.string().default("Fornecedor"),
   fornecedorId: z.string().cuid("Fornecedor invalido"),
   fotos: z.array(z.string().min(1)).min(1, "Minimo 1 foto obrigatoria"),
-});
+}).refine(
+  (data) => {
+    // Se for COMPRA, valor de compra deve ser positivo (maior que 0)
+    if (data.origemTipo === "COMPRA" && data.valorCompra <= 0) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "Valor de compra deve ser positivo para compras",
+    path: ["valorCompra"],
+  }
+);
 
 const PecaUpdateSchema = z.object({
   id: z.string().cuid(),

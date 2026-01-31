@@ -16,6 +16,7 @@ import {
   Wrench,
   CheckCircle,
   Banknote,
+  CreditCard,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,11 @@ export function DashboardPage() {
   // Buscar recebiveis pendentes
   const { data: recebiveis } = useQuery(
     trpc.dashboard.getRecebiveisPendentes.queryOptions()
+  );
+
+  // Buscar dividas com fornecedores
+  const { data: dividasFornecedores } = useQuery(
+    trpc.dashboard.getDividasFornecedores.queryOptions()
   );
 
   // Verificar alertas automaticamente
@@ -234,6 +240,39 @@ export function DashboardPage() {
                   ? formatCurrency(metricas.financeiro.repassesPendentes)
                   : "-"}
               </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Dividas com Fornecedores (apenas para quem pode ver valores) */}
+        {podeVerValores && dividasFornecedores && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                A Pagar (Fornecedores)
+              </CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {formatCurrency(dividasFornecedores.totalGeral)}
+              </div>
+              <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                <p>
+                  Repasses (consignado):{" "}
+                  <span className="font-medium">{formatCurrency(dividasFornecedores.repasses.total)}</span>
+                  {dividasFornecedores.repasses.quantidade > 0 && (
+                    <span className="text-muted-foreground"> ({dividasFornecedores.repasses.quantidade})</span>
+                  )}
+                </p>
+                <p>
+                  Pagamentos (compra):{" "}
+                  <span className="font-medium">{formatCurrency(dividasFornecedores.pagamentos.total)}</span>
+                  {dividasFornecedores.pagamentos.quantidade > 0 && (
+                    <span className="text-muted-foreground"> ({dividasFornecedores.pagamentos.quantidade})</span>
+                  )}
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -562,6 +601,103 @@ export function DashboardPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Dividas com Fornecedores - Detalhado (apenas para quem pode ver valores) */}
+      {podeVerValores && dividasFornecedores && dividasFornecedores.totalGeral > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Repasses Pendentes (Consignados) */}
+          {dividasFornecedores.repasses.quantidade > 0 && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Repasses Pendentes</CardTitle>
+                  <p className="text-sm text-muted-foreground">Pecas consignadas vendidas</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-red-600">
+                    {formatCurrency(dividasFornecedores.repasses.total)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {dividasFornecedores.repasses.quantidade} peca(s)
+                  </p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {dividasFornecedores.repasses.itens.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                      onClick={() => router.push(`/vendas/${item.id}`)}
+                    >
+                      <div>
+                        <p className="font-mono text-sm">{item.sku}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.fornecedor}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-red-600">
+                          {formatCurrency(item.pendente)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          de {formatCurrency(item.devido)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Pagamentos Pendentes (Compras) */}
+          {dividasFornecedores.pagamentos.quantidade > 0 && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Pagamentos Pendentes</CardTitle>
+                  <p className="text-sm text-muted-foreground">Pecas compradas nao pagas</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-red-600">
+                    {formatCurrency(dividasFornecedores.pagamentos.total)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {dividasFornecedores.pagamentos.quantidade} peca(s)
+                  </p>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {dividasFornecedores.pagamentos.itens.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                      onClick={() => router.push(`/estoque/${item.id}`)}
+                    >
+                      <div>
+                        <p className="font-mono text-sm">{item.sku}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.fornecedor}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-red-600">
+                          {formatCurrency(item.pendente)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          de {formatCurrency(item.valorCompra)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
     </div>
   );

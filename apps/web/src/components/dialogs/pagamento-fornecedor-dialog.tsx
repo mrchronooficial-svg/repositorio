@@ -31,6 +31,8 @@ interface PagamentoFornecedorDialogProps {
   onSuccess?: () => void;
 }
 
+// Este dialog e apenas para pecas COMPRADAS (nao consignadas)
+// Pecas consignadas tem repasse gerenciado na venda
 export function PagamentoFornecedorDialog({
   open,
   onOpenChange,
@@ -114,8 +116,8 @@ export function PagamentoFornecedorDialog({
         {isConsignacaoNaoVendida ? (
           <div className="py-4">
             <p className="text-amber-600 bg-amber-50 p-4 rounded-lg">
-              Esta peca e consignada e ainda nao foi vendida. O pagamento ao
-              fornecedor so pode ser registrado apos a venda.
+              Pecas consignadas nao tem pagamento ao fornecedor. O repasse e
+              gerenciado atraves da venda, apos a peca ser vendida.
             </p>
           </div>
         ) : (
