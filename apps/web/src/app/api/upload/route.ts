@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
+import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
 
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
@@ -33,22 +31,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Criar diretorio se nao existir
-    await mkdir(UPLOAD_DIR, { recursive: true });
-
     // Gerar nome unico
     const ext = file.name.split(".").pop();
-    const filename = `${nanoid()}.${ext}`;
-    const filepath = join(UPLOAD_DIR, filename);
+    const filename = `uploads/${nanoid()}.${ext}`;
 
-    // Salvar arquivo
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    await writeFile(filepath, buffer);
+    // Upload para Vercel Blob
+    const blob = await put(filename, file, {
+      access: "public",
+    });
 
-    // Retornar URL
-    const url = `/uploads/${filename}`;
-    return NextResponse.json({ url });
+    // Retornar URL do blob
+    return NextResponse.json({ url: blob.url });
   } catch (error) {
     console.error("Erro no upload:", error);
     return NextResponse.json(
