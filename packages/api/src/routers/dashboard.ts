@@ -467,6 +467,50 @@ export const dashboardRouter = router({
     };
   }),
 
+  // Metricas de valor do estoque
+  getMetricasValorEstoque: protectedProcedure.query(async ({ ctx }) => {
+    const userNivel = ctx.session.user.nivel;
+    if (userNivel === "FUNCIONARIO") {
+      return null;
+    }
+
+    // Status que contam como "em estoque"
+    const statusEmEstoque = ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] as const;
+
+    // Total de pecas (todos os status, nao arquivadas)
+    const totalPecas = await prisma.peca.count({
+      where: {
+        arquivado: false,
+        status: { in: [...statusEmEstoque] },
+      },
+    });
+
+    // Valor em custo (apenas pecas COMPRADAS - consignado nao teve gasto de caixa)
+    const custoEstoque = await prisma.peca.aggregate({
+      _sum: { valorCompra: true },
+      where: {
+        arquivado: false,
+        status: { in: [...statusEmEstoque] },
+        origemTipo: "COMPRA",
+      },
+    });
+
+    // Valor em faturamento (soma do valor estimado de venda de todas as pecas em estoque)
+    const faturamentoEstoque = await prisma.peca.aggregate({
+      _sum: { valorEstimadoVenda: true },
+      where: {
+        arquivado: false,
+        status: { in: [...statusEmEstoque] },
+      },
+    });
+
+    return {
+      totalPecas,
+      valorCusto: Number(custoEstoque._sum.valorCompra) || 0,
+      valorFaturamento: Number(faturamentoEstoque._sum.valorEstimadoVenda) || 0,
+    };
+  }),
+
   // Recebiveis pendentes detalhados
   getRecebiveisPendentes: protectedProcedure.query(async ({ ctx }) => {
     const userNivel = ctx.session.user.nivel;

@@ -9,6 +9,7 @@ import { configuracaoRouter } from "./configuracao";
 import { adminRouter } from "./admin";
 import { auditoriaRouter } from "./auditoria";
 import { logisticaRouter } from "./logistica";
+import { utensilioRouter } from "./utensilio";
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -30,5 +31,6 @@ export const appRouter = router({
   admin: adminRouter,
   auditoria: auditoriaRouter,
   logistica: logisticaRouter,
+  utensilio: utensilioRouter,
 });
 export type AppRouter = typeof appRouter;

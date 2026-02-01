@@ -101,7 +101,7 @@ export function PecasTable({
         {pecas.map((peca) => (
           <TableRow
             key={peca.id}
-            className="cursor-pointer hover:bg-muted/50"
+            className={`cursor-pointer hover:bg-muted/50 ${peca.status === "VENDIDA" ? "bg-green-100" : ""}`}
             onClick={() => onView(peca.id)}
           >
             <TableCell className="py-2">

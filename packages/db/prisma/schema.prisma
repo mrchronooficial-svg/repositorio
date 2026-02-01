@@ -354,6 +354,21 @@ model Configuracao {
 }
 
 // ============================================
+// UTENSÍLIOS DE EMBALAGEM
+// ============================================
+
+model Utensilio {
+  id               String   @id @default(cuid())
+  nome             String   @unique
+  quantidade       Int      @default(0)
+  quantidadeMinima Int      @default(5)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("utensilios")
+}
+
+// ============================================
 // ALERTAS
 // ============================================
 

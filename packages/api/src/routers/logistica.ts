@@ -86,6 +86,14 @@ export const logisticaRouter = router({
         },
       });
 
+      // Subtrair 1 de cada utensílio de embalagem
+      await prisma.utensilio.updateMany({
+        where: { quantidade: { gt: 0 } },
+        data: {
+          quantidade: { decrement: 1 },
+        },
+      });
+
       await registrarAuditoria({
         userId: ctx.user.id,
         acao: "MARCAR_ENVIADO",

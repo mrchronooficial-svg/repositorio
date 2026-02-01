@@ -18,6 +18,7 @@ import {
   Banknote,
   CreditCard,
   PackageX,
+  Box,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -68,9 +69,19 @@ export function DashboardPage() {
     trpc.dashboard.getDividasFornecedores.queryOptions()
   );
 
+  // Buscar metricas de valor do estoque
+  const { data: metricasValorEstoque } = useQuery(
+    trpc.dashboard.getMetricasValorEstoque.queryOptions()
+  );
+
   // Buscar alertas de envio pendente
   const { data: alertasEnvio } = useQuery(
     trpc.logistica.getAlertasEnvio.queryOptions()
+  );
+
+  // Buscar utensílios de embalagem
+  const { data: utensilios } = useQuery(
+    trpc.utensilio.list.queryOptions()
   );
 
   // Verificar alertas automaticamente
@@ -154,6 +165,90 @@ export function DashboardPage() {
             >
               Ver Logistica
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Card de Valor do Estoque */}
+      {podeVerValores && metricasValorEstoque && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Valor do Estoque
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Total de Pecas</p>
+                <p className="text-2xl font-bold">{metricasValorEstoque.totalPecas}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Valor em Custo</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {formatCurrency(metricasValorEstoque.valorCusto)}
+                </p>
+                <p className="text-xs text-muted-foreground">apenas compras</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Valor em Faturamento</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {formatCurrency(metricasValorEstoque.valorFaturamento)}
+                </p>
+                <p className="text-xs text-muted-foreground">valor de venda estimado</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Card de Utensílios de Embalagem */}
+      {utensilios && utensilios.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Box className="h-5 w-5" />
+              Utensilios de Embalagem
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              {utensilios.map((utensilio) => {
+                const estoqueBaixo = utensilio.quantidade <= utensilio.quantidadeMinima;
+                return (
+                  <div
+                    key={utensilio.id}
+                    className={cn(
+                      "text-center p-3 rounded-lg border",
+                      estoqueBaixo ? "border-red-200 bg-red-50" : "border-gray-200"
+                    )}
+                  >
+                    <p className="text-sm text-muted-foreground truncate" title={utensilio.nome}>
+                      {utensilio.nome}
+                    </p>
+                    <p className={cn(
+                      "text-2xl font-bold",
+                      estoqueBaixo ? "text-red-600" : ""
+                    )}>
+                      {utensilio.quantidade}
+                    </p>
+                    {estoqueBaixo && (
+                      <p className="text-xs text-red-500">Estoque baixo!</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 text-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/admin?tab=utensilios")}
+              >
+                Gerenciar Utensilios
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

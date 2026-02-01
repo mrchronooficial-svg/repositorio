@@ -11,6 +11,7 @@ import {
   ShoppingCart,
   UserCheck,
   Truck,
+  Box,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,10 @@ export function AdminPage() {
 
   const { data: auditoriaStats } = useQuery(
     trpc.auditoria.getStats.queryOptions()
+  );
+
+  const { data: utensilios } = useQuery(
+    trpc.utensilio.list.queryOptions()
   );
 
   if (isLoading) {
@@ -142,6 +147,45 @@ export function AdminPage() {
                 <p className="text-2xl font-bold">{auditoriaStats?.mes ?? 0}</p>
                 <p className="text-xs text-muted-foreground">mes</p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Utensilios */}
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => router.push("/admin/utensilios")}
+        >
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
+              <Box className="h-5 w-5 text-green-600" />
+            </div>
+            <Button variant="ghost" size="sm">
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <CardTitle className="text-lg">Utensilios</CardTitle>
+            <CardDescription className="mt-1">
+              Materiais de embalagem
+            </CardDescription>
+            <div className="mt-4">
+              {utensilios && utensilios.length > 0 ? (
+                <div className="flex items-center gap-4">
+                  <div>
+                    <p className="text-2xl font-bold">{utensilios.length}</p>
+                    <p className="text-xs text-muted-foreground">tipos</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-amber-600">
+                      {utensilios.filter((u) => u.quantidade <= u.quantidadeMinima).length}
+                    </p>
+                    <p className="text-xs text-muted-foreground">em baixa</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nao configurado</p>
+              )}
             </div>
           </CardContent>
         </Card>
