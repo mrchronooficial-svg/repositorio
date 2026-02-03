@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { StatusDialog } from "@/components/dialogs/status-dialog";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/formatters";
+import { toast } from "sonner";
 
 interface SelectedPeca {
   id: string;
@@ -30,7 +31,7 @@ interface SelectedPeca {
 export function EstoquePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { podeVerValores } = usePermissions();
+  const { podeVerValores, isAdmin } = usePermissions();
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string | undefined>();
@@ -71,6 +72,22 @@ export function EstoquePage() {
   const handleStatusSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
     queryClient.invalidateQueries({ queryKey: ["peca", "getMetricas"] });
+  };
+
+  // Mutation para deletar peca
+  const deleteMutation = useMutation(trpc.peca.delete.mutationOptions());
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync({ id });
+      toast.success("Peca excluida com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
+      queryClient.invalidateQueries({ queryKey: ["peca", "getMetricas"] });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao excluir peca";
+      toast.error(message);
+      throw error;
+    }
   };
 
   return (
@@ -215,8 +232,10 @@ export function EstoquePage() {
         pecas={data?.pecas ?? []}
         isLoading={isLoading}
         podeVerValores={podeVerValores}
+        podeExcluir={isAdmin}
         onView={(id) => router.push(`/estoque/${id}`)}
         onStatusClick={handleStatusClick}
+        onDelete={handleDelete}
       />
 
       {/* Paginacao */}

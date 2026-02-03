@@ -290,6 +290,8 @@ model Venda {
   // Logística/Envio
   statusEnvio         StatusEnvio   @default(PENDENTE)
   dataEnvio           DateTime?
+  codigoRastreio      String?
+  tipoEntrega         String?       // RETIRADA_PESSOALMENTE, ENTREGA_RJ ou null para envio normal
   observacaoLogistica String?
   // Datas
   dataVenda DateTime @default(now())

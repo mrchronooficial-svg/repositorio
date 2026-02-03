@@ -49,6 +49,18 @@ export const STATUS_REPASSE_COLORS: Record<string, string> = {
   PENDENTE: "bg-red-100 text-red-800",
 };
 
+export const STATUS_ENVIO_LABELS: Record<string, string> = {
+  PENDENTE: "Pendente",
+  ENVIADO: "Enviado",
+  ENTREGUE: "Entregue",
+};
+
+export const STATUS_ENVIO_COLORS: Record<string, string> = {
+  PENDENTE: "bg-orange-100 text-orange-800",
+  ENVIADO: "bg-green-100 text-green-800",
+  ENTREGUE: "bg-blue-100 text-blue-800",
+};
+
 export const FORMA_PAGAMENTO_LABELS: Record<string, string> = {
   PIX: "PIX",
   CREDITO_VISTA: "Crédito à Vista",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,10 +19,25 @@ import {
   CreditCard,
   PackageX,
   Box,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { StatusBadge } from "@/components/status-badge";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -33,6 +48,8 @@ export function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { podeVerValores } = usePermissions();
+  const [showRecebiveisModal, setShowRecebiveisModal] = useState(false);
+  const [showDividasModal, setShowDividasModal] = useState(false);
 
   // Buscar metricas
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery(
@@ -346,7 +363,10 @@ export function DashboardPage() {
 
         {/* Recebiveis (apenas para quem pode ver valores) */}
         {podeVerValores && (
-          <Card>
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setShowRecebiveisModal(true)}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 A Receber
@@ -371,7 +391,10 @@ export function DashboardPage() {
 
         {/* Dividas com Fornecedores (apenas para quem pode ver valores) */}
         {podeVerValores && dividasFornecedores && (
-          <Card>
+          <Card
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setShowDividasModal(true)}
+          >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 A Pagar (Fornecedores)
@@ -824,6 +847,183 @@ export function DashboardPage() {
           )}
         </div>
       )}
+
+      {/* Modal de Recebiveis Pendentes */}
+      <Dialog open={showRecebiveisModal} onOpenChange={setShowRecebiveisModal}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Banknote className="h-5 w-5 text-amber-600" />
+              Valores a Receber
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {!recebiveis || recebiveis.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhum valor pendente de recebimento.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Peca (SKU)</TableHead>
+                    <TableHead>Data da Compra</TableHead>
+                    <TableHead className="text-right">Valor Devido</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recebiveis.map((item) => (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => {
+                        setShowRecebiveisModal(false);
+                        router.push(`/vendas/${item.id}`);
+                      }}
+                    >
+                      <TableCell className="font-medium">{item.cliente}</TableCell>
+                      <TableCell className="font-mono">{item.sku}</TableCell>
+                      <TableCell>{formatDate(item.dataVenda)}</TableCell>
+                      <TableCell className="text-right font-medium text-amber-600">
+                        {formatCurrency(item.saldoDevedor)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+            {recebiveis && recebiveis.length > 0 && (
+              <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  {recebiveis.length} venda(s) com pagamento pendente
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowRecebiveisModal(false);
+                    router.push("/vendas?statusPagamento=NAO_PAGO");
+                  }}
+                >
+                  Ver todas as vendas
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Dividas com Fornecedores */}
+      <Dialog open={showDividasModal} onOpenChange={setShowDividasModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-red-600" />
+              Valores a Pagar (Fornecedores)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4 space-y-6">
+            {dividasFornecedores && dividasFornecedores.totalGeral > 0 ? (
+              <>
+                {/* Total Geral */}
+                <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
+                  <span className="font-medium text-red-800">Total a Pagar</span>
+                  <span className="text-2xl font-bold text-red-600">
+                    {formatCurrency(dividasFornecedores.totalGeral)}
+                  </span>
+                </div>
+
+                {/* Repasses Pendentes (Consignados) */}
+                {dividasFornecedores.repasses.quantidade > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold">Repasses Pendentes (Consignados)</h3>
+                      <span className="text-sm text-muted-foreground">
+                        {dividasFornecedores.repasses.quantidade} peca(s) - {formatCurrency(dividasFornecedores.repasses.total)}
+                      </span>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fornecedor</TableHead>
+                          <TableHead>Peca (SKU)</TableHead>
+                          <TableHead className="text-right">Valor Devido</TableHead>
+                          <TableHead className="text-right">Valor Pendente</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dividasFornecedores.repasses.itens.map((item) => (
+                          <TableRow
+                            key={item.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => {
+                              setShowDividasModal(false);
+                              router.push(`/vendas/${item.id}`);
+                            }}
+                          >
+                            <TableCell className="font-medium">{item.fornecedor}</TableCell>
+                            <TableCell className="font-mono">{item.sku}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.devido)}</TableCell>
+                            <TableCell className="text-right font-medium text-red-600">
+                              {formatCurrency(item.pendente)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+
+                {/* Pagamentos Pendentes (Compras) */}
+                {dividasFornecedores.pagamentos.quantidade > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold">Pagamentos Pendentes (Compras)</h3>
+                      <span className="text-sm text-muted-foreground">
+                        {dividasFornecedores.pagamentos.quantidade} peca(s) - {formatCurrency(dividasFornecedores.pagamentos.total)}
+                      </span>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fornecedor</TableHead>
+                          <TableHead>Peca (SKU)</TableHead>
+                          <TableHead className="text-right">Valor Compra</TableHead>
+                          <TableHead className="text-right">Valor Pendente</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dividasFornecedores.pagamentos.itens.map((item) => (
+                          <TableRow
+                            key={item.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => {
+                              setShowDividasModal(false);
+                              router.push(`/estoque/${item.id}`);
+                            }}
+                          >
+                            <TableCell className="font-medium">{item.fornecedor}</TableCell>
+                            <TableCell className="font-mono">{item.sku}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(item.valorCompra)}</TableCell>
+                            <TableCell className="text-right font-medium text-red-600">
+                              {formatCurrency(item.pendente)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhuma obrigacao pendente com fornecedores.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

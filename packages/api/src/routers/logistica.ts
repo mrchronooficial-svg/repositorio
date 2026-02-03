@@ -35,7 +35,14 @@ export const logisticaRouter = router({
           skip,
           take: limit,
           orderBy: { dataVenda: "desc" },
-          include: {
+          select: {
+            id: true,
+            dataVenda: true,
+            statusEnvio: true,
+            dataEnvio: true,
+            codigoRastreio: true,
+            tipoEntrega: true,
+            observacaoLogistica: true,
             peca: {
               select: {
                 sku: true,
@@ -46,7 +53,7 @@ export const logisticaRouter = router({
               },
             },
             cliente: {
-              select: { nome: true },
+              select: { nome: true, cep: true },
             },
           },
         }),
@@ -63,7 +70,11 @@ export const logisticaRouter = router({
 
   // Marcar como enviado
   marcarEnviado: protectedProcedure
-    .input(z.object({ vendaId: z.string().cuid() }))
+    .input(z.object({
+      vendaId: z.string().cuid(),
+      codigoRastreio: z.string().optional(),
+      tipoEntrega: z.enum(["RETIRADA_PESSOALMENTE", "ENTREGA_RJ"]).optional(),
+    }))
     .mutation(async ({ input, ctx }) => {
       const venda = await prisma.venda.findUnique({
         where: { id: input.vendaId },
@@ -83,6 +94,8 @@ export const logisticaRouter = router({
         data: {
           statusEnvio: "ENVIADO",
           dataEnvio: new Date(),
+          codigoRastreio: input.codigoRastreio || null,
+          tipoEntrega: input.tipoEntrega || null,
         },
       });
 
@@ -123,6 +136,8 @@ export const logisticaRouter = router({
         data: {
           statusEnvio: "PENDENTE",
           dataEnvio: null,
+          codigoRastreio: null,
+          tipoEntrega: null,
         },
       });
 

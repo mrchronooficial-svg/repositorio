@@ -127,24 +127,24 @@ export const dashboardRouter = router({
     // Adicionar metricas financeiras se usuario tem permissao
     if (podeVerValores) {
       const [
-        faturamentoMesResult,
-        faturamentoMesAnteriorResult,
+        vendasMesResult,
+        vendasMesAnteriorResult,
         recebiveisResult,
         repassesPendentesResult,
         custoMesResult,
       ] = await Promise.all([
-        // Faturamento do mes (soma de valorFinal das vendas)
-        prisma.venda.aggregate({
-          _sum: { valorFinal: true },
+        // Vendas do mes (para calcular faturamento real)
+        prisma.venda.findMany({
           where: { dataVenda: { gte: inicioMes }, cancelada: false },
+          select: { valorFinal: true, valorRepasseDevido: true },
         }),
-        // Faturamento mes anterior
-        prisma.venda.aggregate({
-          _sum: { valorFinal: true },
+        // Vendas mes anterior (para calcular faturamento real)
+        prisma.venda.findMany({
           where: {
             dataVenda: { gte: inicioMesAnterior, lte: fimMesAnterior },
             cancelada: false,
           },
+          select: { valorFinal: true, valorRepasseDevido: true },
         }),
         // Recebiveis (vendas nao pagas ou parciais)
         prisma.venda.findMany({
@@ -174,8 +174,21 @@ export const dashboardRouter = router({
         }),
       ]);
 
-      const faturamentoMes = Number(faturamentoMesResult._sum.valorFinal) || 0;
-      const faturamentoMesAnterior = Number(faturamentoMesAnteriorResult._sum.valorFinal) || 0;
+      // Calcular faturamento real:
+      // - Compra: valorFinal (receita total)
+      // - Consignacao: valorFinal - valorRepasseDevido (margem da Mr. Chrono)
+      const faturamentoMes = vendasMesResult.reduce((total, v) => {
+        const valorFinal = Number(v.valorFinal) || 0;
+        const valorRepasse = Number(v.valorRepasseDevido) || 0;
+        // Se tem repasse, é consignação: receita = margem
+        return total + (valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal);
+      }, 0);
+
+      const faturamentoMesAnterior = vendasMesAnteriorResult.reduce((total, v) => {
+        const valorFinal = Number(v.valorFinal) || 0;
+        const valorRepasse = Number(v.valorRepasseDevido) || 0;
+        return total + (valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal);
+      }, 0);
 
       const variacaoFaturamento =
         faturamentoMesAnterior > 0
@@ -236,7 +249,7 @@ export const dashboardRouter = router({
       const inicioMes = new Date(data.getFullYear(), data.getMonth(), 1);
       const fimMes = new Date(data.getFullYear(), data.getMonth() + 1, 0, 23, 59, 59);
 
-      const [countVendas, sumFaturamento] = await Promise.all([
+      const [countVendas, vendasDoMes] = await Promise.all([
         prisma.venda.count({
           where: {
             dataVenda: { gte: inicioMes, lte: fimMes },
@@ -244,22 +257,32 @@ export const dashboardRouter = router({
           },
         }),
         podeVerValores
-          ? prisma.venda.aggregate({
-              _sum: { valorFinal: true },
+          ? prisma.venda.findMany({
               where: {
                 dataVenda: { gte: inicioMes, lte: fimMes },
                 cancelada: false,
               },
+              select: { valorFinal: true, valorRepasseDevido: true },
             })
           : null,
       ]);
+
+      // Calcular faturamento real (consignação = margem)
+      let faturamento: number | null = null;
+      if (vendasDoMes) {
+        faturamento = vendasDoMes.reduce((total, v) => {
+          const valorFinal = Number(v.valorFinal) || 0;
+          const valorRepasse = Number(v.valorRepasseDevido) || 0;
+          return total + (valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal);
+        }, 0);
+      }
 
       const nomeMes = inicioMes.toLocaleDateString("pt-BR", { month: "short" });
 
       meses.push({
         mes: nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1),
         vendas: countVendas,
-        faturamento: sumFaturamento ? Number(sumFaturamento._sum.valorFinal) || 0 : null,
+        faturamento,
       });
     }
 

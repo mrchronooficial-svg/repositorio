@@ -39,6 +39,7 @@ interface Venda {
   valorFinal: Decimal | null;
   statusPagamento: string;
   statusRepasse: string | null;
+  statusEnvio: string;
   peca: Peca;
   cliente: Cliente;
 }
@@ -87,6 +88,7 @@ export function VendasTable({
             <TableHead>Cliente</TableHead>
             <TableHead>Pagamento</TableHead>
             <TableHead>Repasse</TableHead>
+            <TableHead>Envio</TableHead>
             {podeVerValores && <TableHead className="text-right">Valor</TableHead>}
           </TableRow>
         </TableHeader>
@@ -132,6 +134,9 @@ export function VendasTable({
                 ) : (
                   <span className="text-muted-foreground text-sm">-</span>
                 )}
+              </TableCell>
+              <TableCell>
+                <StatusBadge type="envio" status={venda.statusEnvio} size="sm" />
               </TableCell>
               {podeVerValores && (
                 <TableCell className="text-right font-medium">

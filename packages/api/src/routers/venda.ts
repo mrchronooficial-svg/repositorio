@@ -573,13 +573,17 @@ export const vendaRouter = router({
           cancelada: false,
           dataVenda: { gte: inicioMes },
         },
-        select: { valorFinal: true },
+        select: { valorFinal: true, valorRepasseDevido: true },
       });
 
-      faturamentoMes = vendasValores.reduce(
-        (acc, v) => acc + Number(v.valorFinal),
-        0
-      );
+      // Calcular faturamento real:
+      // - Compra: valorFinal (receita total)
+      // - Consignacao: valorFinal - valorRepasseDevido (margem)
+      faturamentoMes = vendasValores.reduce((acc, v) => {
+        const valorFinal = Number(v.valorFinal) || 0;
+        const valorRepasse = Number(v.valorRepasseDevido) || 0;
+        return acc + (valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal);
+      }, 0);
     }
 
     return {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Package, Truck, Clock, Search, Check, Undo2 } from "lucide-react";
+import { Package, Truck, Clock, Search, Check, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +24,12 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { trpc } from "@/utils/trpc";
@@ -49,6 +54,11 @@ export default function LogisticaPage() {
   const [page, setPage] = useState(1);
   const [selectedImage, setSelectedImage] = useState<{ url: string; sku: string } | null>(null);
 
+  // Estado para modal de envio
+  const [envioModal, setEnvioModal] = useState<{ vendaId: string; sku: string } | null>(null);
+  const [codigoRastreio, setCodigoRastreio] = useState("");
+  const [tipoEntrega, setTipoEntrega] = useState<"RETIRADA_PESSOALMENTE" | "ENTREGA_RJ" | null>(null);
+
   const queryOptions = trpc.logistica.list.queryOptions({
     page,
     limit: 20,
@@ -67,6 +77,7 @@ export default function LogisticaPage() {
       toast.success("Marcado como enviado!");
       queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
       queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
+      fecharModalEnvio();
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -85,8 +96,32 @@ export default function LogisticaPage() {
     },
   });
 
-  const handleMarcarEnviado = (vendaId: string) => {
-    marcarEnviadoMutation.mutate({ vendaId });
+  const abrirModalEnvio = (vendaId: string, sku: string) => {
+    setEnvioModal({ vendaId, sku });
+    setCodigoRastreio("");
+    setTipoEntrega(null);
+  };
+
+  const fecharModalEnvio = () => {
+    setEnvioModal(null);
+    setCodigoRastreio("");
+    setTipoEntrega(null);
+  };
+
+  const handleConfirmarEnvio = () => {
+    if (!envioModal) return;
+
+    // Validação: só pode não ter código se tiver tipo de entrega selecionado
+    if (!codigoRastreio.trim() && !tipoEntrega) {
+      toast.error("Informe o código de rastreio ou selecione uma opção de entrega");
+      return;
+    }
+
+    marcarEnviadoMutation.mutate({
+      vendaId: envioModal.vendaId,
+      codigoRastreio: codigoRastreio.trim() || undefined,
+      tipoEntrega: tipoEntrega || undefined,
+    });
   };
 
   const handleDesfazerEnvio = (vendaId: string) => {
@@ -211,8 +246,10 @@ export default function LogisticaPage() {
                   <TableHead>SKU</TableHead>
                   <TableHead>Dias</TableHead>
                   <TableHead>Cliente</TableHead>
+                  <TableHead>CEP</TableHead>
                   <TableHead>Localizacao</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Rastreio</TableHead>
                   <TableHead>Observacao</TableHead>
                   <TableHead className="text-right">Acoes</TableHead>
                 </TableRow>
@@ -254,6 +291,9 @@ export default function LogisticaPage() {
                         </div>
                       </TableCell>
                       <TableCell>{venda.cliente.nome}</TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {venda.cliente.cep ? `${venda.cliente.cep.slice(0, 5)}-${venda.cliente.cep.slice(5)}` : "-"}
+                      </TableCell>
                       <TableCell className="text-sm">{venda.peca.localizacao}</TableCell>
                       <TableCell>
                         {venda.statusEnvio === "ENVIADO" ? (
@@ -268,6 +308,24 @@ export default function LogisticaPage() {
                           </span>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {venda.statusEnvio === "ENVIADO" ? (
+                          venda.codigoRastreio ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800" title={venda.codigoRastreio}>
+                              <Check className="h-3 w-3 mr-1" />
+                              Sim
+                            </span>
+                          ) : venda.tipoEntrega ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700" title={venda.tipoEntrega === "RETIRADA_PESSOALMENTE" ? "Retirou pessoalmente" : "Entrega no RJ"}>
+                              {venda.tipoEntrega === "RETIRADA_PESSOALMENTE" ? "Retirada" : "RJ"}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="max-w-[200px]">
                         <p className="text-sm text-muted-foreground truncate" title={venda.observacaoLogistica || ""}>
                           {venda.observacaoLogistica || "-"}
@@ -277,7 +335,7 @@ export default function LogisticaPage() {
                         {venda.statusEnvio === "PENDENTE" ? (
                           <Button
                             size="sm"
-                            onClick={() => handleMarcarEnviado(venda.id)}
+                            onClick={() => abrirModalEnvio(venda.id, venda.peca.sku)}
                             disabled={marcarEnviadoMutation.isPending}
                           >
                             <Truck className="h-4 w-4 mr-1" />
@@ -346,6 +404,83 @@ export default function LogisticaPage() {
               </p>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de envio com código de rastreio */}
+      <Dialog open={!!envioModal} onOpenChange={(open) => !open && fecharModalEnvio()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Envio</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-muted-foreground">
+              Peca: <span className="font-mono font-medium">{envioModal?.sku}</span>
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="codigoRastreio">Codigo de Rastreio</Label>
+              <Input
+                id="codigoRastreio"
+                placeholder="Ex: BR123456789BR"
+                value={codigoRastreio}
+                onChange={(e) => setCodigoRastreio(e.target.value)}
+                disabled={!!tipoEntrega}
+              />
+              {tipoEntrega && (
+                <p className="text-xs text-muted-foreground">
+                  Codigo desabilitado pois uma opcao de entrega foi selecionada
+                </p>
+              )}
+            </div>
+
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-3">
+                Ou selecione se nao houver rastreio:
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="retirada"
+                    checked={tipoEntrega === "RETIRADA_PESSOALMENTE"}
+                    onCheckedChange={(checked) => {
+                      setTipoEntrega(checked ? "RETIRADA_PESSOALMENTE" : null);
+                      if (checked) setCodigoRastreio("");
+                    }}
+                  />
+                  <Label htmlFor="retirada" className="cursor-pointer">
+                    Retirou pessoalmente
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="entregaRJ"
+                    checked={tipoEntrega === "ENTREGA_RJ"}
+                    onCheckedChange={(checked) => {
+                      setTipoEntrega(checked ? "ENTREGA_RJ" : null);
+                      if (checked) setCodigoRastreio("");
+                    }}
+                  />
+                  <Label htmlFor="entregaRJ" className="cursor-pointer">
+                    Entrega no RJ
+                  </Label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={fecharModalEnvio}>
+              <X className="h-4 w-4 mr-1" />
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmarEnvio}
+              disabled={marcarEnviadoMutation.isPending}
+            >
+              <Truck className="h-4 w-4 mr-1" />
+              {marcarEnviadoMutation.isPending ? "Enviando..." : "Confirmar Envio"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,7 +13,12 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/formatters";
@@ -51,18 +57,35 @@ interface PecasTableProps {
   pecas: Peca[];
   isLoading: boolean;
   podeVerValores: boolean;
+  podeExcluir?: boolean;
   onView: (id: string) => void;
   onStatusClick?: (peca: PecaStatusInfo) => void;
+  onDelete?: (id: string) => Promise<void>;
 }
 
 export function PecasTable({
   pecas,
   isLoading,
   podeVerValores,
+  podeExcluir = false,
   onView,
   onStatusClick,
+  onDelete,
 }: PecasTableProps) {
   const [selectedImage, setSelectedImage] = useState<{ url: string; sku: string } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ id: string; sku: string; marca: string; modelo: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!deleteDialog || !onDelete) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(deleteDialog.id);
+      setDeleteDialog(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -95,6 +118,7 @@ export function PecasTable({
           <TableHead>Localizacao</TableHead>
           {podeVerValores && <TableHead>Pgto. Fornecedor</TableHead>}
           {podeVerValores && <TableHead className="text-right">Valor</TableHead>}
+          {podeExcluir && <TableHead className="w-12"></TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -181,6 +205,27 @@ export function PecasTable({
                   : "-"}
               </TableCell>
             )}
+            {podeExcluir && (
+              <TableCell className="text-right">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteDialog({
+                      id: peca.id,
+                      sku: peca.sku,
+                      marca: peca.marca,
+                      modelo: peca.modelo,
+                    });
+                  }}
+                  title="Excluir peca"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>
@@ -201,6 +246,41 @@ export function PecasTable({
             </p>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+
+    {/* Dialog de confirmacao de exclusao */}
+    <Dialog open={!!deleteDialog} onOpenChange={() => !isDeleting && setDeleteDialog(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Confirmar exclusao</DialogTitle>
+          <DialogDescription>
+            Tem certeza que deseja excluir a peca{" "}
+            <span className="font-mono font-semibold">{deleteDialog?.sku}</span>
+            {" "}({deleteDialog?.marca} {deleteDialog?.modelo})?
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-sm text-destructive">
+            Esta acao nao pode ser desfeita. A peca sera permanentemente removida do sistema.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setDeleteDialog(null)}
+            disabled={isDeleting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={isDeleting}
+          >
+            {isDeleting ? "Excluindo..." : "Excluir"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
     </>

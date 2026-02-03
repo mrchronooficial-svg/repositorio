@@ -125,6 +125,7 @@ export const clienteRouter = router({
               where: { cancelada: false },
               select: {
                 valorFinal: true,
+                valorRepasseDevido: true,
                 dataVenda: true,
               },
             },
@@ -136,10 +137,12 @@ export const clienteRouter = router({
       // Calcular metricas por cliente
       const clientesComMetricas = clientes.map((cliente) => {
         const totalCompras = cliente.vendas.length;
-        const faturamento = cliente.vendas.reduce(
-          (acc, v) => acc + Number(v.valorFinal),
-          0
-        );
+        // Faturamento real: consignação = margem (valorFinal - valorRepasseDevido)
+        const faturamento = cliente.vendas.reduce((acc, v) => {
+          const valorFinal = Number(v.valorFinal) || 0;
+          const valorRepasse = Number(v.valorRepasseDevido) || 0;
+          return acc + (valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal);
+        }, 0);
 
         return {
           ...cliente,
@@ -178,6 +181,7 @@ export const clienteRouter = router({
                   marca: true,
                   modelo: true,
                   valorCompra: true,
+                  origemTipo: true,
                 },
               },
             },
@@ -194,14 +198,22 @@ export const clienteRouter = router({
 
       // Calcular metricas
       const totalCompras = cliente.vendas.length;
-      const faturamento = cliente.vendas.reduce(
-        (acc, v) => acc + Number(v.valorFinal),
-        0
-      );
+      // Faturamento real: consignação = margem (valorFinal - valorRepasseDevido)
+      const faturamento = cliente.vendas.reduce((acc, v) => {
+        const valorFinal = Number(v.valorFinal) || 0;
+        const valorRepasse = Number(v.valorRepasseDevido) || 0;
+        return acc + (valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal);
+      }, 0);
 
-      // LTV = soma dos lucros
+      // LTV = soma dos lucros reais
+      // - Compra: valorFinal - valorCompra
+      // - Consignacao: valorFinal - valorRepasseDevido (margem)
       const ltv = cliente.vendas.reduce((acc, v) => {
-        const lucro = Number(v.valorFinal) - Number(v.peca.valorCompra);
+        const valorFinal = Number(v.valorFinal) || 0;
+        const valorRepasse = Number(v.valorRepasseDevido) || 0;
+        const valorCompra = Number(v.peca.valorCompra) || 0;
+        // Se tem repasse, é consignação: lucro = margem
+        const lucro = valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal - valorCompra;
         return acc + lucro;
       }, 0);
 
@@ -402,7 +414,7 @@ export const clienteRouter = router({
       include: {
         vendas: {
           where: { cancelada: false },
-          select: { valorFinal: true },
+          select: { valorFinal: true, valorRepasseDevido: true },
         },
       },
     });
@@ -411,7 +423,12 @@ export const clienteRouter = router({
       .map((c) => ({
         id: c.id,
         nome: c.nome,
-        faturamento: c.vendas.reduce((acc, v) => acc + Number(v.valorFinal), 0),
+        // Faturamento real: consignação = margem
+        faturamento: c.vendas.reduce((acc, v) => {
+          const valorFinal = Number(v.valorFinal) || 0;
+          const valorRepasse = Number(v.valorRepasseDevido) || 0;
+          return acc + (valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal);
+        }, 0),
         totalCompras: c.vendas.length,
       }))
       .filter((c) => c.totalCompras > 0)
@@ -441,13 +458,15 @@ export const clienteRouter = router({
     if (podeVerValores) {
       const vendas = await prisma.venda.findMany({
         where: { cancelada: false },
-        select: { valorFinal: true },
+        select: { valorFinal: true, valorRepasseDevido: true },
       });
 
-      faturamentoTotal = vendas.reduce(
-        (acc, v) => acc + Number(v.valorFinal),
-        0
-      );
+      // Faturamento real: consignação = margem
+      faturamentoTotal = vendas.reduce((acc, v) => {
+        const valorFinal = Number(v.valorFinal) || 0;
+        const valorRepasse = Number(v.valorRepasseDevido) || 0;
+        return acc + (valorRepasse > 0 ? valorFinal - valorRepasse : valorFinal);
+      }, 0);
       ticketMedio = vendas.length > 0 ? faturamentoTotal / vendas.length : 0;
     }
 
