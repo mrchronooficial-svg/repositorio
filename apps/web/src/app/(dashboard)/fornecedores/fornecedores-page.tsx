@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,8 @@ import { usePermissions } from "@/hooks/use-permissions";
 
 export function FornecedoresPage() {
   const router = useRouter();
-  const { podeVerValores } = usePermissions();
+  const queryClient = useQueryClient();
+  const { podeVerValores, isAdmin } = usePermissions();
 
   const [search, setSearch] = useState("");
   const [tipo, setTipo] = useState<string | undefined>();
@@ -44,6 +46,20 @@ export function FornecedoresPage() {
   };
 
   const temFiltros = search || tipo || score;
+
+  const deleteMutation = useMutation(trpc.fornecedor.delete.mutationOptions());
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMutation.mutateAsync({ id });
+      toast.success("Fornecedor excluido com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["fornecedor", "list"] });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao excluir fornecedor";
+      toast.error(message);
+      throw error;
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -121,7 +137,9 @@ export function FornecedoresPage() {
         fornecedores={data?.fornecedores ?? []}
         isLoading={isLoading}
         podeVerValores={podeVerValores}
+        podeExcluir={isAdmin}
         onView={(id) => router.push(`/fornecedores/${id}`)}
+        onDelete={handleDelete}
       />
 
       {/* Paginacao */}

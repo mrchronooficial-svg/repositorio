@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,8 @@ import { formatCurrency } from "@/lib/formatters";
 
 export function VendasPage() {
   const router = useRouter();
-  const { podeVerValores } = usePermissions();
+  const queryClient = useQueryClient();
+  const { podeVerValores, podeCancelarVenda } = usePermissions();
 
   const [search, setSearch] = useState("");
   const [statusPagamento, setStatusPagamento] = useState<string | undefined>();
@@ -49,6 +51,22 @@ export function VendasPage() {
   };
 
   const temFiltros = search || statusPagamento || statusRepasse;
+
+  const cancelMutation = useMutation(trpc.venda.cancel.mutationOptions());
+
+  const handleCancel = async (id: string) => {
+    try {
+      await cancelMutation.mutateAsync({ vendaId: id });
+      toast.success("Venda cancelada com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["venda", "list"] });
+      queryClient.invalidateQueries({ queryKey: ["venda", "getMetricas"] });
+      queryClient.invalidateQueries({ queryKey: ["venda", "getRecebiveis"] });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao cancelar venda";
+      toast.error(message);
+      throw error;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -189,7 +207,9 @@ export function VendasPage() {
         vendas={data?.vendas ?? []}
         isLoading={isLoading}
         podeVerValores={podeVerValores}
+        podeExcluir={podeCancelarVenda}
         onView={(id) => router.push(`/vendas/${id}`)}
+        onDelete={handleCancel}
       />
 
       {/* Paginacao */}

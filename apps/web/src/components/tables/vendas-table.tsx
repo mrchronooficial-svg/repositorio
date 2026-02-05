@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,7 +13,12 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency, formatDate } from "@/lib/formatters";
@@ -48,16 +54,33 @@ interface VendasTableProps {
   vendas: Venda[];
   isLoading: boolean;
   podeVerValores: boolean;
+  podeExcluir?: boolean;
   onView: (id: string) => void;
+  onDelete?: (id: string) => Promise<void>;
 }
 
 export function VendasTable({
   vendas,
   isLoading,
   podeVerValores,
+  podeExcluir = false,
   onView,
+  onDelete,
 }: VendasTableProps) {
   const [selectedImage, setSelectedImage] = useState<{ url: string; sku: string } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{ id: string; sku: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!deleteDialog || !onDelete) return;
+    setIsDeleting(true);
+    try {
+      await onDelete(deleteDialog.id);
+      setDeleteDialog(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -90,6 +113,7 @@ export function VendasTable({
             <TableHead>Repasse</TableHead>
             <TableHead>Envio</TableHead>
             {podeVerValores && <TableHead className="text-right">Valor</TableHead>}
+            {podeExcluir && <TableHead className="w-12"></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -143,6 +167,25 @@ export function VendasTable({
                   {venda.valorFinal ? formatCurrency(Number(venda.valorFinal)) : "-"}
                 </TableCell>
               )}
+              {podeExcluir && (
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteDialog({
+                        id: venda.id,
+                        sku: venda.peca.sku,
+                      });
+                    }}
+                    title="Cancelar venda"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
@@ -163,6 +206,40 @@ export function VendasTable({
               </p>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmacao de cancelamento */}
+      <Dialog open={!!deleteDialog} onOpenChange={() => !isDeleting && setDeleteDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar venda</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja cancelar a venda da peca{" "}
+              <span className="font-mono font-semibold">{deleteDialog?.sku}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-destructive">
+              A peca voltara ao estoque com status Disponivel.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialog(null)}
+              disabled={isDeleting}
+            >
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Cancelando..." : "Cancelar Venda"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

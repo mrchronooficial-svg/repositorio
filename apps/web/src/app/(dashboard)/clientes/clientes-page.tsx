@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,8 @@ import { formatCurrency } from "@/lib/formatters";
 
 export function ClientesPage() {
   const router = useRouter();
-  const { podeVerValores } = usePermissions();
+  const queryClient = useQueryClient();
+  const { podeVerValores, podeExcluir } = usePermissions();
 
   const [search, setSearch] = useState("");
   const [tipo, setTipo] = useState<string | undefined>();
@@ -46,6 +48,22 @@ export function ClientesPage() {
   };
 
   const temFiltros = search || tipo;
+
+  const archiveMutation = useMutation(trpc.cliente.archive.mutationOptions());
+
+  const handleArchive = async (id: string) => {
+    try {
+      await archiveMutation.mutateAsync({ id });
+      toast.success("Cliente arquivado com sucesso");
+      queryClient.invalidateQueries({ queryKey: ["cliente", "list"] });
+      queryClient.invalidateQueries({ queryKey: ["cliente", "getDashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["cliente", "getTopClientes"] });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao arquivar cliente";
+      toast.error(message);
+      throw error;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -203,7 +221,9 @@ export function ClientesPage() {
         clientes={data?.clientes ?? []}
         isLoading={isLoading}
         podeVerValores={podeVerValores}
+        podeExcluir={podeExcluir}
         onView={(id) => router.push(`/clientes/${id}`)}
+        onDelete={handleArchive}
       />
 
       {/* Paginacao */}
