@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Plus, Search, X } from "lucide-react";
+import { Archive, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,7 @@ export function EstoquePage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string | undefined>();
   const [localizacao, setLocalizacao] = useState<string | undefined>();
+  const [arquivado, setArquivado] = useState(false);
   const [page, setPage] = useState(1);
 
   // Estado para o modal de status
@@ -49,6 +50,7 @@ export function EstoquePage() {
       search: search || undefined,
       status: status as "DISPONIVEL" | "EM_TRANSITO" | "REVISAO" | "VENDIDA" | "DEFEITO" | "PERDA" | undefined,
       localizacao: localizacao || undefined,
+      arquivado,
     })
   );
 
@@ -59,10 +61,11 @@ export function EstoquePage() {
     setSearch("");
     setStatus(undefined);
     setLocalizacao(undefined);
+    setArquivado(false);
     setPage(1);
   };
 
-  const temFiltros = search || status || localizacao;
+  const temFiltros = search || status || localizacao || arquivado;
 
   const handleStatusClick = (peca: SelectedPeca) => {
     setSelectedPeca(peca);
@@ -219,6 +222,17 @@ export function EstoquePage() {
             ))}
           </SelectContent>
         </Select>
+        <Button
+          variant={arquivado ? "default" : "outline"}
+          onClick={() => {
+            setArquivado(!arquivado);
+            setPage(1);
+          }}
+          className="gap-2"
+        >
+          <Archive className="h-4 w-4" />
+          Arquivadas
+        </Button>
         {temFiltros && (
           <Button variant="ghost" onClick={limparFiltros}>
             <X className="h-4 w-4 mr-2" />
