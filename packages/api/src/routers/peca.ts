@@ -466,15 +466,14 @@ export const pecaRouter = router({
   delete: adminProcedure
     .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ input, ctx }) => {
-      // Verificar se tem venda vinculada
+      // Deletar venda vinculada (se existir) antes de excluir a peca
       const venda = await prisma.venda.findUnique({
         where: { pecaId: input.id },
       });
 
       if (venda) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: "Nao e possivel excluir peca com venda vinculada",
+        await prisma.venda.delete({
+          where: { id: venda.id },
         });
       }
 
