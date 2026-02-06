@@ -9,6 +9,8 @@ import {
   Banknote,
   RotateCcw,
   AlertTriangle,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +19,8 @@ import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StatusBadge } from "@/components/status-badge";
 import { PagamentoDialog } from "@/components/dialogs/pagamento-dialog";
 import { RepasseDialog } from "@/components/dialogs/repasse-dialog";
+import { EditarPagamentoDialog } from "@/components/dialogs/editar-pagamento-dialog";
+import { EditarRepasseDialog } from "@/components/dialogs/editar-repasse-dialog";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
@@ -31,6 +35,8 @@ export default function VendaDetalhesPage() {
 
   const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
   const [repasseDialogOpen, setRepasseDialogOpen] = useState(false);
+  const [editarPagamento, setEditarPagamento] = useState<{ id: string; valor: number } | null>(null);
+  const [editarRepasseOpen, setEditarRepasseOpen] = useState(false);
 
   const id = params.id as string;
 
@@ -48,6 +54,17 @@ export default function VendaDetalhesPage() {
     ...trpc.venda.cancel.mutationOptions(),
     onSuccess: (result) => {
       toast.success(`Venda cancelada. Nova peca criada: ${result.novoSku}`);
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const deletarPagamentoMutation = useMutation({
+    ...trpc.venda.deletarPagamento.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Pagamento removido com sucesso!");
       refetch();
     },
     onError: (error: Error) => {
@@ -89,6 +106,14 @@ export default function VendaDetalhesPage() {
     }
   };
 
+  const handleDeletarPagamento = (pagamentoId: string, valor: number) => {
+    if (
+      confirm(`Tem certeza que deseja remover o pagamento de ${formatCurrency(valor)}?`)
+    ) {
+      deletarPagamentoMutation.mutate({ pagamentoId });
+    }
+  };
+
   return (
     <div>
       <Breadcrumbs
@@ -124,7 +149,14 @@ export default function VendaDetalhesPage() {
         </div>
 
         {!venda.cancelada && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/vendas/${id}/editar`)}
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
             {venda.statusPagamento !== "PAGO" && podeVerValores && (
               <Button onClick={() => setPagamentoDialogOpen(true)}>
                 <CreditCard className="h-4 w-4 mr-2" />
@@ -215,7 +247,7 @@ export default function VendaDetalhesPage() {
                 <CardTitle>Valores</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Valor Original</p>
                     <p className="font-medium">
@@ -237,6 +269,14 @@ export default function VendaDetalhesPage() {
                     <p className="text-xl font-bold">
                       {venda.valorFinal
                         ? formatCurrency(Number(venda.valorFinal))
+                        : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor a Declarar</p>
+                    <p className="font-medium text-orange-600">
+                      {venda.valorDeclarar
+                        ? formatCurrency(Number(venda.valorDeclarar))
                         : "-"}
                     </p>
                   </div>
@@ -278,14 +318,46 @@ export default function VendaDetalhesPage() {
                     {venda.pagamentos.map((p) => (
                       <div
                         key={p.id}
-                        className="flex items-center justify-between p-2 rounded border"
+                        className="flex items-center justify-between p-2 rounded border group"
                       >
                         <span className="text-sm text-muted-foreground">
                           {formatDateTime(p.data)}
                         </span>
-                        <span className="font-medium">
-                          {p.valor ? formatCurrency(Number(p.valor)) : "-"}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">
+                            {p.valor ? formatCurrency(Number(p.valor)) : "-"}
+                          </span>
+                          {!venda.cancelada && (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-primary"
+                                onClick={() =>
+                                  setEditarPagamento({
+                                    id: p.id,
+                                    valor: Number(p.valor),
+                                  })
+                                }
+                                title="Editar pagamento"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() =>
+                                  handleDeletarPagamento(p.id, Number(p.valor))
+                                }
+                                disabled={deletarPagamentoMutation.isPending}
+                                title="Remover pagamento"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -329,8 +401,19 @@ export default function VendaDetalhesPage() {
           {/* Repasse (se consignacao) */}
           {podeVerValores && venda.valorRepasseDevido && (
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>Repasse ao Fornecedor</CardTitle>
+                {!venda.cancelada && podeRegistrarRepasse && Number(venda.valorRepasseFeito || 0) > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                    onClick={() => setEditarRepasseOpen(true)}
+                    title="Editar repasse"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
               </CardHeader>
               <CardContent className="space-y-2">
                 <div>
@@ -388,13 +471,36 @@ export default function VendaDetalhesPage() {
       )}
 
       {venda.valorRepasseDevido && venda.peca.fornecedor && (
-        <RepasseDialog
-          open={repasseDialogOpen}
-          onOpenChange={setRepasseDialogOpen}
-          vendaId={id}
-          valorDevido={Number(venda.valorRepasseDevido)}
-          valorFeito={Number(venda.valorRepasseFeito) || 0}
-          fornecedorNome={venda.peca.fornecedor.nome}
+        <>
+          <RepasseDialog
+            open={repasseDialogOpen}
+            onOpenChange={setRepasseDialogOpen}
+            vendaId={id}
+            valorDevido={Number(venda.valorRepasseDevido)}
+            valorFeito={Number(venda.valorRepasseFeito) || 0}
+            fornecedorNome={venda.peca.fornecedor.nome}
+            onSuccess={refetch}
+          />
+          <EditarRepasseDialog
+            open={editarRepasseOpen}
+            onOpenChange={setEditarRepasseOpen}
+            vendaId={id}
+            valorDevido={Number(venda.valorRepasseDevido)}
+            valorFeito={Number(venda.valorRepasseFeito) || 0}
+            fornecedorNome={venda.peca.fornecedor.nome}
+            onSuccess={refetch}
+          />
+        </>
+      )}
+
+      {editarPagamento && (
+        <EditarPagamentoDialog
+          open={!!editarPagamento}
+          onOpenChange={(open) => {
+            if (!open) setEditarPagamento(null);
+          }}
+          pagamentoId={editarPagamento.id}
+          valorAtual={editarPagamento.valor}
           onSuccess={refetch}
         />
       )}

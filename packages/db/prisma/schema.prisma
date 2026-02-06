@@ -293,6 +293,9 @@ model Venda {
   codigoRastreio      String?
   tipoEntrega         String?       // RETIRADA_PESSOALMENTE, ENTREGA_RJ ou null para envio normal
   observacaoLogistica String?
+  // NFe / Declaracao Fiscal
+  valorDeclarar        Decimal?      @db.Decimal(10, 2)
+  nfeDeclarada         Boolean       @default(false)
   // Datas
   dataVenda DateTime @default(now())
   createdAt DateTime @default(now())

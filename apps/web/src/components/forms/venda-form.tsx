@@ -22,6 +22,24 @@ import { trpc } from "@/utils/trpc";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/formatters";
 
+interface VendaFormInitialData {
+  id: string;
+  pecaId: string;
+  clienteId: string;
+  valorOriginal: number;
+  valorFinal: string;
+  formaPagamento: "PIX" | "CREDITO_VISTA" | "CREDITO_PARCELADO";
+  parcelas: string;
+  observacaoLogistica: string;
+  dataVenda: string;
+  valorDeclarar: string;
+}
+
+interface VendaFormProps {
+  initialData?: VendaFormInitialData;
+  isEditing?: boolean;
+}
+
 interface VendaData {
   pecaId: string;
   clienteId: string;
@@ -30,6 +48,8 @@ interface VendaData {
   parcelas: string;
   pagamentoInicial: string;
   observacaoLogistica: string;
+  dataVenda: string;
+  valorDeclarar: string;
 }
 
 const defaultData: VendaData = {
@@ -40,11 +60,28 @@ const defaultData: VendaData = {
   parcelas: "",
   pagamentoInicial: "",
   observacaoLogistica: "",
+  dataVenda: "",
+  valorDeclarar: "",
 };
 
-export function VendaForm() {
+export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
   const router = useRouter();
-  const [data, setData] = useState<VendaData>(defaultData);
+  const [data, setData] = useState<VendaData>(() => {
+    if (initialData) {
+      return {
+        pecaId: initialData.pecaId,
+        clienteId: initialData.clienteId,
+        valorFinal: initialData.valorFinal,
+        formaPagamento: initialData.formaPagamento,
+        parcelas: initialData.parcelas,
+        pagamentoInicial: "",
+        observacaoLogistica: initialData.observacaoLogistica,
+        dataVenda: initialData.dataVenda,
+        valorDeclarar: initialData.valorDeclarar,
+      };
+    }
+    return defaultData;
+  });
   const [pecaSearch, setPecaSearch] = useState("");
   const [clienteSearch, setClienteSearch] = useState("");
   const [showPecaList, setShowPecaList] = useState(false);
@@ -75,7 +112,7 @@ export function VendaForm() {
       limit: 20,
       search: pecaSearch.trim() || undefined,
     }),
-    enabled: showPecaList, // Busca quando o dropdown está aberto
+    enabled: showPecaList && !isEditing,
   });
 
   // Buscar peca selecionada
@@ -91,7 +128,7 @@ export function VendaForm() {
       limit: 20,
       search: clienteSearch.trim() || undefined,
     }),
-    enabled: showClienteList, // Busca quando o dropdown está aberto
+    enabled: showClienteList,
   });
 
   // Buscar cliente selecionado
@@ -111,17 +148,32 @@ export function VendaForm() {
     },
   });
 
+  const updateMutation = useMutation({
+    ...trpc.venda.update.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Venda atualizada com sucesso!");
+      router.push(`/vendas/${initialData?.id}`);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const mutation = isEditing ? updateMutation : createMutation;
+
   const handleChange = (field: keyof VendaData, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const valorOriginal = pecaSelecionada?.valorEstimadoVenda
-    ? Number(pecaSelecionada.valorEstimadoVenda)
-    : 0;
+  const valorOriginal = isEditing && initialData
+    ? initialData.valorOriginal
+    : pecaSelecionada?.valorEstimadoVenda
+      ? Number(pecaSelecionada.valorEstimadoVenda)
+      : 0;
 
-  // Valor final digitado pelo usuário (ou valor original se não preenchido)
+  // Valor final digitado pelo usuario (ou valor original se nao preenchido)
   const valorFinal = data.valorFinal ? parseFloat(data.valorFinal) : valorOriginal;
-  // Desconto é calculado automaticamente
+  // Desconto e calculado automaticamente
   const desconto = valorOriginal - valorFinal;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -137,17 +189,36 @@ export function VendaForm() {
       return;
     }
 
-    createMutation.mutate({
-      pecaId: data.pecaId,
-      clienteId: data.clienteId,
-      valorDesconto: desconto > 0 ? desconto : undefined,
-      formaPagamento: data.formaPagamento,
-      parcelas: data.parcelas ? parseInt(data.parcelas, 10) : undefined,
-      pagamentoInicial: data.pagamentoInicial
-        ? parseFloat(data.pagamentoInicial)
-        : undefined,
-      observacaoLogistica: data.observacaoLogistica || undefined,
-    });
+    if (isEditing && initialData) {
+      updateMutation.mutate({
+        id: initialData.id,
+        clienteId: data.clienteId,
+        valorDesconto: desconto,
+        formaPagamento: data.formaPagamento,
+        parcelas: data.formaPagamento === "CREDITO_PARCELADO" && data.parcelas
+          ? parseInt(data.parcelas, 10)
+          : null,
+        observacaoLogistica: data.observacaoLogistica || null,
+        dataVenda: data.dataVenda ? new Date(data.dataVenda + "T12:00:00") : undefined,
+        valorDeclarar: data.valorDeclarar ? parseFloat(data.valorDeclarar) : null,
+      });
+    } else {
+      createMutation.mutate({
+        pecaId: data.pecaId,
+        clienteId: data.clienteId,
+        valorDesconto: desconto !== 0 ? desconto : undefined,
+        formaPagamento: data.formaPagamento,
+        parcelas: data.parcelas ? parseInt(data.parcelas, 10) : undefined,
+        pagamentoInicial: data.pagamentoInicial
+          ? parseFloat(data.pagamentoInicial)
+          : undefined,
+        observacaoLogistica: data.observacaoLogistica || undefined,
+        dataVenda: data.dataVenda ? new Date(data.dataVenda + "T12:00:00") : undefined,
+        valorDeclarar: data.valorDeclarar
+          ? parseFloat(data.valorDeclarar)
+          : undefined,
+      });
+    }
   };
 
   return (
@@ -155,10 +226,35 @@ export function VendaForm() {
       {/* Selecao de Peca */}
       <Card>
         <CardHeader>
-          <CardTitle>Peca *</CardTitle>
+          <CardTitle>Peca {!isEditing && "*"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {pecaSelecionada ? (
+          {isEditing && pecaSelecionada ? (
+            <div className="flex items-start gap-4 p-4 border rounded-lg bg-muted/30">
+              {pecaSelecionada.fotos?.[0] && (
+                <img
+                  src={pecaSelecionada.fotos[0].url}
+                  alt={pecaSelecionada.sku}
+                  className="w-20 h-20 object-cover rounded"
+                />
+              )}
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-medium">{pecaSelecionada.sku}</span>
+                  <StatusBadge type="peca" status={pecaSelecionada.status} size="sm" />
+                </div>
+                <p className="text-muted-foreground">
+                  {pecaSelecionada.marca} {pecaSelecionada.modelo}
+                </p>
+                {pecaSelecionada.valorEstimadoVenda && (
+                  <p className="font-medium mt-1">
+                    {formatCurrency(Number(pecaSelecionada.valorEstimadoVenda))}
+                  </p>
+                )}
+              </div>
+              <span className="text-xs text-muted-foreground">Nao editavel</span>
+            </div>
+          ) : pecaSelecionada ? (
             <div className="flex items-start gap-4 p-4 border rounded-lg">
               {pecaSelecionada.fotos?.[0] && (
                 <img
@@ -213,7 +309,7 @@ export function VendaForm() {
                   {isLoadingPecas ? (
                     <div className="flex items-center justify-center py-8 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                      <span>Carregando peças...</span>
+                      <span>Carregando pecas...</span>
                     </div>
                   ) : pecas && pecas.pecas.length > 0 ? (
                     <div className="divide-y">
@@ -251,7 +347,7 @@ export function VendaForm() {
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
                       <Package className="h-8 w-8 mb-2 opacity-50" />
-                      <span className="text-sm">Nenhuma peça disponível encontrada</span>
+                      <span className="text-sm">Nenhuma peca disponivel encontrada</span>
                       {pecaSearch && (
                         <span className="text-xs mt-1">Tente outro termo de busca</span>
                       )}
@@ -388,7 +484,6 @@ export function VendaForm() {
                 type="number"
                 step="0.01"
                 min="0"
-                max={valorOriginal * 2}
                 value={data.valorFinal}
                 onChange={(e) => handleChange("valorFinal", e.target.value)}
                 placeholder={valorOriginal.toFixed(2)}
@@ -425,6 +520,22 @@ export function VendaForm() {
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="valorDeclarar">Valor a Declarar (R$)</Label>
+            <Input
+              id="valorDeclarar"
+              type="number"
+              step="0.01"
+              min="0"
+              value={data.valorDeclarar}
+              onChange={(e) => handleChange("valorDeclarar", e.target.value)}
+              placeholder="Valor que sera declarado na nota fiscal"
+            />
+            <p className="text-xs text-muted-foreground">
+              Valor que sera declarado na nota fiscal
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -467,24 +578,26 @@ export function VendaForm() {
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="pagamentoInicial">Pagamento Inicial (R$)</Label>
-            <Input
-              id="pagamentoInicial"
-              type="number"
-              step="0.01"
-              min="0"
-              max={valorFinal || valorOriginal}
-              value={data.pagamentoInicial}
-              onChange={(e) => handleChange("pagamentoInicial", e.target.value)}
-              placeholder="Deixe em branco para registrar depois"
-            />
-            <p className="text-xs text-muted-foreground">
-              Opcional. Registre o valor recebido no momento da venda.
-            </p>
-          </div>
+          {!isEditing && (
+            <div className="space-y-2">
+              <Label htmlFor="pagamentoInicial">Pagamento Inicial (R$)</Label>
+              <Input
+                id="pagamentoInicial"
+                type="number"
+                step="0.01"
+                min="0"
+                max={valorFinal || valorOriginal}
+                value={data.pagamentoInicial}
+                onChange={(e) => handleChange("pagamentoInicial", e.target.value)}
+                placeholder="Deixe em branco para registrar depois"
+              />
+              <p className="text-xs text-muted-foreground">
+                Opcional. Registre o valor recebido no momento da venda.
+              </p>
+            </div>
+          )}
 
-          {pecaSelecionada?.origemTipo === "CONSIGNACAO" && pecaSelecionada.valorRepasse && (
+          {!isEditing && pecaSelecionada?.origemTipo === "CONSIGNACAO" && pecaSelecionada.valorRepasse && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded">
               <p className="text-sm text-amber-800">
                 <strong>Peca em consignacao.</strong> Repasse de{" "}
@@ -493,6 +606,30 @@ export function VendaForm() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Data da Venda */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Data da Venda</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="dataVenda">Data</Label>
+            <Input
+              id="dataVenda"
+              type="date"
+              value={data.dataVenda}
+              onChange={(e) => handleChange("dataVenda", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              {isEditing
+                ? "Altere a data em que a venda foi realizada."
+                : "Opcional. Se nao informado, sera usada a data de hoje."
+              }
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -524,17 +661,17 @@ export function VendaForm() {
           type="button"
           variant="outline"
           onClick={() => router.back()}
-          disabled={createMutation.isPending}
+          disabled={mutation.isPending}
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={createMutation.isPending}>
-          {createMutation.isPending ? (
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
             <Check className="mr-2 h-4 w-4" />
           )}
-          Registrar Venda
+          {isEditing ? "Salvar Alteracoes" : "Registrar Venda"}
         </Button>
       </div>
     </form>

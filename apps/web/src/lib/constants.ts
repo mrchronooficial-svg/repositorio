@@ -103,6 +103,16 @@ export const NIVEL_ACESSO_LABELS: Record<string, string> = {
   FUNCIONARIO: "Funcionário",
 };
 
+export const STATUS_NFE_LABELS: Record<string, string> = {
+  DECLARADA: "Declarada",
+  NAO_DECLARADA: "Nao Declarada",
+};
+
+export const STATUS_NFE_COLORS: Record<string, string> = {
+  DECLARADA: "bg-green-100 text-green-800",
+  NAO_DECLARADA: "bg-red-100 text-red-800",
+};
+
 export const LOCALIZACOES_PADRAO = [
   "Rafael",
   "Pedro",

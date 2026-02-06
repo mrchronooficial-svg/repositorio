@@ -10,11 +10,24 @@ import { gerarSKUDevolucao } from "../services/sku.service";
 const VendaCreateSchema = z.object({
   pecaId: z.string().cuid("Peca invalida"),
   clienteId: z.string().cuid("Cliente invalido"),
-  valorDesconto: z.number().min(0).optional(),
+  valorDesconto: z.number().optional(),
   formaPagamento: z.enum(["PIX", "CREDITO_VISTA", "CREDITO_PARCELADO"]),
   parcelas: z.number().int().min(1).max(12).optional(),
   pagamentoInicial: z.number().min(0).optional(),
   observacaoLogistica: z.string().optional(),
+  dataVenda: z.date().optional(),
+  valorDeclarar: z.number().min(0).optional(),
+});
+
+const VendaUpdateSchema = z.object({
+  id: z.string().cuid("Venda invalida"),
+  clienteId: z.string().cuid("Cliente invalido").optional(),
+  valorDesconto: z.number().optional(),
+  formaPagamento: z.enum(["PIX", "CREDITO_VISTA", "CREDITO_PARCELADO"]).optional(),
+  parcelas: z.number().int().min(1).max(12).nullable().optional(),
+  observacaoLogistica: z.string().nullable().optional(),
+  dataVenda: z.date().optional(),
+  valorDeclarar: z.number().min(0).nullable().optional(),
 });
 
 const VendaListSchema = z.object({
@@ -228,6 +241,8 @@ export const vendaRouter = router({
           valorRepasseFeito: valorRepasseDevido ? 0 : null,
           statusRepasse,
           observacaoLogistica: input.observacaoLogistica || null,
+          dataVenda: input.dataVenda || new Date(),
+          valorDeclarar: input.valorDeclarar ?? null,
         },
       });
 
@@ -291,6 +306,79 @@ export const vendaRouter = router({
       });
 
       return venda;
+    }),
+
+  // Editar venda
+  update: protectedProcedure
+    .input(VendaUpdateSchema)
+    .mutation(async ({ input, ctx }) => {
+      // 1. Validar que a venda existe
+      const venda = await prisma.venda.findUnique({
+        where: { id: input.id },
+        include: { peca: true },
+      });
+
+      if (!venda) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Venda nao encontrada",
+        });
+      }
+
+      if (venda.cancelada) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Nao e possivel editar uma venda cancelada",
+        });
+      }
+
+      // 2. Validar cliente (se alterado)
+      if (input.clienteId) {
+        const cliente = await prisma.cliente.findUnique({
+          where: { id: input.clienteId },
+        });
+        if (!cliente) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Cliente nao encontrado",
+          });
+        }
+      }
+
+      // 3. Calcular valores
+      const valorOriginal = Number(venda.valorOriginal);
+      const valorDesconto = input.valorDesconto !== undefined ? input.valorDesconto : Number(venda.valorDesconto || 0);
+      const valorFinal = valorOriginal - valorDesconto;
+
+      // 4. Atualizar venda
+      const vendaAtualizada = await prisma.venda.update({
+        where: { id: input.id },
+        data: {
+          ...(input.clienteId && { clienteId: input.clienteId }),
+          valorDesconto,
+          valorFinal,
+          ...(input.formaPagamento && { formaPagamento: input.formaPagamento }),
+          ...(input.parcelas !== undefined && { parcelas: input.parcelas }),
+          ...(input.observacaoLogistica !== undefined && { observacaoLogistica: input.observacaoLogistica }),
+          ...(input.dataVenda && { dataVenda: input.dataVenda }),
+          ...(input.valorDeclarar !== undefined && { valorDeclarar: input.valorDeclarar }),
+        },
+      });
+
+      // 5. Registrar auditoria
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "EDITAR",
+        entidade: "VENDA",
+        entidadeId: input.id,
+        detalhes: {
+          peca: venda.peca.sku,
+          valorFinal,
+          campos: Object.keys(input).filter((k) => k !== "id"),
+        },
+      });
+
+      return vendaAtualizada;
     }),
 
   // Registrar pagamento
@@ -359,6 +447,111 @@ export const vendaRouter = router({
       return pagamento;
     }),
 
+  // Editar pagamento
+  editarPagamento: protectedProcedure
+    .input(z.object({
+      pagamentoId: z.string().cuid(),
+      valor: z.number().positive("Valor deve ser positivo"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const pagamento = await prisma.pagamento.findUnique({
+        where: { id: input.pagamentoId },
+        include: { venda: { include: { pagamentos: true } } },
+      });
+
+      if (!pagamento) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Pagamento nao encontrado" });
+      }
+
+      if (pagamento.venda.cancelada) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Venda cancelada" });
+      }
+
+      // Calcular total pago sem este pagamento
+      const totalPagoSemEste = pagamento.venda.pagamentos
+        .filter((p) => p.id !== input.pagamentoId)
+        .reduce((acc, p) => acc + Number(p.valor), 0);
+
+      const valorFinal = Number(pagamento.venda.valorFinal);
+      const saldoDisponivel = valorFinal - totalPagoSemEste;
+
+      if (input.valor > saldoDisponivel) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Valor excede o saldo disponivel de R$ ${saldoDisponivel.toFixed(2)}`,
+        });
+      }
+
+      await prisma.pagamento.update({
+        where: { id: input.pagamentoId },
+        data: { valor: input.valor },
+      });
+
+      // Recalcular status
+      const novoTotalPago = totalPagoSemEste + input.valor;
+      const novoStatus = novoTotalPago >= valorFinal ? "PAGO" : novoTotalPago > 0 ? "PARCIAL" : "NAO_PAGO";
+
+      await prisma.venda.update({
+        where: { id: pagamento.vendaId },
+        data: { statusPagamento: novoStatus },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "EDITAR_PAGAMENTO",
+        entidade: "VENDA",
+        entidadeId: pagamento.vendaId,
+        detalhes: { pagamentoId: input.pagamentoId, valorAnterior: Number(pagamento.valor), valorNovo: input.valor },
+      });
+
+      return { success: true };
+    }),
+
+  // Deletar pagamento
+  deletarPagamento: protectedProcedure
+    .input(z.object({ pagamentoId: z.string().cuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const pagamento = await prisma.pagamento.findUnique({
+        where: { id: input.pagamentoId },
+        include: { venda: { include: { pagamentos: true } } },
+      });
+
+      if (!pagamento) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Pagamento nao encontrado" });
+      }
+
+      if (pagamento.venda.cancelada) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Venda cancelada" });
+      }
+
+      await prisma.pagamento.delete({
+        where: { id: input.pagamentoId },
+      });
+
+      // Recalcular status
+      const totalPagoRestante = pagamento.venda.pagamentos
+        .filter((p) => p.id !== input.pagamentoId)
+        .reduce((acc, p) => acc + Number(p.valor), 0);
+
+      const valorFinal = Number(pagamento.venda.valorFinal);
+      const novoStatus = totalPagoRestante >= valorFinal ? "PAGO" : totalPagoRestante > 0 ? "PARCIAL" : "NAO_PAGO";
+
+      await prisma.venda.update({
+        where: { id: pagamento.vendaId },
+        data: { statusPagamento: novoStatus },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "DELETAR_PAGAMENTO",
+        entidade: "VENDA",
+        entidadeId: pagamento.vendaId,
+        detalhes: { pagamentoId: input.pagamentoId, valor: Number(pagamento.valor) },
+      });
+
+      return { success: true };
+    }),
+
   // Registrar repasse
   registrarRepasse: socioOuAdminProcedure
     .input(RepasseSchema)
@@ -412,6 +605,98 @@ export const vendaRouter = router({
         entidade: "VENDA",
         entidadeId: input.vendaId,
         detalhes: { valor: input.valor },
+      });
+
+      return { success: true };
+    }),
+
+  // Editar repasse (ajustar valor repassado)
+  editarRepasse: socioOuAdminProcedure
+    .input(z.object({
+      vendaId: z.string().cuid(),
+      valorRepasseFeito: z.number().min(0, "Valor nao pode ser negativo"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const venda = await prisma.venda.findUnique({
+        where: { id: input.vendaId },
+      });
+
+      if (!venda) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Venda nao encontrada" });
+      }
+
+      if (!venda.valorRepasseDevido) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Esta venda nao tem repasse" });
+      }
+
+      const valorDevido = Number(venda.valorRepasseDevido);
+      if (input.valorRepasseFeito > valorDevido) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Valor excede o repasse devido de R$ ${valorDevido.toFixed(2)}`,
+        });
+      }
+
+      const novoStatus = input.valorRepasseFeito >= valorDevido
+        ? "FEITO"
+        : input.valorRepasseFeito > 0
+          ? "PARCIAL"
+          : "PENDENTE";
+
+      await prisma.venda.update({
+        where: { id: input.vendaId },
+        data: {
+          valorRepasseFeito: input.valorRepasseFeito,
+          statusRepasse: novoStatus,
+          dataRepasse: novoStatus === "FEITO" ? new Date() : null,
+        },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "EDITAR_REPASSE",
+        entidade: "VENDA",
+        entidadeId: input.vendaId,
+        detalhes: {
+          valorAnterior: Number(venda.valorRepasseFeito),
+          valorNovo: input.valorRepasseFeito,
+        },
+      });
+
+      return { success: true };
+    }),
+
+  // Resetar repasse (zerar valor repassado)
+  resetarRepasse: socioOuAdminProcedure
+    .input(z.object({ vendaId: z.string().cuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const venda = await prisma.venda.findUnique({
+        where: { id: input.vendaId },
+      });
+
+      if (!venda) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Venda nao encontrada" });
+      }
+
+      if (!venda.valorRepasseDevido) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Esta venda nao tem repasse" });
+      }
+
+      await prisma.venda.update({
+        where: { id: input.vendaId },
+        data: {
+          valorRepasseFeito: 0,
+          statusRepasse: "PENDENTE",
+          dataRepasse: null,
+        },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "RESETAR_REPASSE",
+        entidade: "VENDA",
+        entidadeId: input.vendaId,
+        detalhes: { valorAnterior: Number(venda.valorRepasseFeito) },
       });
 
       return { success: true };

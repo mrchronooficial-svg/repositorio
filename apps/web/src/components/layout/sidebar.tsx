@@ -12,6 +12,7 @@ import {
   Watch,
   Crown,
   PackageCheck,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,12 @@ const menuItems = [
     href: "/logistica",
     icon: PackageCheck,
     color: "from-teal-400 to-teal-600",
+  },
+  {
+    label: "NFe",
+    href: "/nfe",
+    icon: FileText,
+    color: "from-orange-400 to-orange-600",
   },
   {
     label: "Clientes",

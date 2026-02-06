@@ -8,11 +8,13 @@ import {
   STATUS_REPASSE_COLORS,
   STATUS_ENVIO_LABELS,
   STATUS_ENVIO_COLORS,
+  STATUS_NFE_LABELS,
+  STATUS_NFE_COLORS,
   SCORE_LABELS,
   SCORE_COLORS,
 } from "@/lib/constants";
 
-type StatusType = "peca" | "pagamento" | "repasse" | "envio" | "score";
+type StatusType = "peca" | "pagamento" | "repasse" | "envio" | "nfe" | "score";
 
 interface StatusBadgeProps {
   type: StatusType;
@@ -25,6 +27,7 @@ const labelsMap: Record<StatusType, Record<string, string>> = {
   pagamento: STATUS_PAGAMENTO_LABELS,
   repasse: STATUS_REPASSE_LABELS,
   envio: STATUS_ENVIO_LABELS,
+  nfe: STATUS_NFE_LABELS,
   score: SCORE_LABELS,
 };
 
@@ -33,6 +36,7 @@ const colorsMap: Record<StatusType, Record<string, string>> = {
   pagamento: STATUS_PAGAMENTO_COLORS,
   repasse: STATUS_REPASSE_COLORS,
   envio: STATUS_ENVIO_COLORS,
+  nfe: STATUS_NFE_COLORS,
   score: SCORE_COLORS,
 };
 
