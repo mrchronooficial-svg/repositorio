@@ -40,8 +40,8 @@ export function usePermissions(): Permissions {
   // Sócio e Admin podem ver valores em R$
   const podeVerValores = isAdmin || isSocio;
 
-  // Sócio e Admin podem excluir/arquivar
-  const podeExcluir = isAdmin || isSocio;
+  // Todos os níveis podem excluir/arquivar
+  const podeExcluir = isAdmin || isSocio || isFuncionario;
 
   // Sócio e Admin podem editar peça vendida
   const podeEditarVendida = isAdmin || isSocio;

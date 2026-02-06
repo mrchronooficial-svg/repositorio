@@ -31,7 +31,7 @@ interface SelectedPeca {
 export function EstoquePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { podeVerValores, isAdmin } = usePermissions();
+  const { podeVerValores, podeExcluir } = usePermissions();
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string | undefined>();
@@ -246,7 +246,7 @@ export function EstoquePage() {
         pecas={data?.pecas ?? []}
         isLoading={isLoading}
         podeVerValores={podeVerValores}
-        podeExcluir={isAdmin}
+        podeExcluir={podeExcluir}
         onView={(id) => router.push(`/estoque/${id}`)}
         onStatusClick={handleStatusClick}
         onDelete={handleDelete}
