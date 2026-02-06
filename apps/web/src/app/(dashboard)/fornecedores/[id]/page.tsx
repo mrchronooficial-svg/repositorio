@@ -171,16 +171,14 @@ export default function FornecedorDetalhesPage() {
                 <RotateCcw className="h-4 w-4 mr-2" />
                 Restaurar
               </Button>
-              {isAdmin && (
-                <Button
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir
-                </Button>
-              )}
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
             </>
           )}
         </div>

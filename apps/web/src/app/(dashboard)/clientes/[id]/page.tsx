@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Edit, Archive, RotateCcw } from "lucide-react";
+import { ArrowLeft, Edit, Archive, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -54,6 +54,17 @@ export default function ClienteDetalhesPage() {
     onSuccess: () => {
       toast.success("Cliente restaurado com sucesso!");
       refetch();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    ...trpc.cliente.delete.mutationOptions(),
+    onSuccess: () => {
+      toast.success("Cliente excluido permanentemente!");
+      router.push("/clientes");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -145,14 +156,28 @@ export default function ClienteDetalhesPage() {
             </>
           )}
           {cliente.arquivado && podeExcluir && (
-            <Button
-              variant="outline"
-              onClick={() => restoreMutation.mutate({ id })}
-              disabled={restoreMutation.isPending}
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Restaurar
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                onClick={() => restoreMutation.mutate({ id })}
+                disabled={restoreMutation.isPending}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Restaurar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (confirm("ATENCAO: Esta acao e irreversivel. Tem certeza que deseja excluir permanentemente este cliente?")) {
+                    deleteMutation.mutate({ id });
+                  }
+                }}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </Button>
+            </>
           )}
         </div>
       </div>

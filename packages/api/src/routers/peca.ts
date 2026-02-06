@@ -463,7 +463,7 @@ export const pecaRouter = router({
     }),
 
   // Excluir peca
-  delete: adminProcedure
+  delete: protectedProcedure
     .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ input, ctx }) => {
       // Deletar venda vinculada (se existir) antes de excluir a peca

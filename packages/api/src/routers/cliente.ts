@@ -401,6 +401,36 @@ export const clienteRouter = router({
       return cliente;
     }),
 
+  // Excluir cliente (permanente)
+  delete: protectedProcedure
+    .input(z.object({ id: z.string().cuid() }))
+    .mutation(async ({ input, ctx }) => {
+      // Verificar se tem vendas vinculadas
+      const vendas = await prisma.venda.count({
+        where: { clienteId: input.id },
+      });
+
+      if (vendas > 0) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Não é possível excluir cliente com vendas vinculadas",
+        });
+      }
+
+      await prisma.cliente.delete({
+        where: { id: input.id },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "EXCLUIR",
+        entidade: "CLIENTE",
+        entidadeId: input.id,
+      });
+
+      return { success: true };
+    }),
+
   // Top 10 clientes por faturamento
   getTopClientes: protectedProcedure.query(async ({ ctx }) => {
     const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);

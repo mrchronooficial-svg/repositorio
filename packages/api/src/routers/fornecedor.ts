@@ -331,7 +331,7 @@ export const fornecedorRouter = router({
     }),
 
   // Excluir fornecedor (permanente)
-  delete: adminProcedure
+  delete: protectedProcedure
     .input(z.object({ id: z.string().cuid() }))
     .mutation(async ({ input, ctx }) => {
       // Verificar se tem peças vinculadas
