@@ -114,6 +114,7 @@ export function PecasTable({
           <TableHead>SKU</TableHead>
           <TableHead>Marca / Modelo</TableHead>
           <TableHead>Fornecedor</TableHead>
+          <TableHead>Origem</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Localizacao</TableHead>
           {podeVerValores && <TableHead>Pgto. Fornecedor</TableHead>}
@@ -152,6 +153,15 @@ export function PecasTable({
               <div className="text-sm text-muted-foreground">{peca.modelo}</div>
             </TableCell>
             <TableCell className="text-sm">{peca.fornecedor.nome}</TableCell>
+            <TableCell>
+              <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                peca.origemTipo === "CONSIGNACAO"
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-blue-100 text-blue-800"
+              }`}>
+                {peca.origemTipo === "CONSIGNACAO" ? "Consignacao" : "Compra"}
+              </span>
+            </TableCell>
             <TableCell>
               <div
                 className={onStatusClick ? "cursor-pointer hover:opacity-80 inline-block" : "inline-block"}

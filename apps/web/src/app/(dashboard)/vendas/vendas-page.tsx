@@ -209,6 +209,7 @@ export function VendasPage() {
         podeVerValores={podeVerValores}
         podeExcluir={podeCancelarVenda}
         onView={(id) => router.push(`/vendas/${id}`)}
+        onEdit={(id) => router.push(`/vendas/${id}/editar`)}
         onDelete={handleCancel}
       />
 

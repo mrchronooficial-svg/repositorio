@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "../index";
 import prisma from "@gestaomrchrono/db";
+import { auth } from "@gestaomrchrono/auth";
 import { registrarAuditoria } from "../services/auditoria.service";
 
 // Verificar se usuario e admin
@@ -119,34 +120,26 @@ export const adminRouter = router({
         throw new Error("Ja existe um usuario com este email");
       }
 
-      // Hash da senha usando bcrypt (via Better Auth)
-      const bcrypt = await import("bcryptjs");
-      const hashedPassword = await bcrypt.hash(input.password, 10);
-
-      // Gerar ID unico
-      const { randomUUID } = await import("crypto");
-      const userId = randomUUID();
-
-      // Criar usuario
-      const user = await prisma.user.create({
-        data: {
-          id: userId,
+      // Usar a API do Better Auth para criar o usuario (garante hash correto da senha)
+      const betterAuthResult = await auth.api.signUpEmail({
+        body: {
           name: input.name,
           email: input.email,
-          nivel: input.nivel,
-          ativo: true,
-          emailVerified: true, // Usuario criado pelo admin ja esta verificado
+          password: input.password,
         },
       });
 
-      // Criar account com senha
-      await prisma.account.create({
+      if (!betterAuthResult?.user?.id) {
+        throw new Error("Erro ao criar usuario via Better Auth");
+      }
+
+      // Atualizar com campos customizados (nivel, ativo, emailVerified)
+      const user = await prisma.user.update({
+        where: { id: betterAuthResult.user.id },
         data: {
-          id: randomUUID(),
-          accountId: userId,
-          providerId: "credential",
-          userId: userId,
-          password: hashedPassword,
+          nivel: input.nivel,
+          ativo: true,
+          emailVerified: true,
         },
       });
 
@@ -242,9 +235,9 @@ export const adminRouter = router({
         throw new Error("Usuario nao encontrado");
       }
 
-      // Hash da nova senha
-      const bcrypt = await import("bcryptjs");
-      const hashedPassword = await bcrypt.hash(input.newPassword, 10);
+      // Usar o hasher interno do Better Auth para garantir compatibilidade
+      const authCtx = await auth.$context;
+      const hashedPassword = await authCtx.password.hash(input.newPassword);
 
       // Atualizar senha na account
       await prisma.account.updateMany({

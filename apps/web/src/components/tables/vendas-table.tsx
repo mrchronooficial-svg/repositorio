@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -56,6 +56,7 @@ interface VendasTableProps {
   podeVerValores: boolean;
   podeExcluir?: boolean;
   onView: (id: string) => void;
+  onEdit?: (id: string) => void;
   onDelete?: (id: string) => Promise<void>;
 }
 
@@ -65,6 +66,7 @@ export function VendasTable({
   podeVerValores,
   podeExcluir = false,
   onView,
+  onEdit,
   onDelete,
 }: VendasTableProps) {
   const [selectedImage, setSelectedImage] = useState<{ url: string; sku: string } | null>(null);
@@ -113,7 +115,7 @@ export function VendasTable({
             <TableHead>Repasse</TableHead>
             <TableHead>Envio</TableHead>
             {podeVerValores && <TableHead className="text-right">Valor</TableHead>}
-            {podeExcluir && <TableHead className="w-12"></TableHead>}
+            {(onEdit || podeExcluir) && <TableHead className="w-20"></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -167,23 +169,41 @@ export function VendasTable({
                   {venda.valorFinal ? formatCurrency(Number(venda.valorFinal)) : "-"}
                 </TableCell>
               )}
-              {podeExcluir && (
+              {(onEdit || podeExcluir) && (
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteDialog({
-                        id: venda.id,
-                        sku: venda.peca.sku,
-                      });
-                    }}
-                    title="Cancelar venda"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center justify-end gap-1">
+                    {onEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEdit(venda.id);
+                        }}
+                        title="Editar venda"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {podeExcluir && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteDialog({
+                            id: venda.id,
+                            sku: venda.peca.sku,
+                          });
+                        }}
+                        title="Cancelar venda"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               )}
             </TableRow>
