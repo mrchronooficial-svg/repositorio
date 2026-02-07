@@ -104,7 +104,11 @@ export const dashboardRouter = router({
         recebiveis: number;
         repassesPendentes: number;
         lucroMes: number;
+        lucroBrutoMes: number | null;
+        margemBrutaMes: number | null;
+        lucroBrutoPorPeca: number | null;
       } | null;
+      isAdmin: boolean;
     } = {
       estoque: {
         disponivel: pecasDisponiveis,
@@ -122,6 +126,7 @@ export const dashboardRouter = router({
         total: totalVendas,
       },
       financeiro: null,
+      isAdmin: userNivel === "ADMINISTRADOR",
     };
 
     // Adicionar metricas financeiras se usuario tem permissao
@@ -133,10 +138,14 @@ export const dashboardRouter = router({
         repassesPendentesResult,
         custoMesResult,
       ] = await Promise.all([
-        // Vendas do mes (para calcular faturamento real)
+        // Vendas do mes (para calcular faturamento real e lucro bruto)
         prisma.venda.findMany({
           where: { dataVenda: { gte: inicioMes }, cancelada: false },
-          select: { valorFinal: true, valorRepasseDevido: true },
+          select: {
+            valorFinal: true,
+            valorRepasseDevido: true,
+            peca: { select: { origemTipo: true, valorCompra: true } },
+          },
         }),
         // Vendas mes anterior (para calcular faturamento real)
         prisma.venda.findMany({
@@ -218,6 +227,42 @@ export const dashboardRouter = router({
       // Ticket medio
       const ticketMedio = vendasMes > 0 ? faturamentoMes / vendasMes : 0;
 
+      // Calcular lucro bruto (apenas para admin)
+      let lucroBrutoMes: number | null = null;
+      let margemBrutaMes: number | null = null;
+      let lucroBrutoPorPeca: number | null = null;
+
+      if (userNivel === "ADMINISTRADOR") {
+        const somaValorFinal = vendasMesResult.reduce(
+          (sum, v) => sum + (Number(v.valorFinal) || 0),
+          0
+        );
+
+        lucroBrutoMes = vendasMesResult.reduce((total, v) => {
+          const valorFinal = Number(v.valorFinal) || 0;
+          const origemTipo = v.peca.origemTipo;
+
+          if (origemTipo === "CONSIGNACAO") {
+            const valorRepasse = Number(v.valorRepasseDevido) || 0;
+            return total + (valorFinal - valorRepasse);
+          } else {
+            // COMPRA
+            const valorCompra = Number(v.peca.valorCompra) || 0;
+            return total + (valorFinal - valorCompra);
+          }
+        }, 0);
+
+        margemBrutaMes =
+          somaValorFinal > 0
+            ? Math.round((lucroBrutoMes / somaValorFinal) * 1000) / 10
+            : 0;
+
+        lucroBrutoPorPeca =
+          vendasMesResult.length > 0
+            ? Math.round((lucroBrutoMes / vendasMesResult.length) * 100) / 100
+            : 0;
+      }
+
       resultado.financeiro = {
         faturamentoMes,
         faturamentoMesAnterior,
@@ -226,6 +271,9 @@ export const dashboardRouter = router({
         recebiveis,
         repassesPendentes,
         lucroMes,
+        lucroBrutoMes,
+        margemBrutaMes,
+        lucroBrutoPorPeca,
       };
     }
 

@@ -47,7 +47,7 @@ import { cn } from "@/lib/utils";
 export function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { podeVerValores } = usePermissions();
+  const { podeVerValores, isAdmin } = usePermissions();
   const [showRecebiveisModal, setShowRecebiveisModal] = useState(false);
   const [showDividasModal, setShowDividasModal] = useState(false);
 
@@ -214,6 +214,49 @@ export function DashboardPage() {
                   {formatCurrency(metricasValorEstoque.valorFaturamento)}
                 </p>
                 <p className="text-xs text-muted-foreground">valor de venda estimado</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Card de Lucro Bruto (apenas admin) */}
+      {isAdmin && metricas?.financeiro?.lucroBrutoMes !== null && metricas?.financeiro?.lucroBrutoMes !== undefined && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Lucro Bruto do Mes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Lucro Bruto</p>
+                <p className={cn(
+                  "text-2xl font-bold",
+                  metricas.financeiro.lucroBrutoMes >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {formatCurrency(metricas.financeiro.lucroBrutoMes)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Margem Bruta</p>
+                <p className={cn(
+                  "text-2xl font-bold",
+                  (metricas.financeiro.margemBrutaMes ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {metricas.financeiro.margemBrutaMes ?? 0}%
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Lucro por Peca</p>
+                <p className={cn(
+                  "text-2xl font-bold",
+                  (metricas.financeiro.lucroBrutoPorPeca ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {formatCurrency(metricas.financeiro.lucroBrutoPorPeca ?? 0)}
+                </p>
               </div>
             </div>
           </CardContent>
