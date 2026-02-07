@@ -338,6 +338,14 @@ export const vendaRouter = router({
         });
       }
 
+      // 1.5 Apenas Admin/Socio podem alterar a data da venda
+      if (input.dataVenda && !["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Apenas administradores e socios podem alterar a data da venda",
+        });
+      }
+
       // 2. Validar cliente (se alterado)
       if (input.clienteId) {
         const cliente = await prisma.cliente.findUnique({

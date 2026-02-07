@@ -19,6 +19,7 @@ export interface Permissions {
   podeAcessarAdmin: boolean;
   podeCancelarVenda: boolean;
   podeRegistrarRepasse: boolean;
+  podeEditarDataVenda: boolean;
 
   // Nível atual
   nivel: NivelAcesso | null;
@@ -55,6 +56,9 @@ export function usePermissions(): Permissions {
   // Sócio e Admin podem registrar repasse
   const podeRegistrarRepasse = isAdmin || isSocio;
 
+  // Sócio e Admin podem editar data da venda
+  const podeEditarDataVenda = isAdmin || isSocio;
+
   return {
     isAdmin,
     isSocio,
@@ -65,6 +69,7 @@ export function usePermissions(): Permissions {
     podeAcessarAdmin,
     podeCancelarVenda,
     podeRegistrarRepasse,
+    podeEditarDataVenda,
     nivel: nivel ?? null,
     isLoading: isPending,
   };

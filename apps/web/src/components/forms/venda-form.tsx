@@ -21,6 +21,7 @@ import { ClienteModal } from "./cliente-modal";
 import { trpc } from "@/utils/trpc";
 import { toast } from "sonner";
 import { formatCurrency } from "@/lib/formatters";
+import { usePermissions } from "@/hooks/use-permissions";
 
 interface VendaFormInitialData {
   id: string;
@@ -66,6 +67,7 @@ const defaultData: VendaData = {
 
 export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
   const router = useRouter();
+  const { podeEditarDataVenda } = usePermissions();
   const [data, setData] = useState<VendaData>(() => {
     if (initialData) {
       return {
@@ -199,7 +201,7 @@ export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
           ? parseInt(data.parcelas, 10)
           : null,
         observacaoLogistica: data.observacaoLogistica || null,
-        dataVenda: data.dataVenda ? new Date(data.dataVenda + "T12:00:00") : undefined,
+        dataVenda: podeEditarDataVenda && data.dataVenda ? new Date(data.dataVenda + "T12:00:00") : undefined,
         valorDeclarar: data.valorDeclarar ? parseFloat(data.valorDeclarar) : null,
       });
     } else {
@@ -622,10 +624,13 @@ export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
               type="date"
               value={data.dataVenda}
               onChange={(e) => handleChange("dataVenda", e.target.value)}
+              disabled={isEditing && !podeEditarDataVenda}
             />
             <p className="text-xs text-muted-foreground">
               {isEditing
-                ? "Altere a data em que a venda foi realizada."
+                ? podeEditarDataVenda
+                  ? "Altere a data em que a venda foi realizada."
+                  : "Apenas administradores e socios podem alterar a data da venda."
                 : "Opcional. Se nao informado, sera usada a data de hoje."
               }
             </p>
