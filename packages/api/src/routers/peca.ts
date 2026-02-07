@@ -18,7 +18,8 @@ const PecaCreateSchema = z.object({
   valorEstimadoVenda: z.number().positive("Valor estimado deve ser positivo"),
   origemTipo: z.enum(["COMPRA", "CONSIGNACAO"]),
   origemCanal: z.enum(["PESSOA_FISICA", "LEILAO_BRASIL", "EBAY"]).optional(),
-  valorRepasse: z.number().positive().optional(), // Obrigatorio se consignacao
+  valorRepasse: z.number().positive().optional(), // Valor fixo de repasse (consignacao)
+  percentualRepasse: z.number().positive().max(100).optional(), // Percentual do valor final (consignacao)
   localizacao: z.string().default("Fornecedor"),
   fornecedorId: z.string().cuid("Fornecedor invalido"),
   fotos: z.array(z.string().min(1)).min(1, "Minimo 1 foto obrigatoria"),
@@ -47,6 +48,7 @@ const PecaUpdateSchema = z.object({
   valorCompra: z.number().positive().optional(),
   valorEstimadoVenda: z.number().positive().optional(),
   valorRepasse: z.number().positive().optional().nullable(),
+  percentualRepasse: z.number().positive().max(100).optional().nullable(),
   localizacao: z.string().optional(),
 });
 
@@ -122,6 +124,7 @@ export const pecaRouter = router({
         valorCompra: podeVerValores ? peca.valorCompra : null,
         valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
         valorRepasse: podeVerValores ? peca.valorRepasse : null,
+        percentualRepasse: podeVerValores ? peca.percentualRepasse : null,
         statusPagamentoFornecedor: podeVerValores ? peca.statusPagamentoFornecedor : null,
       }));
 
@@ -182,6 +185,7 @@ export const pecaRouter = router({
         valorCompra: podeVerValores ? peca.valorCompra : null,
         valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
         valorRepasse: podeVerValores ? peca.valorRepasse : null,
+        percentualRepasse: podeVerValores ? peca.percentualRepasse : null,
       }));
 
       return {
@@ -232,6 +236,7 @@ export const pecaRouter = router({
         valorCompra: podeVerValores ? peca.valorCompra : null,
         valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
         valorRepasse: podeVerValores ? peca.valorRepasse : null,
+        percentualRepasse: podeVerValores ? peca.percentualRepasse : null,
         valorPagoFornecedor: podeVerValores ? peca.valorPagoFornecedor : null,
         // Ocultar pagamentos se nao puder ver valores
         pagamentosFornecedor: podeVerValores ? peca.pagamentosFornecedor : [],
@@ -253,12 +258,20 @@ export const pecaRouter = router({
   create: protectedProcedure
     .input(PecaCreateSchema)
     .mutation(async ({ input, ctx }) => {
-      // Validar consignacao
-      if (input.origemTipo === "CONSIGNACAO" && !input.valorRepasse) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Valor de repasse e obrigatorio para consignacao",
-        });
+      // Validar consignacao - exigir pelo menos um tipo de repasse
+      if (input.origemTipo === "CONSIGNACAO") {
+        if (!input.valorRepasse && !input.percentualRepasse) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Valor de repasse ou percentual e obrigatorio para consignacao",
+          });
+        }
+        if (input.valorRepasse && input.percentualRepasse) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Informe apenas valor fixo OU percentual, nao ambos",
+          });
+        }
       }
 
       // Verificar se fornecedor existe
@@ -291,7 +304,8 @@ export const pecaRouter = router({
           valorEstimadoVenda: input.valorEstimadoVenda,
           origemTipo: input.origemTipo,
           origemCanal: input.origemCanal,
-          valorRepasse: input.valorRepasse,
+          valorRepasse: input.percentualRepasse ? null : input.valorRepasse,
+          percentualRepasse: input.valorRepasse ? null : input.percentualRepasse,
           localizacao: input.localizacao,
           status: "EM_TRANSITO",
           fornecedorId: input.fornecedorId,
@@ -331,9 +345,18 @@ export const pecaRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
 
+      // Garantir exclusividade mutua entre valorRepasse e percentualRepasse
+      const updateData: Record<string, unknown> = { ...data };
+      if (data.valorRepasse !== undefined && data.valorRepasse !== null) {
+        updateData.percentualRepasse = null;
+      }
+      if (data.percentualRepasse !== undefined && data.percentualRepasse !== null) {
+        updateData.valorRepasse = null;
+      }
+
       const peca = await prisma.peca.update({
         where: { id },
-        data,
+        data: updateData,
       });
 
       await registrarAuditoria({

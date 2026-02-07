@@ -191,7 +191,8 @@ model Peca {
   // Origem
   origemTipo       OrigemTipo
   origemCanal      OrigemCanal?
-  valorRepasse     Decimal?    @db.Decimal(10, 2) // Para consignação
+  valorRepasse     Decimal?    @db.Decimal(10, 2) // Para consignação (valor fixo)
+  percentualRepasse Float?     // Ex: 10.5 para 10,5% do valor final da venda
   // Pagamento ao fornecedor (para compras diretas)
   statusPagamentoFornecedor StatusPagamento @default(NAO_PAGO)
   valorPagoFornecedor       Decimal         @default(0) @db.Decimal(10, 2)

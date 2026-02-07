@@ -93,7 +93,6 @@ export default function EditarVendaPage() {
           parcelas: venda.parcelas ? venda.parcelas.toString() : "",
           observacaoLogistica: venda.observacaoLogistica || "",
           dataVenda: formatDateForInput(venda.dataVenda),
-          valorDeclarar: venda.valorDeclarar ? Number(venda.valorDeclarar).toString() : "",
         }}
         isEditing
       />

@@ -33,7 +33,6 @@ interface VendaFormInitialData {
   parcelas: string;
   observacaoLogistica: string;
   dataVenda: string;
-  valorDeclarar: string;
 }
 
 interface VendaFormProps {
@@ -50,7 +49,6 @@ interface VendaData {
   pagamentoInicial: string;
   observacaoLogistica: string;
   dataVenda: string;
-  valorDeclarar: string;
 }
 
 const defaultData: VendaData = {
@@ -62,7 +60,6 @@ const defaultData: VendaData = {
   pagamentoInicial: "",
   observacaoLogistica: "",
   dataVenda: "",
-  valorDeclarar: "",
 };
 
 export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
@@ -79,7 +76,6 @@ export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
         pagamentoInicial: "",
         observacaoLogistica: initialData.observacaoLogistica,
         dataVenda: initialData.dataVenda,
-        valorDeclarar: initialData.valorDeclarar,
       };
     }
     return defaultData;
@@ -202,7 +198,6 @@ export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
           : null,
         observacaoLogistica: data.observacaoLogistica || null,
         dataVenda: podeEditarDataVenda && data.dataVenda ? new Date(data.dataVenda + "T12:00:00") : undefined,
-        valorDeclarar: data.valorDeclarar ? parseFloat(data.valorDeclarar) : null,
       });
     } else {
       createMutation.mutate({
@@ -216,9 +211,6 @@ export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
           : undefined,
         observacaoLogistica: data.observacaoLogistica || undefined,
         dataVenda: data.dataVenda ? new Date(data.dataVenda + "T12:00:00") : undefined,
-        valorDeclarar: data.valorDeclarar
-          ? parseFloat(data.valorDeclarar)
-          : undefined,
       });
     }
   };
@@ -524,21 +516,29 @@ export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="valorDeclarar">Valor a Declarar (R$)</Label>
-            <Input
-              id="valorDeclarar"
-              type="number"
-              step="0.01"
-              min="0"
-              value={data.valorDeclarar}
-              onChange={(e) => handleChange("valorDeclarar", e.target.value)}
-              placeholder="Valor que sera declarado na nota fiscal"
-            />
-            <p className="text-xs text-muted-foreground">
-              Valor que sera declarado na nota fiscal
-            </p>
-          </div>
+          {pecaSelecionada && (
+            <div className="space-y-2">
+              <Label>Valor a Declarar (R$)</Label>
+              <div className="p-2 bg-muted rounded text-lg font-medium text-orange-600">
+                {pecaSelecionada.origemTipo === "CONSIGNACAO"
+                  ? formatCurrency(
+                      valorFinal - (
+                        pecaSelecionada.percentualRepasse
+                          ? valorFinal * pecaSelecionada.percentualRepasse / 100
+                          : Number(pecaSelecionada.valorRepasse || 0)
+                      )
+                    )
+                  : formatCurrency(valorFinal)
+                }
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {pecaSelecionada.origemTipo === "CONSIGNACAO"
+                  ? "Calculado automaticamente: valor final - valor de repasse"
+                  : "Calculado automaticamente: valor efetivo da venda"
+                }
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">

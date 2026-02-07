@@ -16,7 +16,6 @@ const VendaCreateSchema = z.object({
   pagamentoInicial: z.number().min(0).optional(),
   observacaoLogistica: z.string().optional(),
   dataVenda: z.coerce.date().optional(),
-  valorDeclarar: z.number().min(0).optional(),
 });
 
 const VendaUpdateSchema = z.object({
@@ -27,7 +26,6 @@ const VendaUpdateSchema = z.object({
   parcelas: z.number().int().min(1).max(12).nullable().optional(),
   observacaoLogistica: z.string().nullable().optional(),
   dataVenda: z.coerce.date().optional(),
-  valorDeclarar: z.number().min(0).nullable().optional(),
 });
 
 const VendaListSchema = z.object({
@@ -226,12 +224,25 @@ export const vendaRouter = router({
       let valorRepasseDevido = null;
       let statusRepasse = null;
 
-      if (peca.origemTipo === "CONSIGNACAO" && peca.valorRepasse) {
-        valorRepasseDevido = Number(peca.valorRepasse);
-        statusRepasse = "PENDENTE" as const;
+      if (peca.origemTipo === "CONSIGNACAO") {
+        if (peca.percentualRepasse) {
+          valorRepasseDevido = valorFinal * peca.percentualRepasse / 100;
+        } else if (peca.valorRepasse) {
+          valorRepasseDevido = Number(peca.valorRepasse);
+        }
+        if (valorRepasseDevido) {
+          statusRepasse = "PENDENTE" as const;
+        }
       }
 
-      // 6. Criar venda
+      // 6. Calcular valor a declarar automaticamente
+      // COMPRA: valor a declarar = valor final da venda
+      // CONSIGNACAO: valor a declarar = valor final - valor de repasse (margem da empresa)
+      const valorDeclarar = peca.origemTipo === "CONSIGNACAO" && valorRepasseDevido
+        ? valorFinal - valorRepasseDevido
+        : valorFinal;
+
+      // 7. Criar venda
       const venda = await prisma.venda.create({
         data: {
           pecaId: input.pecaId,
@@ -248,11 +259,11 @@ export const vendaRouter = router({
           statusRepasse,
           observacaoLogistica: input.observacaoLogistica || null,
           dataVenda: input.dataVenda || new Date(),
-          valorDeclarar: input.valorDeclarar ?? null,
+          valorDeclarar,
         },
       });
 
-      // 7. Registrar pagamento inicial (se houver)
+      // 8. Registrar pagamento inicial (se houver)
       if (input.pagamentoInicial && input.pagamentoInicial > 0) {
         await prisma.pagamento.create({
           data: {
@@ -271,7 +282,7 @@ export const vendaRouter = router({
         });
       }
 
-      // 8. Criar alerta de repasse (se consignacao)
+      // 9. Criar alerta de repasse (se consignacao)
       if (valorRepasseDevido) {
         await criarAlertaRepassePendente(
           venda.id,
@@ -280,7 +291,7 @@ export const vendaRouter = router({
         );
       }
 
-      // 9. Atualizar peca
+      // 10. Atualizar peca
       await prisma.peca.update({
         where: { id: input.pecaId },
         data: {
@@ -298,7 +309,7 @@ export const vendaRouter = router({
         },
       });
 
-      // 10. Registrar auditoria
+      // 11. Registrar auditoria
       await registrarAuditoria({
         userId: ctx.user.id,
         acao: "CRIAR",
@@ -364,22 +375,50 @@ export const vendaRouter = router({
       const valorDesconto = input.valorDesconto !== undefined ? input.valorDesconto : Number(venda.valorDesconto || 0);
       const valorFinal = valorOriginal - valorDesconto;
 
-      // 4. Atualizar venda
+      // 4. Recalcular repasse se a peca tem percentualRepasse e valorFinal mudou
+      const updateData: Record<string, unknown> = {
+        ...(input.clienteId && { clienteId: input.clienteId }),
+        valorDesconto,
+        valorFinal,
+        ...(input.formaPagamento && { formaPagamento: input.formaPagamento }),
+        ...(input.parcelas !== undefined && { parcelas: input.parcelas }),
+        ...(input.observacaoLogistica !== undefined && { observacaoLogistica: input.observacaoLogistica }),
+        ...(input.dataVenda && { dataVenda: input.dataVenda }),
+      };
+
+      // Determinar o valorRepasseDevido atual (pode ser recalculado abaixo)
+      let repasseDevidoAtual = Number(venda.valorRepasseDevido) || 0;
+
+      if (venda.peca.origemTipo === "CONSIGNACAO" && venda.peca.percentualRepasse && valorFinal !== Number(venda.valorFinal)) {
+        const novoRepasseDevido = valorFinal * venda.peca.percentualRepasse / 100;
+        updateData.valorRepasseDevido = novoRepasseDevido;
+        repasseDevidoAtual = novoRepasseDevido;
+        // Recalcular status do repasse considerando repasses ja feitos
+        const repasseFeito = Number(venda.valorRepasseFeito) || 0;
+        if (repasseFeito >= novoRepasseDevido) {
+          updateData.statusRepasse = "FEITO";
+        } else if (repasseFeito > 0) {
+          updateData.statusRepasse = "PARCIAL";
+        } else {
+          updateData.statusRepasse = "PENDENTE";
+        }
+      }
+
+      // 5. Recalcular valor a declarar automaticamente
+      // COMPRA: valor a declarar = valor final da venda
+      // CONSIGNACAO: valor a declarar = valor final - valor de repasse
+      const valorDeclarar = venda.peca.origemTipo === "CONSIGNACAO" && repasseDevidoAtual > 0
+        ? valorFinal - repasseDevidoAtual
+        : valorFinal;
+      updateData.valorDeclarar = valorDeclarar;
+
+      // Atualizar venda
       const vendaAtualizada = await prisma.venda.update({
         where: { id: input.id },
-        data: {
-          ...(input.clienteId && { clienteId: input.clienteId }),
-          valorDesconto,
-          valorFinal,
-          ...(input.formaPagamento && { formaPagamento: input.formaPagamento }),
-          ...(input.parcelas !== undefined && { parcelas: input.parcelas }),
-          ...(input.observacaoLogistica !== undefined && { observacaoLogistica: input.observacaoLogistica }),
-          ...(input.dataVenda && { dataVenda: input.dataVenda }),
-          ...(input.valorDeclarar !== undefined && { valorDeclarar: input.valorDeclarar }),
-        },
+        data: updateData,
       });
 
-      // 5. Registrar auditoria
+      // 6. Registrar auditoria
       await registrarAuditoria({
         userId: ctx.user.id,
         acao: "EDITAR",
@@ -723,7 +762,9 @@ export const vendaRouter = router({
       const venda = await prisma.venda.findUnique({
         where: { id: input.vendaId },
         include: {
-          peca: true,
+          peca: {
+            include: { fotos: true },
+          },
         },
       });
 
@@ -753,7 +794,7 @@ export const vendaRouter = router({
       // Criar nova peca com SKU derivado
       const novoSku = await gerarSKUDevolucao(venda.peca.skuBase);
 
-      await prisma.peca.create({
+      const novaPeca = await prisma.peca.create({
         data: {
           sku: novoSku,
           skuBase: venda.peca.skuBase,
@@ -769,6 +810,7 @@ export const vendaRouter = router({
           origemTipo: venda.peca.origemTipo,
           origemCanal: venda.peca.origemCanal,
           valorRepasse: venda.peca.valorRepasse,
+          percentualRepasse: venda.peca.percentualRepasse,
           status: "DISPONIVEL",
           localizacao: "Rafael",
           fornecedorId: venda.peca.fornecedorId,
@@ -781,6 +823,17 @@ export const vendaRouter = router({
           },
         },
       });
+
+      // Copiar fotos da peca original para a nova peca
+      if (venda.peca.fotos.length > 0) {
+        await prisma.foto.createMany({
+          data: venda.peca.fotos.map((foto) => ({
+            url: foto.url,
+            ordem: foto.ordem,
+            pecaId: novaPeca.id,
+          })),
+        });
+      }
 
       // Incrementar contador de devolucoes na peca original
       await prisma.peca.update({

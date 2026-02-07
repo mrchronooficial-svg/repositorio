@@ -31,7 +31,9 @@ interface PecaData {
   valorEstimadoVenda: string;
   origemTipo: "COMPRA" | "CONSIGNACAO";
   origemCanal: "PESSOA_FISICA" | "LEILAO_BRASIL" | "EBAY" | "";
+  tipoRepasse: "FIXO" | "PERCENTUAL";
   valorRepasse: string;
+  percentualRepasse: string;
   localizacao: string;
   fornecedorId: string;
   fotos: string[];
@@ -53,7 +55,9 @@ const defaultData: PecaData = {
   valorEstimadoVenda: "",
   origemTipo: "COMPRA",
   origemCanal: "",
+  tipoRepasse: "FIXO",
   valorRepasse: "",
+  percentualRepasse: "",
   localizacao: "Fornecedor",
   fornecedorId: "",
   fotos: [],
@@ -185,10 +189,17 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
     if (!data.fornecedorId) newErrors.fornecedorId = "Fornecedor e obrigatorio";
     if (data.fotos.length === 0) newErrors.fotos = "Minimo 1 foto obrigatoria";
 
-    // Valor de repasse so e obrigatorio se for CONSIGNACAO
+    // Repasse so e obrigatorio se for CONSIGNACAO
     if (data.origemTipo === "CONSIGNACAO") {
-      if (!data.valorRepasse || isNaN(parseFloat(data.valorRepasse))) {
-        newErrors.valorRepasse = "Valor de repasse e obrigatorio para consignacao";
+      if (data.tipoRepasse === "FIXO") {
+        if (!data.valorRepasse || isNaN(parseFloat(data.valorRepasse))) {
+          newErrors.valorRepasse = "Valor de repasse e obrigatorio para consignacao";
+        }
+      } else {
+        const pct = parseFloat(data.percentualRepasse);
+        if (!data.percentualRepasse || isNaN(pct) || pct <= 0 || pct > 100) {
+          newErrors.percentualRepasse = "Percentual deve ser entre 0,01 e 100";
+        }
       }
     }
 
@@ -216,7 +227,12 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       valorEstimadoVenda: parseFloat(data.valorEstimadoVenda),
       origemTipo: data.origemTipo,
       origemCanal: data.origemCanal || undefined,
-      valorRepasse: data.valorRepasse ? parseFloat(data.valorRepasse) : undefined,
+      valorRepasse: data.origemTipo === "CONSIGNACAO" && data.tipoRepasse === "FIXO" && data.valorRepasse
+        ? parseFloat(data.valorRepasse)
+        : undefined,
+      percentualRepasse: data.origemTipo === "CONSIGNACAO" && data.tipoRepasse === "PERCENTUAL" && data.percentualRepasse
+        ? parseFloat(data.percentualRepasse)
+        : undefined,
       localizacao: data.localizacao,
       fornecedorId: data.fornecedorId,
       fotos: data.fotos,
@@ -233,7 +249,8 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         materialPulseira: payload.materialPulseira,
         valorCompra: payload.valorCompra,
         valorEstimadoVenda: payload.valorEstimadoVenda,
-        valorRepasse: payload.valorRepasse,
+        valorRepasse: payload.valorRepasse ?? null,
+        percentualRepasse: payload.percentualRepasse ?? null,
         localizacao: payload.localizacao,
       });
       // Atualizar fotos separadamente
@@ -481,20 +498,68 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
             </div>
 
             {data.origemTipo === "CONSIGNACAO" && (
-              <div className="space-y-2">
-                <Label htmlFor="valorRepasse">Valor Repasse (R$) *</Label>
-                <Input
-                  id="valorRepasse"
-                  type="number"
-                  step="0.01"
-                  value={data.valorRepasse}
-                  onChange={(e) => handleChange("valorRepasse", e.target.value)}
-                  placeholder="0,00"
-                />
-                {errors.valorRepasse && (
-                  <p className="text-sm text-red-500">{errors.valorRepasse}</p>
+              <>
+                <div className="space-y-2">
+                  <Label>Tipo de Repasse *</Label>
+                  <Select
+                    value={data.tipoRepasse}
+                    onValueChange={(value) => {
+                      handleChange("tipoRepasse", value);
+                      // Limpar o campo do outro tipo
+                      if (value === "FIXO") {
+                        handleChange("percentualRepasse", "");
+                      } else {
+                        handleChange("valorRepasse", "");
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FIXO">Valor Fixo (R$)</SelectItem>
+                      <SelectItem value="PERCENTUAL">Percentual do Valor Final (%)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {data.tipoRepasse === "FIXO" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="valorRepasse">Valor Repasse (R$) *</Label>
+                    <Input
+                      id="valorRepasse"
+                      type="number"
+                      step="0.01"
+                      value={data.valorRepasse}
+                      onChange={(e) => handleChange("valorRepasse", e.target.value)}
+                      placeholder="0,00"
+                    />
+                    {errors.valorRepasse && (
+                      <p className="text-sm text-red-500">{errors.valorRepasse}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="percentualRepasse">Percentual de Repasse (%) *</Label>
+                    <Input
+                      id="percentualRepasse"
+                      type="number"
+                      step="0.1"
+                      min="0.01"
+                      max="100"
+                      value={data.percentualRepasse}
+                      onChange={(e) => handleChange("percentualRepasse", e.target.value)}
+                      placeholder="Ex: 10"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      O valor de repasse sera calculado como este percentual sobre o valor final da venda
+                    </p>
+                    {errors.percentualRepasse && (
+                      <p className="text-sm text-red-500">{errors.percentualRepasse}</p>
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </CardContent>

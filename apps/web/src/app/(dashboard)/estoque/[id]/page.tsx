@@ -307,6 +307,16 @@ export default function PecaDetalhesPage() {
                       </p>
                     </div>
                   )}
+                  {peca.origemTipo === "CONSIGNACAO" && peca.percentualRepasse && (
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Repasse (ao fornecedor)
+                      </p>
+                      <p className="font-medium">
+                        {peca.percentualRepasse}% do valor final da venda
+                      </p>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="col-span-3">
