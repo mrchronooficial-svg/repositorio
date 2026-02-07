@@ -32,6 +32,8 @@ interface Peca {
   sku: string;
   marca: string;
   modelo: string;
+  origemTipo?: string;
+  valorCompra?: Decimal | null;
   fotos: Foto[];
 }
 
@@ -43,6 +45,7 @@ interface Venda {
   id: string;
   dataVenda: Date | string;
   valorFinal: Decimal | null;
+  valorRepasseDevido?: Decimal | null;
   statusPagamento: string;
   statusRepasse: string | null;
   statusEnvio: string;
@@ -115,6 +118,7 @@ export function VendasTable({
             <TableHead>Repasse</TableHead>
             <TableHead>Envio</TableHead>
             {podeVerValores && <TableHead className="text-right">Valor</TableHead>}
+            {podeVerValores && <TableHead className="text-right">Lucro Bruto</TableHead>}
             {(onEdit || podeExcluir) && <TableHead className="w-20"></TableHead>}
           </TableRow>
         </TableHeader>
@@ -167,6 +171,24 @@ export function VendasTable({
               {podeVerValores && (
                 <TableCell className="text-right font-medium">
                   {venda.valorFinal ? formatCurrency(Number(venda.valorFinal)) : "-"}
+                </TableCell>
+              )}
+              {podeVerValores && (
+                <TableCell className="text-right font-medium">
+                  {(() => {
+                    const valorFinal = Number(venda.valorFinal) || 0;
+                    if (!valorFinal) return "-";
+                    const custo =
+                      venda.peca.origemTipo === "CONSIGNACAO"
+                        ? Number(venda.valorRepasseDevido) || 0
+                        : Number(venda.peca.valorCompra) || 0;
+                    const lucro = valorFinal - custo;
+                    return (
+                      <span className={lucro >= 0 ? "text-green-600" : "text-red-600"}>
+                        {formatCurrency(lucro)}
+                      </span>
+                    );
+                  })()}
                 </TableCell>
               )}
               {(onEdit || podeExcluir) && (

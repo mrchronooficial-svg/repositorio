@@ -39,7 +39,9 @@ interface Peca {
   modelo: string;
   status: string;
   localizacao: string;
+  valorCompra: Decimal | null;
   valorEstimadoVenda: Decimal | null;
+  valorRepasse?: Decimal | null;
   statusPagamentoFornecedor?: string;
   origemTipo?: string;
   fotos: Foto[];
@@ -119,6 +121,7 @@ export function PecasTable({
           <TableHead>Localizacao</TableHead>
           {podeVerValores && <TableHead>Pgto. Fornecedor</TableHead>}
           {podeVerValores && <TableHead className="text-right">Valor</TableHead>}
+          {podeVerValores && <TableHead className="text-right">Lucro Bruto</TableHead>}
           {podeExcluir && <TableHead className="w-12"></TableHead>}
         </TableRow>
       </TableHeader>
@@ -213,6 +216,24 @@ export function PecasTable({
                 {peca.valorEstimadoVenda
                   ? formatCurrency(Number(peca.valorEstimadoVenda))
                   : "-"}
+              </TableCell>
+            )}
+            {podeVerValores && (
+              <TableCell className="text-right font-medium">
+                {(() => {
+                  const valorVenda = Number(peca.valorEstimadoVenda) || 0;
+                  if (!valorVenda) return "-";
+                  const custo =
+                    peca.origemTipo === "CONSIGNACAO"
+                      ? Number(peca.valorRepasse) || 0
+                      : Number(peca.valorCompra) || 0;
+                  const lucro = valorVenda - custo;
+                  return (
+                    <span className={lucro >= 0 ? "text-green-600" : "text-red-600"}>
+                      {formatCurrency(lucro)}
+                    </span>
+                  );
+                })()}
               </TableCell>
             )}
             {podeExcluir && (

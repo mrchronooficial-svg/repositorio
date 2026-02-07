@@ -85,6 +85,8 @@ export const vendaRouter = router({
                 sku: true,
                 marca: true,
                 modelo: true,
+                origemTipo: true,
+                valorCompra: true,
                 fotos: { take: 1, select: { url: true } },
               },
             },
@@ -103,6 +105,10 @@ export const vendaRouter = router({
         valorFinal: podeVerValores ? v.valorFinal : null,
         valorRepasseDevido: podeVerValores ? v.valorRepasseDevido : null,
         valorRepasseFeito: podeVerValores ? v.valorRepasseFeito : null,
+        peca: {
+          ...v.peca,
+          valorCompra: podeVerValores ? v.peca.valorCompra : null,
+        },
       }));
 
       return {
