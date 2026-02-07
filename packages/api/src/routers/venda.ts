@@ -15,7 +15,7 @@ const VendaCreateSchema = z.object({
   parcelas: z.number().int().min(1).max(12).optional(),
   pagamentoInicial: z.number().min(0).optional(),
   observacaoLogistica: z.string().optional(),
-  dataVenda: z.date().optional(),
+  dataVenda: z.coerce.date().optional(),
   valorDeclarar: z.number().min(0).optional(),
 });
 
@@ -26,7 +26,7 @@ const VendaUpdateSchema = z.object({
   formaPagamento: z.enum(["PIX", "CREDITO_VISTA", "CREDITO_PARCELADO"]).optional(),
   parcelas: z.number().int().min(1).max(12).nullable().optional(),
   observacaoLogistica: z.string().nullable().optional(),
-  dataVenda: z.date().optional(),
+  dataVenda: z.coerce.date().optional(),
   valorDeclarar: z.number().min(0).nullable().optional(),
 });
 
