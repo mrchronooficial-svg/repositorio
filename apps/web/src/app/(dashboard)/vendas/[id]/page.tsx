@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StatusBadge } from "@/components/status-badge";
+import { LogAtividade } from "@/components/log-atividade";
 import { PagamentoDialog } from "@/components/dialogs/pagamento-dialog";
 import { RepasseDialog } from "@/components/dialogs/repasse-dialog";
 import { EditarPagamentoDialog } from "@/components/dialogs/editar-pagamento-dialog";
@@ -31,7 +32,7 @@ export default function VendaDetalhesPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { podeVerValores, podeCancelarVenda, podeRegistrarRepasse } = usePermissions();
+  const { podeVerValores, podeCancelarVenda, podeRegistrarRepasse, isAdmin } = usePermissions();
 
   const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
   const [repasseDialogOpen, setRepasseDialogOpen] = useState(false);
@@ -458,6 +459,8 @@ export default function VendaDetalhesPage() {
           )}
         </div>
       </div>
+
+      {isAdmin && <LogAtividade entidade="VENDA" entidadeId={id} />}
 
       {/* Dialogs */}
       {venda._saldoDevedor !== null && (

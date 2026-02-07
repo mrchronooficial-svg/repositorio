@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StatusBadge } from "@/components/status-badge";
+import { LogAtividade } from "@/components/log-atividade";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -24,7 +25,7 @@ export default function ClienteDetalhesPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { podeVerValores, podeExcluir } = usePermissions();
+  const { podeVerValores, podeExcluir, isAdmin } = usePermissions();
 
   const id = params.id as string;
 
@@ -339,6 +340,8 @@ export default function ClienteDetalhesPage() {
           </Card>
         </div>
       </div>
+
+      {isAdmin && <LogAtividade entidade="CLIENTE" entidadeId={id} />}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StatusBadge } from "@/components/status-badge";
+import { LogAtividade } from "@/components/log-atividade";
 import { HistoricoStatus } from "@/components/historico-status";
 import { StatusDialog } from "@/components/dialogs/status-dialog";
 import { PagamentoFornecedorDialog } from "@/components/dialogs/pagamento-fornecedor-dialog";
@@ -540,6 +541,8 @@ export default function PecaDetalhesPage() {
           </Card>
         </div>
       </div>
+
+      {isAdmin && <LogAtividade entidade="PECA" entidadeId={id} />}
 
       {/* Dialog de status */}
       <StatusDialog

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StatusBadge } from "@/components/status-badge";
+import { LogAtividade } from "@/components/log-atividade";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCPFCNPJ, formatPhone, formatCEP, formatCurrency } from "@/lib/formatters";
@@ -301,6 +302,8 @@ export default function FornecedorDetalhesPage() {
           </Card>
         </div>
       </div>
+
+      {isAdmin && <LogAtividade entidade="FORNECEDOR" entidadeId={id} />}
     </div>
   );
 }
