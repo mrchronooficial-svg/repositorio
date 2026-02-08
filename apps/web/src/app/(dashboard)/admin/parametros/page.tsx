@@ -23,8 +23,35 @@ export default function ParametrosPage() {
   const [diasRelojoeiro, setDiasRelojoeiro] = useState("");
   const [diasAlertaEnvio, setDiasAlertaEnvio] = useState("");
 
+  // Estado para configurações de urgência do catálogo
+  const [catalogoConfigs, setCatalogoConfigs] = useState<Record<string, string>>({
+    catalogo_urgencia_header_viewers_min: "15",
+    catalogo_urgencia_header_viewers_max: "45",
+    catalogo_urgencia_viewers_min_baixo: "10",
+    catalogo_urgencia_viewers_max_baixo: "20",
+    catalogo_urgencia_viewers_min_medio: "15",
+    catalogo_urgencia_viewers_max_medio: "30",
+    catalogo_urgencia_viewers_min_alto: "25",
+    catalogo_urgencia_viewers_max_alto: "45",
+    catalogo_urgencia_vendidos_min_baixo: "4",
+    catalogo_urgencia_vendidos_max_baixo: "8",
+    catalogo_urgencia_vendidos_min_medio: "2",
+    catalogo_urgencia_vendidos_max_medio: "5",
+    catalogo_urgencia_vendidos_min_alto: "1",
+    catalogo_urgencia_vendidos_max_alto: "3",
+    catalogo_urgencia_interacoes_min_baixo: "15",
+    catalogo_urgencia_interacoes_max_baixo: "30",
+    catalogo_urgencia_interacoes_min_medio: "20",
+    catalogo_urgencia_interacoes_max_medio: "40",
+    catalogo_urgencia_interacoes_min_alto: "30",
+    catalogo_urgencia_interacoes_max_alto: "60",
+  });
+
   const queryOptions = trpc.configuracao.getAll.queryOptions();
   const { data: configs, isLoading } = useQuery(queryOptions);
+
+  const catalogoQueryOptions = trpc.catalogoAdmin.getConfiguracoes.queryOptions();
+  const { data: catalogoConfigsData } = useQuery(catalogoQueryOptions);
 
   // Preencher formulario quando configuracoes carregarem
   useEffect(() => {
@@ -37,29 +64,52 @@ export default function ParametrosPage() {
     }
   }, [configs]);
 
-  const updateMutationOptions = trpc.configuracao.updateMany.mutationOptions();
-  const updateMutation = useMutation({
-    mutationFn: updateMutationOptions.mutationFn,
-    onSuccess: () => {
-      toast.success("Configuracoes salvas com sucesso!");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  // Preencher configs do catálogo
+  useEffect(() => {
+    if (catalogoConfigsData) {
+      const mapped: Record<string, string> = {};
+      for (const c of catalogoConfigsData) {
+        mapped[c.chave] = c.valor;
+      }
+      setCatalogoConfigs((prev) => ({ ...prev, ...mapped }));
+    }
+  }, [catalogoConfigsData]);
 
-  const resetMutationOptions = trpc.configuracao.resetToDefaults.mutationOptions();
-  const resetMutation = useMutation({
-    mutationFn: resetMutationOptions.mutationFn,
-    onSuccess: () => {
-      toast.success("Configuracoes restauradas para os valores padrao!");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const updateMutation = useMutation(
+    trpc.configuracao.updateMany.mutationOptions({
+      onSuccess: () => {
+        toast.success("Configuracoes salvas com sucesso!");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
+
+  const catalogoMutation = useMutation(
+    trpc.catalogoAdmin.updateConfiguracoes.mutationOptions({
+      onSuccess: () => {
+        toast.success("Configuracoes do catalogo salvas com sucesso!");
+        queryClient.invalidateQueries({ queryKey: catalogoQueryOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
+
+  const resetMutation = useMutation(
+    trpc.configuracao.resetToDefaults.mutationOptions({
+      onSuccess: () => {
+        toast.success("Configuracoes restauradas para os valores padrao!");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +145,37 @@ export default function ParametrosPage() {
       return;
     }
 
+    // Validar configs do catálogo: min < max para cada par
+    const pares = [
+      { label: "Header Viewers", min: "catalogo_urgencia_header_viewers_min", max: "catalogo_urgencia_header_viewers_max" },
+      { label: "Viewers Baixo", min: "catalogo_urgencia_viewers_min_baixo", max: "catalogo_urgencia_viewers_max_baixo" },
+      { label: "Viewers Medio", min: "catalogo_urgencia_viewers_min_medio", max: "catalogo_urgencia_viewers_max_medio" },
+      { label: "Viewers Alto", min: "catalogo_urgencia_viewers_min_alto", max: "catalogo_urgencia_viewers_max_alto" },
+      { label: "Vendidos Baixo", min: "catalogo_urgencia_vendidos_min_baixo", max: "catalogo_urgencia_vendidos_max_baixo" },
+      { label: "Vendidos Medio", min: "catalogo_urgencia_vendidos_min_medio", max: "catalogo_urgencia_vendidos_max_medio" },
+      { label: "Vendidos Alto", min: "catalogo_urgencia_vendidos_min_alto", max: "catalogo_urgencia_vendidos_max_alto" },
+      { label: "Interacoes Baixo", min: "catalogo_urgencia_interacoes_min_baixo", max: "catalogo_urgencia_interacoes_max_baixo" },
+      { label: "Interacoes Medio", min: "catalogo_urgencia_interacoes_min_medio", max: "catalogo_urgencia_interacoes_max_medio" },
+      { label: "Interacoes Alto", min: "catalogo_urgencia_interacoes_min_alto", max: "catalogo_urgencia_interacoes_max_alto" },
+    ];
+
+    for (const par of pares) {
+      const minVal = parseInt(catalogoConfigs[par.min]);
+      const maxVal = parseInt(catalogoConfigs[par.max]);
+      if (isNaN(minVal) || minVal < 0) {
+        toast.error(`${par.label}: valor minimo deve ser um numero inteiro >= 0`);
+        return;
+      }
+      if (isNaN(maxVal) || maxVal < 1) {
+        toast.error(`${par.label}: valor maximo deve ser um numero inteiro >= 1`);
+        return;
+      }
+      if (minVal >= maxVal) {
+        toast.error(`${par.label}: minimo (${minVal}) deve ser menor que maximo (${maxVal})`);
+        return;
+      }
+    }
+
     updateMutation.mutate({
       configuracoes: [
         { chave: "TAXA_MDR", valor: taxaMDR },
@@ -103,6 +184,14 @@ export default function ParametrosPage() {
         { chave: "ALERTA_DIAS_RELOJOEIRO", valor: diasRelojoeiro },
         { chave: "dias_alerta_envio", valor: diasAlertaEnvio },
       ],
+    });
+
+    // Salvar configs do catálogo
+    catalogoMutation.mutate({
+      configuracoes: Object.entries(catalogoConfigs).map(([chave, valor]) => ({
+        chave,
+        valor,
+      })),
     });
   };
 
@@ -329,6 +418,202 @@ export default function ParametrosPage() {
             </Card>
           </div>
 
+          {/* Seção Catálogo */}
+          <div className="mt-8 mb-2">
+            <h2 className="text-lg font-semibold">Catalogo Publico — Urgencia</h2>
+            <p className="text-sm text-muted-foreground">
+              Configure os patamares min/max dos numeros de urgencia exibidos no catalogo
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Header Viewers */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Header — Viewers Globais</CardTitle>
+                <CardDescription>
+                  Numero de &quot;pessoas vendo agora&quot; no topo do catalogo
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Minimo</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={catalogoConfigs.catalogo_urgencia_header_viewers_min}
+                      onChange={(e) =>
+                        setCatalogoConfigs((prev) => ({
+                          ...prev,
+                          catalogo_urgencia_header_viewers_min: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Maximo</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={catalogoConfigs.catalogo_urgencia_header_viewers_max}
+                      onChange={(e) =>
+                        setCatalogoConfigs((prev) => ({
+                          ...prev,
+                          catalogo_urgencia_header_viewers_max: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Viewers por Peça */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Viewers por Peca</CardTitle>
+                <CardDescription>
+                  &quot;Pessoas vendo agora&quot; em cada peca, por faixa de preco
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(["baixo", "medio", "alto"] as const).map((faixa) => (
+                  <div key={faixa} className="grid grid-cols-[100px_1fr_1fr] gap-3 items-center">
+                    <span className="text-sm text-muted-foreground">
+                      {faixa === "baixo" ? "< R$5k" : faixa === "medio" ? "R$5k-15k" : "> R$15k"}
+                    </span>
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="Min"
+                      value={catalogoConfigs[`catalogo_urgencia_viewers_min_${faixa}`]}
+                      onChange={(e) =>
+                        setCatalogoConfigs((prev) => ({
+                          ...prev,
+                          [`catalogo_urgencia_viewers_min_${faixa}`]: e.target.value,
+                        }))
+                      }
+                    />
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Max"
+                      value={catalogoConfigs[`catalogo_urgencia_viewers_max_${faixa}`]}
+                      onChange={(e) =>
+                        setCatalogoConfigs((prev) => ({
+                          ...prev,
+                          [`catalogo_urgencia_viewers_max_${faixa}`]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+                <div className="grid grid-cols-[100px_1fr_1fr] gap-3 text-xs text-muted-foreground">
+                  <span />
+                  <span className="text-center">Min</span>
+                  <span className="text-center">Max</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Vendidos 7 dias */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Vendidos (7 dias)</CardTitle>
+                <CardDescription>
+                  &quot;Similares vendidos nos ultimos 7 dias&quot; por faixa de preco
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(["baixo", "medio", "alto"] as const).map((faixa) => (
+                  <div key={faixa} className="grid grid-cols-[100px_1fr_1fr] gap-3 items-center">
+                    <span className="text-sm text-muted-foreground">
+                      {faixa === "baixo" ? "< R$5k" : faixa === "medio" ? "R$5k-15k" : "> R$15k"}
+                    </span>
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="Min"
+                      value={catalogoConfigs[`catalogo_urgencia_vendidos_min_${faixa}`]}
+                      onChange={(e) =>
+                        setCatalogoConfigs((prev) => ({
+                          ...prev,
+                          [`catalogo_urgencia_vendidos_min_${faixa}`]: e.target.value,
+                        }))
+                      }
+                    />
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Max"
+                      value={catalogoConfigs[`catalogo_urgencia_vendidos_max_${faixa}`]}
+                      onChange={(e) =>
+                        setCatalogoConfigs((prev) => ({
+                          ...prev,
+                          [`catalogo_urgencia_vendidos_max_${faixa}`]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+                <div className="grid grid-cols-[100px_1fr_1fr] gap-3 text-xs text-muted-foreground">
+                  <span />
+                  <span className="text-center">Min</span>
+                  <span className="text-center">Max</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Interações */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Interacoes</CardTitle>
+                <CardDescription>
+                  &quot;Pessoas que interagiram com essa peca&quot; por faixa de preco
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {(["baixo", "medio", "alto"] as const).map((faixa) => (
+                  <div key={faixa} className="grid grid-cols-[100px_1fr_1fr] gap-3 items-center">
+                    <span className="text-sm text-muted-foreground">
+                      {faixa === "baixo" ? "< R$5k" : faixa === "medio" ? "R$5k-15k" : "> R$15k"}
+                    </span>
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="Min"
+                      value={catalogoConfigs[`catalogo_urgencia_interacoes_min_${faixa}`]}
+                      onChange={(e) =>
+                        setCatalogoConfigs((prev) => ({
+                          ...prev,
+                          [`catalogo_urgencia_interacoes_min_${faixa}`]: e.target.value,
+                        }))
+                      }
+                    />
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Max"
+                      value={catalogoConfigs[`catalogo_urgencia_interacoes_max_${faixa}`]}
+                      onChange={(e) =>
+                        setCatalogoConfigs((prev) => ({
+                          ...prev,
+                          [`catalogo_urgencia_interacoes_max_${faixa}`]: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+                <div className="grid grid-cols-[100px_1fr_1fr] gap-3 text-xs text-muted-foreground">
+                  <span />
+                  <span className="text-center">Min</span>
+                  <span className="text-center">Max</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Botoes */}
           <div className="flex justify-end gap-4 mt-6">
             <Button
@@ -338,9 +623,9 @@ export default function ParametrosPage() {
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={updateMutation.isPending}>
+            <Button type="submit" disabled={updateMutation.isPending || catalogoMutation.isPending}>
               <Save className="h-4 w-4 mr-2" />
-              {updateMutation.isPending ? "Salvando..." : "Salvar Configuracoes"}
+              {updateMutation.isPending || catalogoMutation.isPending ? "Salvando..." : "Salvar Configuracoes"}
             </Button>
           </div>
         </form>
