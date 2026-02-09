@@ -1,19 +1,19 @@
 "use client";
 
-export default function GlobalError({
-  error,
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+// Force dynamic rendering to avoid prerender crash (Next.js 16 bug)
+// See: https://github.com/vercel/next.js/issues/85668
+export const dynamic = "force-dynamic";
+
+export default function GlobalError() {
   return (
-    <html>
-      <body>
-        <div style={{ padding: "20px", textAlign: "center" }}>
+    <html lang="pt-BR">
+      <body style={{ margin: 0, fontFamily: "system-ui, sans-serif" }}>
+        <div style={{ padding: "40px", textAlign: "center" }}>
           <h2>Algo deu errado!</h2>
-          <p>{error.message}</p>
-          <button onClick={() => reset()}>Tentar novamente</button>
+          <p>Ocorreu um erro inesperado.</p>
+          <a href="/" style={{ color: "#2563eb" }}>
+            Voltar ao inicio
+          </a>
         </div>
       </body>
     </html>

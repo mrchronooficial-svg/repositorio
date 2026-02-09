@@ -15,6 +15,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Mr. Chrono - Sistema de Gestão",
   description: "Sistema de Gestão Operacional Mr. Chrono",
