@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit, Archive, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,38 +40,41 @@ export default function ClienteDetalhesPage() {
     queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
   };
 
-  const archiveMutation = useMutation({
-    ...trpc.cliente.archive.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Cliente arquivado com sucesso!");
-      refetch();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const archiveMutation = useMutation(
+    trpc.cliente.archive.mutationOptions({
+      onSuccess: () => {
+        toast.success("Cliente arquivado com sucesso!");
+        refetch();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const restoreMutation = useMutation({
-    ...trpc.cliente.restore.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Cliente restaurado com sucesso!");
-      refetch();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const restoreMutation = useMutation(
+    trpc.cliente.restore.mutationOptions({
+      onSuccess: () => {
+        toast.success("Cliente restaurado com sucesso!");
+        refetch();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const deleteMutation = useMutation({
-    ...trpc.cliente.delete.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Cliente excluido permanentemente!");
-      router.push("/clientes");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const deleteMutation = useMutation(
+    trpc.cliente.delete.mutationOptions({
+      onSuccess: () => {
+        toast.success("Cliente excluido permanentemente!");
+        router.push("/clientes");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   if (isLoading) {
     return (
@@ -135,7 +139,7 @@ export default function ClienteDetalhesPage() {
             <>
               <Button
                 variant="outline"
-                onClick={() => router.push(`/clientes/${id}/editar`)}
+                onClick={() => router.push(`/clientes/${id}/editar` as Route)}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
@@ -252,7 +256,7 @@ export default function ClienteDetalhesPage() {
                     <div
                       key={venda.id}
                       className="flex items-center justify-between p-3 rounded border hover:bg-muted/50 cursor-pointer"
-                      onClick={() => router.push(`/vendas/${venda.id}`)}
+                      onClick={() => router.push(`/vendas/${venda.id}` as Route)}
                     >
                       <div>
                         <p className="font-mono text-sm">{venda.peca.sku}</p>

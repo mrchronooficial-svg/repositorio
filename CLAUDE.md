@@ -511,6 +511,18 @@ Variáveis de ambiente necessárias com exemplos.
 
 ---
 
+## Catálogo Público (Nova Feature)
+
+Página pública de catálogo de relógios para clientes, mobile-first, com urgência simulada e integração WhatsApp.
+
+**Antes de implementar qualquer coisa do catálogo, ler OBRIGATORIAMENTE:**
+- `Docs/CATALOGO_SPEC.md` — Especificação completa (o que fazer)
+- `Docs/CATALOGO_IMPLEMENTACAO.md` — Plano faseado (como fazer)
+
+Implementar fase por fase, testando cada uma antes de avançar para a próxima.
+
+---
+
 ## Links Úteis
 
 - Better-T-Stack: https://www.better-t-stack.dev

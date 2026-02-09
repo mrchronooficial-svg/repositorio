@@ -42,19 +42,20 @@ export function RepasseDialog({
 
   const saldoRepasse = valorDevido - valorFeito;
 
-  const mutation = useMutation({
-    ...trpc.venda.registrarRepasse.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Repasse registrado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
-      onOpenChange(false);
-      setValor("");
-      onSuccess?.();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const mutation = useMutation(
+    trpc.venda.registrarRepasse.mutationOptions({
+      onSuccess: () => {
+        toast.success("Repasse registrado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
+        onOpenChange(false);
+        setValor("");
+        onSuccess?.();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleSubmit = () => {
     const valorNum = parseFloat(valor);

@@ -49,7 +49,7 @@ export const auditoriaRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session!.user!.nivel!);
 
       const { page, limit, userId, acao, entidade, entidadeId, dataInicio, dataFim } = input;
       const skip = (page - 1) * limit;
@@ -100,7 +100,7 @@ export const auditoriaRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session!.user!.nivel!);
 
       const log = await prisma.auditoria.findUnique({
         where: { id: input.id },
@@ -131,7 +131,7 @@ export const auditoriaRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session!.user!.nivel!);
 
       const logs = await prisma.auditoria.findMany({
         where: {
@@ -163,7 +163,7 @@ export const auditoriaRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session!.user!.nivel!);
 
       const { userId, page, limit } = input;
       const skip = (page - 1) * limit;
@@ -187,7 +187,7 @@ export const auditoriaRouter = router({
 
   // Estatisticas de auditoria
   getStats: protectedProcedure.query(async ({ ctx }) => {
-    assertAdmin(ctx.session.user.nivel);
+    assertAdmin(ctx.session!.user!.nivel!);
 
     const hoje = new Date();
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
@@ -212,7 +212,7 @@ export const auditoriaRouter = router({
       prisma.auditoria.count({
         where: {
           createdAt: {
-            gte: new Date(hoje.toISOString().split("T")[0]),
+            gte: new Date(hoje.toISOString().split("T")[0]!),
           },
         },
       }),
@@ -263,7 +263,7 @@ export const auditoriaRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session!.user!.nivel!);
 
       const logs = await prisma.auditoria.findMany({
         where: {

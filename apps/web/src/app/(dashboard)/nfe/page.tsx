@@ -51,29 +51,31 @@ export default function NfePage() {
   const metricasOptions = trpc.nfe.getMetricas.queryOptions();
   const { data: metricas } = useQuery(metricasOptions);
 
-  const marcarDeclaradaMutation = useMutation({
-    ...trpc.nfe.marcarDeclarada.mutationOptions(),
-    onSuccess: () => {
-      toast.success("NFe marcada como declarada!");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-      queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const marcarDeclaradaMutation = useMutation(
+    trpc.nfe.marcarDeclarada.mutationOptions({
+      onSuccess: () => {
+        toast.success("NFe marcada como declarada!");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+        queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const desmarcarDeclaradaMutation = useMutation({
-    ...trpc.nfe.desmarcarDeclarada.mutationOptions(),
-    onSuccess: () => {
-      toast.success("NFe desmarcada!");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-      queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const desmarcarDeclaradaMutation = useMutation(
+    trpc.nfe.desmarcarDeclarada.mutationOptions({
+      onSuccess: () => {
+        toast.success("NFe desmarcada!");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+        queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   return (
     <div className="space-y-6">

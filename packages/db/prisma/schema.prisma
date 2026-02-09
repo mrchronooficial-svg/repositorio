@@ -4,8 +4,9 @@
 // ============================================
 
 generator client {
-  provider     = "prisma-client-js"
+  provider     = "prisma-client"
   output       = "./generated/client"
+  moduleFormat = "esm"
 }
 
 datasource db {
@@ -76,6 +77,35 @@ enum TipoAlerta {
   ESTOQUE_BAIXO
   RELOJOEIRO_DEMORADO
   REPASSE_PENDENTE
+}
+
+// ============================================
+// ENUMS — MÓDULO FINANCEIRO
+// ============================================
+
+enum TipoConta {
+  GRUPO
+  SUBGRUPO
+  ANALITICA
+}
+
+enum NaturezaConta {
+  DEVEDORA
+  CREDORA
+}
+
+enum TipoLancamento {
+  MANUAL
+  AUTOMATICO_VENDA
+  AUTOMATICO_DESPESA_RECORRENTE
+  TRANSFERENCIA
+  DISTRIBUICAO_LUCROS
+  ANTECIPACAO
+}
+
+enum StatusDespesaRecorrente {
+  ATIVA
+  INATIVA
 }
 
 enum StatusEnvio {
@@ -188,6 +218,7 @@ model Peca {
   // Valores
   valorCompra      Decimal     @db.Decimal(10, 2)
   valorEstimadoVenda Decimal   @db.Decimal(10, 2)
+  custoManutencao    Decimal?  @db.Decimal(10, 2) // Revisão relojoeiro + restauro mostrador (entra no CMV)
   // Origem
   origemTipo       OrigemTipo
   origemCanal      OrigemCanal?
@@ -205,6 +236,10 @@ model Peca {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
+  // Catálogo público
+  pinnedInCatalog  Boolean     @default(false)
+  pinnedAt         DateTime?
+
   // Relações
   fornecedorId           String
   fornecedor             Fornecedor              @relation(fields: [fornecedorId], references: [id])
@@ -219,6 +254,7 @@ model Peca {
   @@index([arquivado])
   @@index([fornecedorId])
   @@index([statusPagamentoFornecedor])
+  @@index([pinnedInCatalog])
   @@map("pecas")
 }
 
@@ -463,4 +499,229 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+// ============================================
+// MÓDULO FINANCEIRO — PLANO DE CONTAS
+// ============================================
+
+model ContaContabil {
+  id            String        @id @default(cuid())
+  codigo        String        @unique // Ex: "1.1.1.01"
+  nome          String // Ex: "Nubank (Pix)"
+  tipo          TipoConta // GRUPO, SUBGRUPO, ANALITICA
+  natureza      NaturezaConta // DEVEDORA ou CREDORA
+  contaPaiId    String? // Referência hierárquica
+  contaPai      ContaContabil?  @relation("HierarquiaConta", fields: [contaPaiId], references: [id])
+  contasFilhas  ContaContabil[] @relation("HierarquiaConta")
+  ordem         Int           @default(0) // Para ordenação dentro do nível
+  ativa         Boolean       @default(true)
+  sistematica   Boolean       @default(false) // true = conta criada pelo sistema, não pode ser excluída
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relações com lançamentos
+  linhasDebito  LinhaLancamento[] @relation("ContaDebito")
+  linhasCredito LinhaLancamento[] @relation("ContaCredito")
+
+  // Relações com outros módulos
+  contaBancaria    ContaBancaria?
+  despesasRecorrentes DespesaRecorrente[]
+
+  @@index([contaPaiId])
+  @@index([codigo])
+  @@map("contas_contabeis")
+}
+
+// ============================================
+// MÓDULO FINANCEIRO — LANÇAMENTOS CONTÁBEIS
+// ============================================
+
+model Lancamento {
+  id            String         @id @default(cuid())
+  numero        Int            @default(autoincrement()) // Número sequencial
+  data          DateTime // Data do lançamento (competência)
+  descricao     String
+  tipo          TipoLancamento
+  recorrente    Boolean        @default(true) // false = não-recorrente (one-off)
+  // Referências opcionais
+  vendaId       String? // Se gerado por uma venda
+  despesaRecorrenteId String? // Se gerado por despesa recorrente
+  // Controle
+  estornado     Boolean        @default(false)
+  estornoDeId   String? // Referência ao lançamento original estornado
+  userId        String // Quem criou
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relações
+  linhas LinhaLancamento[]
+
+  @@index([data])
+  @@index([tipo])
+  @@index([vendaId])
+  @@index([despesaRecorrenteId])
+  @@index([estornoDeId])
+  @@map("lancamentos")
+}
+
+model LinhaLancamento {
+  id             String        @id @default(cuid())
+  lancamentoId   String
+  lancamento     Lancamento    @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
+  contaDebitoId  String
+  contaDebito    ContaContabil @relation("ContaDebito", fields: [contaDebitoId], references: [id])
+  contaCreditoId String
+  contaCredito   ContaContabil @relation("ContaCredito", fields: [contaCreditoId], references: [id])
+  valor          Decimal       @db.Decimal(10, 2)
+  historico      String? // Descrição da linha
+
+  @@index([lancamentoId])
+  @@index([contaDebitoId])
+  @@index([contaCreditoId])
+  @@map("linhas_lancamento")
+}
+
+// ============================================
+// MÓDULO FINANCEIRO — CONTAS BANCÁRIAS
+// ============================================
+
+model ContaBancaria {
+  id              String        @id @default(cuid())
+  nome            String // Ex: "Nubank PJ"
+  banco           String // Ex: "Nubank"
+  agencia         String?
+  conta           String?
+  contaContabilId String        @unique // Vinculada a uma conta do plano de contas
+  contaContabil   ContaContabil @relation(fields: [contaContabilId], references: [id])
+  saldoInicial    Decimal       @default(0) @db.Decimal(10, 2)
+  ativa           Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relações
+  transferenciasOrigem  TransferenciaBancaria[] @relation("ContaOrigem")
+  transferenciasDestino TransferenciaBancaria[] @relation("ContaDestino")
+  distribuicoes         DistribuicaoLucros[]
+  antecipacoes          AntecipacaoRecebivel[]
+
+  @@map("contas_bancarias")
+}
+
+// ============================================
+// MÓDULO FINANCEIRO — DESPESAS RECORRENTES
+// ============================================
+
+model DespesaRecorrente {
+  id              String                  @id @default(cuid())
+  nome            String // Ex: "Contabilidade"
+  valor           Decimal                 @db.Decimal(10, 2)
+  contaContabilId String // Conta de despesa vinculada
+  contaContabil   ContaContabil           @relation(fields: [contaContabilId], references: [id])
+  status          StatusDespesaRecorrente  @default(ATIVA)
+  diaReconhecimento Int                   @default(31) // Último dia do mês
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([status])
+  @@map("despesas_recorrentes")
+}
+
+// ============================================
+// MÓDULO FINANCEIRO — TRANSFERÊNCIAS BANCÁRIAS
+// ============================================
+
+model TransferenciaBancaria {
+  id              String        @id @default(cuid())
+  contaOrigemId   String
+  contaOrigem     ContaBancaria @relation("ContaOrigem", fields: [contaOrigemId], references: [id])
+  contaDestinoId  String
+  contaDestino    ContaBancaria @relation("ContaDestino", fields: [contaDestinoId], references: [id])
+  valor           Decimal       @db.Decimal(10, 2)
+  data            DateTime
+  descricao       String?
+  lancamentoId    String? // Lançamento contábil gerado
+  userId          String // Quem registrou
+  createdAt       DateTime      @default(now())
+
+  @@index([data])
+  @@index([contaOrigemId])
+  @@index([contaDestinoId])
+  @@map("transferencias_bancarias")
+}
+
+// ============================================
+// MÓDULO FINANCEIRO — DISTRIBUIÇÃO DE LUCROS
+// ============================================
+
+model DistribuicaoLucros {
+  id              String        @id @default(cuid())
+  socio           String // "Rafael" ou "João"
+  valor           Decimal       @db.Decimal(10, 2)
+  data            DateTime
+  contaBancariaId String
+  contaBancaria   ContaBancaria @relation(fields: [contaBancariaId], references: [id])
+  lancamentoId    String? // Lançamento contábil gerado
+  descricao       String?
+  userId          String // Quem registrou
+  createdAt       DateTime      @default(now())
+
+  @@index([socio])
+  @@index([data])
+  @@map("distribuicoes_lucros")
+}
+
+// ============================================
+// MÓDULO FINANCEIRO — ANTECIPAÇÃO DE RECEBÍVEIS
+// ============================================
+
+model AntecipacaoRecebivel {
+  id              String        @id @default(cuid())
+  data            DateTime
+  valorBruto      Decimal       @db.Decimal(10, 2) // Valor total dos recebíveis
+  taxaAntecipacao Decimal       @db.Decimal(5, 2) // Percentual da taxa
+  valorTaxa       Decimal       @db.Decimal(10, 2) // Valor da taxa em R$
+  valorLiquido    Decimal       @db.Decimal(10, 2) // Valor recebido (bruto - taxa)
+  contaBancariaId String
+  contaBancaria   ContaBancaria @relation(fields: [contaBancariaId], references: [id])
+  lancamentoId    String? // Lançamento contábil gerado
+  userId          String // Quem registrou
+  createdAt       DateTime      @default(now())
+
+  // Relação com vendas antecipadas
+  vendas AntecipacaoVenda[]
+
+  @@index([data])
+  @@map("antecipacoes_recebiveis")
+}
+
+model AntecipacaoVenda {
+  id              String              @id @default(cuid())
+  antecipacaoId   String
+  antecipacao     AntecipacaoRecebivel @relation(fields: [antecipacaoId], references: [id], onDelete: Cascade)
+  vendaId         String
+  valorAntecipado Decimal             @db.Decimal(10, 2)
+
+  @@index([antecipacaoId])
+  @@index([vendaId])
+  @@map("antecipacao_vendas")
+}
+
+// ============================================
+// CATÁLOGO PÚBLICO — EVENTOS/ANALYTICS
+// ============================================
+
+model CatalogoEvento {
+  id         String   @id @default(cuid())
+  tipo       String   // "pageview", "card_view", "click_interesse", "click_share", "filter_use"
+  pecaId     String?
+  deviceType String?  // "mobile", "desktop", "tablet"
+  referrer   String?
+  metadata   String?  // JSON
+  createdAt  DateTime @default(now())
+
+  @@index([tipo])
+  @@index([pecaId])
+  @@index([createdAt])
+  @@map("catalogo_eventos")
 }

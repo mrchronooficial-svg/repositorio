@@ -5,6 +5,7 @@ import prisma from "@gestaomrchrono/db";
 import { registrarAuditoria } from "../services/auditoria.service";
 import { criarAlertaRepassePendente } from "../services/alerta.service";
 import { gerarSKUDevolucao } from "../services/sku.service";
+import { criarLancamentosVenda, reverterLancamentosVenda } from "../services/lancamento-venda.service";
 
 // Schemas
 const VendaCreateSchema = z.object({
@@ -321,6 +322,32 @@ export const vendaRouter = router({
           valorFinal,
         },
       });
+
+      // 12. Gerar lançamentos contábeis automáticos (módulo financeiro)
+      try {
+        await criarLancamentosVenda(
+          {
+            id: venda.id,
+            valorFinal,
+            formaPagamento: input.formaPagamento,
+            taxaMDR,
+            valorRepasseDevido,
+            dataVenda: venda.dataVenda,
+            peca: {
+              sku: peca.sku,
+              origemTipo: peca.origemTipo,
+              origemCanal: peca.origemCanal,
+              valorCompra: Number(peca.valorCompra),
+              custoManutencao: peca.custoManutencao ? Number(peca.custoManutencao) : null,
+            },
+          },
+          ctx.user.id
+        );
+      } catch {
+        // Não bloquear a venda se o lançamento financeiro falhar
+        // O admin pode gerar manualmente depois
+        console.error(`[Financeiro] Erro ao gerar lancamentos para venda ${venda.id}`);
+      }
 
       return venda;
     }),
@@ -850,6 +877,13 @@ export const vendaRouter = router({
         entidadeId: input.vendaId,
         detalhes: { novoSku },
       });
+
+      // Estornar lançamentos contábeis automáticos (módulo financeiro)
+      try {
+        await reverterLancamentosVenda(input.vendaId, ctx.user.id);
+      } catch {
+        console.error(`[Financeiro] Erro ao estornar lancamentos da venda ${input.vendaId}`);
+      }
 
       return { success: true, novoSku };
     }),

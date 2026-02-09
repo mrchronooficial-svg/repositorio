@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -65,27 +66,29 @@ export function ClienteForm({ initialData, isEditing }: ClienteFormProps) {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof ClienteData, string>>>({});
 
-  const createMutation = useMutation({
-    ...trpc.cliente.create.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Cliente criado com sucesso!");
-      router.push("/clientes");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const createMutation = useMutation(
+    trpc.cliente.create.mutationOptions({
+      onSuccess: () => {
+        toast.success("Cliente criado com sucesso!");
+        router.push("/clientes");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const updateMutation = useMutation({
-    ...trpc.cliente.update.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Cliente atualizado com sucesso!");
-      router.push(`/clientes/${initialData?.id}`);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const updateMutation = useMutation(
+    trpc.cliente.update.mutationOptions({
+      onSuccess: () => {
+        toast.success("Cliente atualizado com sucesso!");
+        router.push(`/clientes/${initialData?.id}` as Route);
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -77,40 +78,43 @@ export default function UsuariosPage() {
 
   const { data, isLoading } = useQuery(queryOptions);
 
-  const deactivateMutation = useMutation({
-    ...trpc.admin.deactivateUser.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Usuario desativado com sucesso");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const deactivateMutation = useMutation(
+    trpc.admin.deactivateUser.mutationOptions({
+      onSuccess: () => {
+        toast.success("Usuario desativado com sucesso");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const activateMutation = useMutation({
-    ...trpc.admin.activateUser.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Usuario reativado com sucesso");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const activateMutation = useMutation(
+    trpc.admin.activateUser.mutationOptions({
+      onSuccess: () => {
+        toast.success("Usuario reativado com sucesso");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const resetPasswordMutation = useMutation({
-    ...trpc.admin.resetPassword.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Senha alterada com sucesso");
-      setResetPasswordDialogOpen(false);
-      setSelectedUserId(null);
-      setNewPassword("");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const resetPasswordMutation = useMutation(
+    trpc.admin.resetPassword.mutationOptions({
+      onSuccess: () => {
+        toast.success("Senha alterada com sucesso");
+        setResetPasswordDialogOpen(false);
+        setSelectedUserId(null);
+        setNewPassword("");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const limparFiltros = () => {
     setSearch("");
@@ -280,7 +284,7 @@ export default function UsuariosPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               onClick={() =>
-                                router.push(`/admin/usuarios/${user.id}`)
+                                router.push(`/admin/usuarios/${user.id}` as Route)
                               }
                             >
                               <Edit className="h-4 w-4 mr-2" />

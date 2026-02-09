@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -49,38 +50,41 @@ export default function PecaDetalhesPage() {
     queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
   };
 
-  const archiveMutation = useMutation({
-    ...trpc.peca.archive.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Peca arquivada com sucesso!");
-      refetch();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const archiveMutation = useMutation(
+    trpc.peca.archive.mutationOptions({
+      onSuccess: () => {
+        toast.success("Peca arquivada com sucesso!");
+        refetch();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const restoreMutation = useMutation({
-    ...trpc.peca.restore.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Peca restaurada com sucesso!");
-      refetch();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const restoreMutation = useMutation(
+    trpc.peca.restore.mutationOptions({
+      onSuccess: () => {
+        toast.success("Peca restaurada com sucesso!");
+        refetch();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const deleteMutation = useMutation({
-    ...trpc.peca.delete.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Peca excluida permanentemente!");
-      router.push("/estoque");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const deleteMutation = useMutation(
+    trpc.peca.delete.mutationOptions({
+      onSuccess: () => {
+        toast.success("Peca excluida permanentemente!");
+        router.push("/estoque");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   if (isLoading) {
     return (
@@ -172,7 +176,7 @@ export default function PecaDetalhesPage() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => router.push(`/estoque/${id}/editar`)}
+                onClick={() => router.push(`/estoque/${id}/editar` as Route)}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
@@ -354,7 +358,7 @@ export default function PecaDetalhesPage() {
             <CardContent>
               <div
                 className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
-                onClick={() => router.push(`/fornecedores/${peca.fornecedor.id}`)}
+                onClick={() => router.push(`/fornecedores/${peca.fornecedor.id}` as Route)}
               >
                 <p className="font-medium">{peca.fornecedor.nome}</p>
                 <p className="text-sm text-muted-foreground">
@@ -527,7 +531,7 @@ export default function PecaDetalhesPage() {
               <CardContent>
                 <div
                   className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/vendas/${peca.venda!.id}`)}
+                  onClick={() => router.push(`/vendas/${peca.venda!.id}` as Route)}
                 >
                   <p className="font-medium">
                     {peca.venda.cliente?.nome || "Cliente"}

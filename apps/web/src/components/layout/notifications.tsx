@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, AlertTriangle, Package, Clock, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,19 +40,21 @@ export function Notifications() {
     refetchInterval: 60000, // Atualizar a cada 1 minuto
   });
 
-  const marcarLidoMutation = useMutation({
-    ...trpc.alerta.marcarLido.mutationOptions(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-  });
+  const marcarLidoMutation = useMutation(
+    trpc.alerta.marcarLido.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+    })
+  );
 
-  const marcarTodosLidosMutation = useMutation({
-    ...trpc.alerta.marcarTodosLidos.mutationOptions(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-  });
+  const marcarTodosLidosMutation = useMutation(
+    trpc.alerta.marcarTodosLidos.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+    })
+  );
 
   const count = alertas.length;
 
@@ -61,9 +64,9 @@ export function Notifications() {
     // Navegar para a entidade relacionada se existir
     if (alerta.entidade && alerta.entidadeId) {
       if (alerta.entidade === "PECA") {
-        router.push(`/estoque/${alerta.entidadeId}`);
+        router.push(`/estoque/${alerta.entidadeId}` as Route);
       } else if (alerta.entidade === "VENDA") {
-        router.push(`/vendas/${alerta.entidadeId}`);
+        router.push(`/vendas/${alerta.entidadeId}` as Route);
       }
     }
   };

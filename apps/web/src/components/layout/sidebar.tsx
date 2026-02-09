@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -13,6 +14,7 @@ import {
   Crown,
   PackageCheck,
   FileText,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +67,15 @@ const menuItems = [
   },
 ];
 
+const financeiroItems = [
+  {
+    label: "Financeiro",
+    href: "/financeiro",
+    icon: DollarSign,
+    color: "from-emerald-500 to-teal-600",
+  },
+];
+
 const adminItems = [
   {
     label: "Administração",
@@ -112,7 +123,7 @@ export function Sidebar({ userLevel }: SidebarProps) {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={item.href as Route}
               className={cn(
                 "group flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200",
                 isActive
@@ -148,6 +159,53 @@ export function Sidebar({ userLevel }: SidebarProps) {
           <>
             <div className="my-4 border-t border-white/[0.06]" />
             <p className="text-[10px] text-white/30 uppercase tracking-[0.2em] font-semibold mb-3 px-3">
+              Financeiro
+            </p>
+            {financeiroItems.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+              const Icon = item.icon;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href as Route}
+                  className={cn(
+                    "group flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200",
+                    isActive
+                      ? "bg-white/[0.12] text-white shadow-lg shadow-black/10"
+                      : "text-white/50 hover:text-white hover:bg-white/[0.06]"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex items-center justify-center w-10 h-10 rounded-xl transition-all duration-300",
+                      isActive
+                        ? `bg-gradient-to-br ${item.color} shadow-lg`
+                        : "bg-white/[0.06] group-hover:bg-white/[0.10]"
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "h-5 w-5 transition-all duration-200",
+                        isActive ? "text-white drop-shadow" : "text-white/60 group-hover:text-white/90",
+                        "group-hover:scale-110"
+                      )}
+                    />
+                  </div>
+                  <span className="flex-1">{item.label}</span>
+                  {isActive && (
+                    <div className="w-2 h-2 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm shadow-amber-500/50" />
+                  )}
+                </Link>
+              );
+            })}
+          </>
+        )}
+
+        {isAdmin && (
+          <>
+            <div className="my-4 border-t border-white/[0.06]" />
+            <p className="text-[10px] text-white/30 uppercase tracking-[0.2em] font-semibold mb-3 px-3">
               Sistema
             </p>
             {adminItems.map((item) => {
@@ -157,7 +215,7 @@ export function Sidebar({ userLevel }: SidebarProps) {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={item.href as Route}
                   className={cn(
                     "group flex items-center gap-4 rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200",
                     isActive

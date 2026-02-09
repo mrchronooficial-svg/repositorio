@@ -65,20 +65,21 @@ export function FornecedorModal({ open, onOpenChange, onSuccess }: FornecedorMod
   const [data, setData] = useState<FornecedorData>(defaultData);
   const [errors, setErrors] = useState<Partial<Record<keyof FornecedorData, string>>>({});
 
-  const createMutation = useMutation({
-    ...trpc.fornecedor.create.mutationOptions(),
-    onSuccess: (fornecedor) => {
-      toast.success("Fornecedor criado com sucesso!");
-      onSuccess({ id: fornecedor.id, nome: fornecedor.nome });
-      // Limpar formulario
-      setData(defaultData);
-      setErrors({});
-      onOpenChange(false);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const createMutation = useMutation(
+    trpc.fornecedor.create.mutationOptions({
+      onSuccess: (fornecedor) => {
+        toast.success("Fornecedor criado com sucesso!");
+        onSuccess({ id: fornecedor.id, nome: fornecedor.nome });
+        // Limpar formulario
+        setData(defaultData);
+        setErrors({});
+        onOpenChange(false);
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleChange = (field: keyof FornecedorData, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }));

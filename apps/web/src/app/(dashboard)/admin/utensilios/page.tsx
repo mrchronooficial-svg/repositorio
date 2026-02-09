@@ -24,40 +24,43 @@ export default function UtensiliosPage() {
   const [quantidades, setQuantidades] = useState<Record<string, number>>({});
 
   // Mutation para inicializar utensílios
-  const inicializarMutation = useMutation({
-    ...trpc.utensilio.inicializar.mutationOptions(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["utensilio"] });
-      toast.success("Utensilios inicializados com sucesso!");
-    },
-    onError: (error) => {
-      toast.error("Erro ao inicializar utensilios: " + error.message);
-    },
-  });
+  const inicializarMutation = useMutation(
+    trpc.utensilio.inicializar.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["utensilio"] });
+        toast.success("Utensilios inicializados com sucesso!");
+      },
+      onError: (error) => {
+        toast.error("Erro ao inicializar utensilios: " + error.message);
+      },
+    })
+  );
 
   // Mutation para adicionar quantidade
-  const adicionarMutation = useMutation({
-    ...trpc.utensilio.adicionarQuantidade.mutationOptions(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["utensilio"] });
-      toast.success("Quantidade adicionada!");
-    },
-    onError: (error) => {
-      toast.error("Erro: " + error.message);
-    },
-  });
+  const adicionarMutation = useMutation(
+    trpc.utensilio.adicionarQuantidade.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["utensilio"] });
+        toast.success("Quantidade adicionada!");
+      },
+      onError: (error) => {
+        toast.error("Erro: " + error.message);
+      },
+    })
+  );
 
   // Mutation para atualizar quantidade mínima
-  const atualizarMinMutation = useMutation({
-    ...trpc.utensilio.atualizarQuantidadeMinima.mutationOptions(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["utensilio"] });
-      toast.success("Quantidade minima atualizada!");
-    },
-    onError: (error) => {
-      toast.error("Erro: " + error.message);
-    },
-  });
+  const atualizarMinMutation = useMutation(
+    trpc.utensilio.atualizarQuantidadeMinima.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["utensilio"] });
+        toast.success("Quantidade minima atualizada!");
+      },
+      onError: (error) => {
+        toast.error("Erro: " + error.message);
+      },
+    })
+  );
 
   const handleAdicionar = (id: string) => {
     const quantidade = quantidades[id] || 0;

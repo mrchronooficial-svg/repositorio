@@ -61,50 +61,54 @@ export default function EditarUsuarioPage() {
     }
   }, [user]);
 
-  const updateMutation = useMutation({
-    ...trpc.admin.updateUser.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Usuario atualizado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const updateMutation = useMutation(
+    trpc.admin.updateUser.mutationOptions({
+      onSuccess: () => {
+        toast.success("Usuario atualizado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const deactivateMutation = useMutation({
-    ...trpc.admin.deactivateUser.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Usuario desativado com sucesso");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const deactivateMutation = useMutation(
+    trpc.admin.deactivateUser.mutationOptions({
+      onSuccess: () => {
+        toast.success("Usuario desativado com sucesso");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const activateMutation = useMutation({
-    ...trpc.admin.activateUser.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Usuario reativado com sucesso");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const activateMutation = useMutation(
+    trpc.admin.activateUser.mutationOptions({
+      onSuccess: () => {
+        toast.success("Usuario reativado com sucesso");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const resetPasswordMutation = useMutation({
-    ...trpc.admin.resetPassword.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Senha alterada com sucesso");
-      setResetPasswordDialogOpen(false);
-      setNewPassword("");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const resetPasswordMutation = useMutation(
+    trpc.admin.resetPassword.mutationOptions({
+      onSuccess: () => {
+        toast.success("Senha alterada com sucesso");
+        setResetPasswordDialogOpen(false);
+        setNewPassword("");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

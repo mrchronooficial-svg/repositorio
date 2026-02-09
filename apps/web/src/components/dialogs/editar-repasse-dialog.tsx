@@ -46,31 +46,33 @@ export function EditarRepasseDialog({
     }
   }, [open, valorFeito]);
 
-  const editMutation = useMutation({
-    ...trpc.venda.editarRepasse.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Repasse atualizado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
-      onOpenChange(false);
-      onSuccess?.();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const editMutation = useMutation(
+    trpc.venda.editarRepasse.mutationOptions({
+      onSuccess: () => {
+        toast.success("Repasse atualizado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
+        onOpenChange(false);
+        onSuccess?.();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const resetMutation = useMutation({
-    ...trpc.venda.resetarRepasse.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Repasse zerado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
-      onOpenChange(false);
-      onSuccess?.();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const resetMutation = useMutation(
+    trpc.venda.resetarRepasse.mutationOptions({
+      onSuccess: () => {
+        toast.success("Repasse zerado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
+        onOpenChange(false);
+        onSuccess?.();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const isPending = editMutation.isPending || resetMutation.isPending;
 

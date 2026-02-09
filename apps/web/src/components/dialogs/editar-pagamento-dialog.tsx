@@ -42,18 +42,19 @@ export function EditarPagamentoDialog({
     }
   }, [open, valorAtual]);
 
-  const mutation = useMutation({
-    ...trpc.venda.editarPagamento.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Pagamento atualizado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
-      onOpenChange(false);
-      onSuccess?.();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const mutation = useMutation(
+    trpc.venda.editarPagamento.mutationOptions({
+      onSuccess: () => {
+        toast.success("Pagamento atualizado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
+        onOpenChange(false);
+        onSuccess?.();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleSubmit = () => {
     const valorNum = parseFloat(valor);

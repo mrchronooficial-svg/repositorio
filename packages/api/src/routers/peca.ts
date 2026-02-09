@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure, socioOuAdminProcedure, adminProcedure } from "../index";
 import prisma from "@gestaomrchrono/db";
 import { registrarAuditoria } from "../services/auditoria.service";
-import { gerarProximoSKU, gerarSKUDevolucao } from "../services/sku.service";
+import { gerarProximoSKU } from "../services/sku.service";
 
 // Schemas de validacao
 const PecaCreateSchema = z.object({
@@ -149,7 +149,7 @@ export const pecaRouter = router({
 
       const where = {
         arquivado: false,
-        status: { notIn: ["VENDIDA", "DEFEITO", "PERDA"] as const },
+        status: { notIn: ["VENDIDA", "DEFEITO", "PERDA"] as ("VENDIDA" | "DEFEITO" | "PERDA")[] },
         ...(search && {
           OR: [
             { sku: { contains: search, mode: "insensitive" as const } },

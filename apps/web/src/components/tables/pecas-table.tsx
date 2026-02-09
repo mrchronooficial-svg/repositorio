@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/formatters";
-import { Decimal } from "@prisma/client/runtime/library";
+type Decimal = { toNumber(): number; toString(): string } | number | string;
 
 interface Foto {
   url: string;
@@ -42,7 +42,7 @@ interface Peca {
   valorCompra: Decimal | null;
   valorEstimadoVenda: Decimal | null;
   valorRepasse?: Decimal | null;
-  statusPagamentoFornecedor?: string;
+  statusPagamentoFornecedor?: string | null;
   origemTipo?: string;
   fotos: Foto[];
   fornecedor: Fornecedor;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery } from "@tanstack/react-query";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { VendaForm } from "@/components/forms/venda-form";
@@ -56,7 +57,7 @@ export default function EditarVendaPage() {
         <h2 className="text-xl font-semibold">Venda cancelada nao pode ser editada</h2>
         <Button
           variant="link"
-          onClick={() => router.push(`/vendas/${id}`)}
+          onClick={() => router.push(`/vendas/${id}` as Route)}
           className="mt-4"
         >
           Voltar para detalhes

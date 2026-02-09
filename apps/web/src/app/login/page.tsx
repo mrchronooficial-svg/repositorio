@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 import { toast } from "sonner";
 import z from "zod";
 import { useEffect } from "react";
@@ -22,7 +23,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (session?.user) {
-      router.push(callbackUrl);
+      router.push(callbackUrl as Route);
     }
   }, [session, router, callbackUrl]);
 
@@ -40,7 +41,7 @@ function LoginForm() {
         {
           onSuccess: () => {
             toast.success("Login realizado com sucesso!");
-            router.push(callbackUrl);
+            router.push(callbackUrl as Route);
           },
           onError: (error) => {
             const message = error.error.message || "Erro ao fazer login";

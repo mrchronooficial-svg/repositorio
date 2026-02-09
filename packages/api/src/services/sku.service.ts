@@ -18,7 +18,7 @@ export async function gerarProximoSKU(): Promise<string> {
 
   if (ultimaPeca?.skuBase) {
     const match = ultimaPeca.skuBase.match(/MRC-(\d+)/);
-    if (match) {
+    if (match && match[1]) {
       proximoNumero = parseInt(match[1], 10) + 1;
     }
   }

@@ -71,30 +71,32 @@ export default function LogisticaPage() {
   const metricasOptions = trpc.logistica.getMetricas.queryOptions();
   const { data: metricas } = useQuery(metricasOptions);
 
-  const marcarEnviadoMutation = useMutation({
-    ...trpc.logistica.marcarEnviado.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Marcado como enviado!");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-      queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
-      fecharModalEnvio();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const marcarEnviadoMutation = useMutation(
+    trpc.logistica.marcarEnviado.mutationOptions({
+      onSuccess: () => {
+        toast.success("Marcado como enviado!");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+        queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
+        fecharModalEnvio();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const desfazerEnvioMutation = useMutation({
-    ...trpc.logistica.desfazerEnvio.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Envio desfeito!");
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-      queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const desfazerEnvioMutation = useMutation(
+    trpc.logistica.desfazerEnvio.mutationOptions({
+      onSuccess: () => {
+        toast.success("Envio desfeito!");
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+        queryClient.invalidateQueries({ queryKey: metricasOptions.queryKey });
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const abrirModalEnvio = (vendaId: string, sku: string) => {
     setEnvioModal({ vendaId, sku });

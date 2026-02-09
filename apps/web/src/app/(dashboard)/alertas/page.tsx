@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Bell,
@@ -64,21 +65,23 @@ export default function AlertasPage() {
 
   const { data, isLoading } = useQuery(queryOptions);
 
-  const marcarLidoMutation = useMutation({
-    ...trpc.alerta.marcarLido.mutationOptions(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-      queryClient.invalidateQueries({ queryKey: ["alerta", "listNaoLidos"] });
-    },
-  });
+  const marcarLidoMutation = useMutation(
+    trpc.alerta.marcarLido.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+        queryClient.invalidateQueries({ queryKey: ["alerta", "listNaoLidos"] });
+      },
+    })
+  );
 
-  const marcarTodosLidosMutation = useMutation({
-    ...trpc.alerta.marcarTodosLidos.mutationOptions(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
-      queryClient.invalidateQueries({ queryKey: ["alerta", "listNaoLidos"] });
-    },
-  });
+  const marcarTodosLidosMutation = useMutation(
+    trpc.alerta.marcarTodosLidos.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
+        queryClient.invalidateQueries({ queryKey: ["alerta", "listNaoLidos"] });
+      },
+    })
+  );
 
   const handleAlertaClick = (alerta: NonNullable<typeof data>["alertas"][0]) => {
     if (!alerta.lido) {
@@ -87,9 +90,9 @@ export default function AlertasPage() {
 
     if (alerta.entidade && alerta.entidadeId) {
       if (alerta.entidade === "PECA") {
-        router.push(`/estoque/${alerta.entidadeId}`);
+        router.push(`/estoque/${alerta.entidadeId}` as Route);
       } else if (alerta.entidade === "VENDA") {
-        router.push(`/vendas/${alerta.entidadeId}`);
+        router.push(`/vendas/${alerta.entidadeId}` as Route);
       }
     }
   };

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, Search, Check, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -135,27 +136,29 @@ export function VendaForm({ initialData, isEditing = false }: VendaFormProps) {
     enabled: !!data.clienteId,
   });
 
-  const createMutation = useMutation({
-    ...trpc.venda.create.mutationOptions(),
-    onSuccess: (venda) => {
-      toast.success("Venda registrada com sucesso!");
-      router.push(`/vendas/${venda.id}`);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const createMutation = useMutation(
+    trpc.venda.create.mutationOptions({
+      onSuccess: (venda) => {
+        toast.success("Venda registrada com sucesso!");
+        router.push(`/vendas/${venda.id}` as Route);
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const updateMutation = useMutation({
-    ...trpc.venda.update.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Venda atualizada com sucesso!");
-      router.push(`/vendas/${initialData?.id}`);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const updateMutation = useMutation(
+    trpc.venda.update.mutationOptions({
+      onSuccess: () => {
+        toast.success("Venda atualizada com sucesso!");
+        router.push(`/vendas/${initialData?.id}` as Route);
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const mutation = isEditing ? updateMutation : createMutation;
 

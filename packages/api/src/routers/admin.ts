@@ -24,7 +24,7 @@ export const adminRouter = router({
       })
     )
     .query(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session.user.nivel!);
 
       const { page, limit, search, nivel, ativo } = input;
       const skip = (page - 1) * limit;
@@ -70,7 +70,7 @@ export const adminRouter = router({
   getUserById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session.user.nivel!);
 
       const user = await prisma.user.findUnique({
         where: { id: input.id },
@@ -109,7 +109,7 @@ export const adminRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session.user.nivel!);
 
       // Verificar se email ja existe
       const existingUser = await prisma.user.findUnique({
@@ -144,11 +144,11 @@ export const adminRouter = router({
       });
 
       await registrarAuditoria({
-        userId: ctx.session.user.id,
+        userId: ctx.session.user.id!,
         acao: "CRIAR",
         entidade: "USUARIO",
         entidadeId: user.id,
-        detalhes: JSON.stringify({ nome: input.name, email: input.email, nivel: input.nivel }),
+        detalhes: { nome: input.name, email: input.email, nivel: input.nivel },
       });
 
       return user;
@@ -166,7 +166,7 @@ export const adminRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session.user.nivel!);
 
       const { id, ...data } = input;
 
@@ -205,11 +205,11 @@ export const adminRouter = router({
       });
 
       await registrarAuditoria({
-        userId: ctx.session.user.id,
+        userId: ctx.session.user.id!,
         acao: "EDITAR",
         entidade: "USUARIO",
         entidadeId: user.id,
-        detalhes: JSON.stringify(data),
+        detalhes: data as Record<string, unknown>,
       });
 
       return user;
@@ -224,7 +224,7 @@ export const adminRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session.user.nivel!);
 
       // Verificar se usuario existe
       const user = await prisma.user.findUnique({
@@ -251,7 +251,7 @@ export const adminRouter = router({
       });
 
       await registrarAuditoria({
-        userId: ctx.session.user.id,
+        userId: ctx.session.user.id!,
         acao: "RESETAR_SENHA",
         entidade: "USUARIO",
         entidadeId: input.userId,
@@ -264,7 +264,7 @@ export const adminRouter = router({
   deactivateUser: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session.user.nivel!);
 
       // Nao permitir desativar o proprio usuario
       if (input.id === ctx.session.user.id) {
@@ -282,7 +282,7 @@ export const adminRouter = router({
       });
 
       await registrarAuditoria({
-        userId: ctx.session.user.id,
+        userId: ctx.session.user.id!,
         acao: "DESATIVAR",
         entidade: "USUARIO",
         entidadeId: input.id,
@@ -295,7 +295,7 @@ export const adminRouter = router({
   activateUser: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      assertAdmin(ctx.session.user.nivel);
+      assertAdmin(ctx.session.user.nivel!);
 
       const user = await prisma.user.update({
         where: { id: input.id },
@@ -303,7 +303,7 @@ export const adminRouter = router({
       });
 
       await registrarAuditoria({
-        userId: ctx.session.user.id,
+        userId: ctx.session.user.id!,
         acao: "REATIVAR",
         entidade: "USUARIO",
         entidadeId: input.id,
@@ -314,7 +314,7 @@ export const adminRouter = router({
 
   // Estatisticas do sistema
   getStats: protectedProcedure.query(async ({ ctx }) => {
-    assertAdmin(ctx.session.user.nivel);
+    assertAdmin(ctx.session.user.nivel!);
 
     const [
       totalUsers,

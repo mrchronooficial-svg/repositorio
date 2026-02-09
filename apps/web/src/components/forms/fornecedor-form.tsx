@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,27 +65,29 @@ export function FornecedorForm({ initialData, isEditing }: FornecedorFormProps) 
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FornecedorData, string>>>({});
 
-  const createMutation = useMutation({
-    ...trpc.fornecedor.create.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Fornecedor criado com sucesso!");
-      router.push("/fornecedores");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const createMutation = useMutation(
+    trpc.fornecedor.create.mutationOptions({
+      onSuccess: () => {
+        toast.success("Fornecedor criado com sucesso!");
+        router.push("/fornecedores");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const updateMutation = useMutation({
-    ...trpc.fornecedor.update.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Fornecedor atualizado com sucesso!");
-      router.push(`/fornecedores/${initialData?.id}`);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const updateMutation = useMutation(
+    trpc.fornecedor.update.mutationOptions({
+      onSuccess: () => {
+        toast.success("Fornecedor atualizado com sucesso!");
+        router.push(`/fornecedores/${initialData?.id}` as Route);
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
 

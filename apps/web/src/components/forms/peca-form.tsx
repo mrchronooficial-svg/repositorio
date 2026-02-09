@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -126,37 +127,40 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
     enabled: !!data.fornecedorId,
   });
 
-  const createMutation = useMutation({
-    ...trpc.peca.create.mutationOptions(),
-    onSuccess: (peca) => {
-      toast.success(`Peca ${peca.sku} criada com sucesso!`);
-      router.push("/estoque");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const createMutation = useMutation(
+    trpc.peca.create.mutationOptions({
+      onSuccess: (peca) => {
+        toast.success(`Peca ${peca.sku} criada com sucesso!`);
+        router.push("/estoque");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const updateMutation = useMutation({
-    ...trpc.peca.update.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Peca atualizada com sucesso!");
-      router.push(`/estoque/${initialData?.id}`);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const updateMutation = useMutation(
+    trpc.peca.update.mutationOptions({
+      onSuccess: () => {
+        toast.success("Peca atualizada com sucesso!");
+        router.push(`/estoque/${initialData?.id}` as Route);
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const updateFotosMutation = useMutation({
-    ...trpc.peca.updateFotos.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Fotos atualizadas!");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const updateFotosMutation = useMutation(
+    trpc.peca.updateFotos.mutationOptions({
+      onSuccess: () => {
+        toast.success("Fotos atualizadas!");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const isLoading = createMutation.isPending || updateMutation.isPending;
 

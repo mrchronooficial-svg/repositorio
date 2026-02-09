@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { Archive, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -247,7 +248,7 @@ export function EstoquePage() {
         isLoading={isLoading}
         podeVerValores={podeVerValores}
         podeExcluir={podeExcluir}
-        onView={(id) => router.push(`/estoque/${id}`)}
+        onView={(id) => router.push(`/estoque/${id}` as Route)}
         onStatusClick={handleStatusClick}
         onDelete={handleDelete}
       />

@@ -113,3 +113,11 @@ export function formatRelativeDate(date: Date | string | null | undefined): stri
   }
   return "agora";
 }
+
+/**
+ * Formata percentual com 1 casa decimal
+ */
+export function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "0,0%";
+  return `${value.toFixed(1).replace(".", ",")}%`;
+}

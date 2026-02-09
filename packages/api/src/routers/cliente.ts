@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, protectedProcedure, socioOuAdminProcedure, adminProcedure } from "../index";
+import { router, protectedProcedure, socioOuAdminProcedure } from "../index";
 import prisma from "@gestaomrchrono/db";
 import { registrarAuditoria } from "../services/auditoria.service";
 
@@ -12,19 +12,19 @@ function validarCPF(cpf: string): boolean {
 
   let soma = 0;
   for (let i = 0; i < 9; i++) {
-    soma += parseInt(digits[i]) * (10 - i);
+    soma += parseInt(digits[i]!) * (10 - i);
   }
   let resto = (soma * 10) % 11;
   if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(digits[9])) return false;
+  if (resto !== parseInt(digits[9]!)) return false;
 
   soma = 0;
   for (let i = 0; i < 10; i++) {
-    soma += parseInt(digits[i]) * (11 - i);
+    soma += parseInt(digits[i]!) * (11 - i);
   }
   resto = (soma * 10) % 11;
   if (resto === 10 || resto === 11) resto = 0;
-  if (resto !== parseInt(digits[10])) return false;
+  if (resto !== parseInt(digits[10]!)) return false;
 
   return true;
 }
@@ -40,19 +40,19 @@ function validarCNPJ(cnpj: string): boolean {
 
   let soma = 0;
   for (let i = 0; i < 12; i++) {
-    soma += parseInt(digits[i]) * pesos1[i];
+    soma += parseInt(digits[i]!) * pesos1[i]!;
   }
   let resto = soma % 11;
   const digito1 = resto < 2 ? 0 : 11 - resto;
-  if (digito1 !== parseInt(digits[12])) return false;
+  if (digito1 !== parseInt(digits[12]!)) return false;
 
   soma = 0;
   for (let i = 0; i < 13; i++) {
-    soma += parseInt(digits[i]) * pesos2[i];
+    soma += parseInt(digits[i]!) * pesos2[i]!;
   }
   resto = soma % 11;
   const digito2 = resto < 2 ? 0 : 11 - resto;
-  if (digito2 !== parseInt(digits[13])) return false;
+  if (digito2 !== parseInt(digits[13]!)) return false;
 
   return true;
 }

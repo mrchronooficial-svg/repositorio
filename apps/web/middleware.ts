@@ -8,10 +8,12 @@ export async function middleware(request: NextRequest) {
   const publicPaths = ["/", "/login"];
   const isPublicPath = publicPaths.includes(path);
   const isApiAuth = path.startsWith("/api/auth");
+  const isApiTrpc = path.startsWith("/api/trpc");
+  const isCatalogo = path.startsWith("/catalogo");
   const isStaticFile = path.startsWith("/_next") || path.includes(".");
 
-  // Permitir rotas públicas e arquivos estáticos
-  if (isPublicPath || isApiAuth || isStaticFile) {
+  // Permitir rotas públicas, catálogo, API e arquivos estáticos
+  if (isPublicPath || isApiAuth || isApiTrpc || isCatalogo || isStaticFile) {
     return NextResponse.next();
   }
 

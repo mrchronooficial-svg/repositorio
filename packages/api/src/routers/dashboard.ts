@@ -30,7 +30,7 @@ export const dashboardRouter = router({
       pecasDisponiveis,
       pecasEmTransito,
       pecasEmRevisao,
-      pecasVendidasMes,
+      _pecasVendidasMes,
       pecasTotal,
     ] = await Promise.all([
       prisma.peca.count({

@@ -61,18 +61,19 @@ export function StatusDialog({
 
   const { data: localizacoes } = useQuery(trpc.peca.getLocalizacoes.queryOptions());
 
-  const updateMutation = useMutation({
-    ...trpc.peca.updateStatus.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Status atualizado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["peca", "getById"] });
-      onOpenChange(false);
-      onSuccess?.();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const updateMutation = useMutation(
+    trpc.peca.updateStatus.mutationOptions({
+      onSuccess: () => {
+        toast.success("Status atualizado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["peca", "getById"] });
+        onOpenChange(false);
+        onSuccess?.();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleSubmit = () => {
     if (status === currentStatus && localizacao === currentLocalizacao) {

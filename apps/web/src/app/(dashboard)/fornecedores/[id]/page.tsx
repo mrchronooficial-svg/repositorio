@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit, Archive, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,38 +34,41 @@ export default function FornecedorDetalhesPage() {
     queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
   };
 
-  const archiveMutation = useMutation({
-    ...trpc.fornecedor.archive.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Fornecedor arquivado com sucesso!");
-      refetch();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const archiveMutation = useMutation(
+    trpc.fornecedor.archive.mutationOptions({
+      onSuccess: () => {
+        toast.success("Fornecedor arquivado com sucesso!");
+        refetch();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const restoreMutation = useMutation({
-    ...trpc.fornecedor.restore.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Fornecedor restaurado com sucesso!");
-      refetch();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const restoreMutation = useMutation(
+    trpc.fornecedor.restore.mutationOptions({
+      onSuccess: () => {
+        toast.success("Fornecedor restaurado com sucesso!");
+        refetch();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const deleteMutation = useMutation({
-    ...trpc.fornecedor.delete.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Fornecedor excluido permanentemente!");
-      router.push("/fornecedores");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const deleteMutation = useMutation(
+    trpc.fornecedor.delete.mutationOptions({
+      onSuccess: () => {
+        toast.success("Fornecedor excluido permanentemente!");
+        router.push("/fornecedores");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   if (isLoading) {
     return (
@@ -145,7 +149,7 @@ export default function FornecedorDetalhesPage() {
             <>
               <Button
                 variant="outline"
-                onClick={() => router.push(`/fornecedores/${id}/editar`)}
+                onClick={() => router.push(`/fornecedores/${id}/editar` as Route)}
               >
                 <Edit className="h-4 w-4 mr-2" />
                 Editar
@@ -254,7 +258,7 @@ export default function FornecedorDetalhesPage() {
                     <div
                       key={peca.id}
                       className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 cursor-pointer"
-                      onClick={() => router.push(`/estoque/${peca.id}`)}
+                      onClick={() => router.push(`/estoque/${peca.id}` as Route)}
                     >
                       <div>
                         <p className="font-medium">{peca.sku}</p>

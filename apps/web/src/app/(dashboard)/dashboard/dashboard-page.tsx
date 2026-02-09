@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Package,
@@ -102,12 +103,13 @@ export function DashboardPage() {
   );
 
   // Verificar alertas automaticamente
-  const verificarAlertasMutation = useMutation({
-    ...trpc.alerta.verificarAlertas.mutationOptions(),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["alerta"] });
-    },
-  });
+  const verificarAlertasMutation = useMutation(
+    trpc.alerta.verificarAlertas.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["alerta"] });
+      },
+    })
+  );
 
   // Verificar alertas ao carregar a pagina
   useEffect(() => {
@@ -651,7 +653,7 @@ export function DashboardPage() {
                   <div
                     key={venda.id}
                     className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
-                    onClick={() => router.push(`/vendas/${venda.id}`)}
+                    onClick={() => router.push(`/vendas/${venda.id}` as Route)}
                   >
                     <div>
                       <p className="font-mono text-sm">{venda.peca.sku}</p>
@@ -707,7 +709,7 @@ export function DashboardPage() {
                         ? "border-orange-200 bg-orange-50 hover:bg-orange-100"
                         : "hover:bg-muted/50"
                     )}
-                    onClick={() => router.push(`/estoque/${peca.id}`)}
+                    onClick={() => router.push(`/estoque/${peca.id}` as Route)}
                   >
                     <div>
                       <p className="font-mono text-sm">{peca.sku}</p>
@@ -765,7 +767,7 @@ export function DashboardPage() {
                     <tr
                       key={item.id}
                       className="border-b hover:bg-muted/50 cursor-pointer"
-                      onClick={() => router.push(`/vendas/${item.id}`)}
+                      onClick={() => router.push(`/vendas/${item.id}` as Route)}
                     >
                       <td className="py-2 font-mono text-sm">{item.sku}</td>
                       <td className="py-2 text-sm">{item.cliente}</td>
@@ -820,7 +822,7 @@ export function DashboardPage() {
                     <div
                       key={item.id}
                       className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
-                      onClick={() => router.push(`/vendas/${item.id}`)}
+                      onClick={() => router.push(`/vendas/${item.id}` as Route)}
                     >
                       <div>
                         <p className="font-mono text-sm">{item.sku}</p>
@@ -866,7 +868,7 @@ export function DashboardPage() {
                     <div
                       key={item.id}
                       className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
-                      onClick={() => router.push(`/estoque/${item.id}`)}
+                      onClick={() => router.push(`/estoque/${item.id}` as Route)}
                     >
                       <div>
                         <p className="font-mono text-sm">{item.sku}</p>
@@ -922,7 +924,7 @@ export function DashboardPage() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => {
                         setShowRecebiveisModal(false);
-                        router.push(`/vendas/${item.id}`);
+                        router.push(`/vendas/${item.id}` as Route);
                       }}
                     >
                       <TableCell className="font-medium">{item.cliente}</TableCell>
@@ -1002,7 +1004,7 @@ export function DashboardPage() {
                             className="cursor-pointer hover:bg-muted/50"
                             onClick={() => {
                               setShowDividasModal(false);
-                              router.push(`/vendas/${item.id}`);
+                              router.push(`/vendas/${item.id}` as Route);
                             }}
                           >
                             <TableCell className="font-medium">{item.fornecedor}</TableCell>
@@ -1043,7 +1045,7 @@ export function DashboardPage() {
                             className="cursor-pointer hover:bg-muted/50"
                             onClick={() => {
                               setShowDividasModal(false);
-                              router.push(`/estoque/${item.id}`);
+                              router.push(`/estoque/${item.id}` as Route);
                             }}
                           >
                             <TableCell className="font-medium">{item.fornecedor}</TableCell>

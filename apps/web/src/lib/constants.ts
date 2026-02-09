@@ -113,6 +113,42 @@ export const STATUS_NFE_COLORS: Record<string, string> = {
   NAO_DECLARADA: "bg-red-100 text-red-800",
 };
 
+// ============================================
+// MÓDULO FINANCEIRO
+// ============================================
+
+export const TIPO_CONTA_LABELS: Record<string, string> = {
+  GRUPO: "Grupo",
+  SUBGRUPO: "Subgrupo",
+  ANALITICA: "Analítica",
+};
+
+export const NATUREZA_CONTA_LABELS: Record<string, string> = {
+  DEVEDORA: "Devedora",
+  CREDORA: "Credora",
+};
+
+export const TIPO_LANCAMENTO_LABELS: Record<string, string> = {
+  MANUAL: "Manual",
+  AUTOMATICO_VENDA: "Automático (Venda)",
+  AUTOMATICO_DESPESA_RECORRENTE: "Automático (Despesa Recorrente)",
+  TRANSFERENCIA: "Transferência",
+  DISTRIBUICAO_LUCROS: "Distribuição de Lucros",
+  ANTECIPACAO: "Antecipação",
+};
+
+export const STATUS_DESPESA_RECORRENTE_LABELS: Record<string, string> = {
+  ATIVA: "Ativa",
+  INATIVA: "Inativa",
+};
+
+export const STATUS_DESPESA_RECORRENTE_COLORS: Record<string, string> = {
+  ATIVA: "bg-green-100 text-green-800",
+  INATIVA: "bg-gray-100 text-gray-800",
+};
+
+export const SOCIOS = ["Rafael", "João"] as const;
+
 export const LOCALIZACOES_PADRAO = [
   "Rafael",
   "Pedro",

@@ -62,19 +62,20 @@ export function PagamentoFornecedorDialog({
     }
   }, [open]);
 
-  const mutation = useMutation({
-    ...trpc.peca.registrarPagamentoFornecedor.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Pagamento registrado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["peca", "getById"] });
-      queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
-      onOpenChange(false);
-      onSuccess?.();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const mutation = useMutation(
+    trpc.peca.registrarPagamentoFornecedor.mutationOptions({
+      onSuccess: () => {
+        toast.success("Pagamento registrado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["peca", "getById"] });
+        queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
+        onOpenChange(false);
+        onSuccess?.();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleSubmit = () => {
     const valorNum = parseFloat(valor.replace(",", "."));

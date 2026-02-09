@@ -67,20 +67,21 @@ export function ClienteModal({ open, onOpenChange, onSuccess }: ClienteModalProp
   const [data, setData] = useState<ClienteData>(defaultData);
   const [errors, setErrors] = useState<Partial<Record<keyof ClienteData, string>>>({});
 
-  const createMutation = useMutation({
-    ...trpc.cliente.create.mutationOptions(),
-    onSuccess: (cliente) => {
-      toast.success("Cliente criado com sucesso!");
-      onSuccess({ id: cliente.id, nome: cliente.nome });
-      // Limpar formulario
-      setData(defaultData);
-      setErrors({});
-      onOpenChange(false);
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const createMutation = useMutation(
+    trpc.cliente.create.mutationOptions({
+      onSuccess: (cliente) => {
+        toast.success("Cliente criado com sucesso!");
+        onSuccess({ id: cliente.id, nome: cliente.nome });
+        // Limpar formulario
+        setData(defaultData);
+        setErrors({});
+        onOpenChange(false);
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleChange = (field: keyof ClienteData, value: string) => {
     setData((prev) => ({ ...prev, [field]: value }));

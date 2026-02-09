@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Search, X } from "lucide-react";
@@ -143,7 +144,7 @@ export function ClientesPage() {
                 <div
                   key={c.id}
                   className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer"
-                  onClick={() => router.push(`/clientes/${c.id}`)}
+                  onClick={() => router.push(`/clientes/${c.id}` as Route)}
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-medium">
@@ -222,7 +223,7 @@ export function ClientesPage() {
         isLoading={isLoading}
         podeVerValores={podeVerValores}
         podeExcluir={podeExcluir}
-        onView={(id) => router.push(`/clientes/${id}`)}
+        onView={(id) => router.push(`/clientes/${id}` as Route)}
         onDelete={handleArchive}
       />
 

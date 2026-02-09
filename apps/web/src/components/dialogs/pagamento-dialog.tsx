@@ -36,19 +36,20 @@ export function PagamentoDialog({
   const queryClient = useQueryClient();
   const [valor, setValor] = useState("");
 
-  const mutation = useMutation({
-    ...trpc.venda.registrarPagamento.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Pagamento registrado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
-      onOpenChange(false);
-      setValor("");
-      onSuccess?.();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const mutation = useMutation(
+    trpc.venda.registrarPagamento.mutationOptions({
+      onSuccess: () => {
+        toast.success("Pagamento registrado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["venda", "getById"] });
+        onOpenChange(false);
+        setValor("");
+        onSuccess?.();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleSubmit = () => {
     const valorNum = parseFloat(valor);

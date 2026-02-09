@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Search, X } from "lucide-react";
@@ -208,8 +209,8 @@ export function VendasPage() {
         isLoading={isLoading}
         podeVerValores={podeVerValores}
         podeExcluir={podeCancelarVenda}
-        onView={(id) => router.push(`/vendas/${id}`)}
-        onEdit={(id) => router.push(`/vendas/${id}/editar`)}
+        onView={(id) => router.push(`/vendas/${id}` as Route)}
+        onEdit={(id) => router.push(`/vendas/${id}/editar` as Route)}
         onDelete={handleCancel}
       />
 

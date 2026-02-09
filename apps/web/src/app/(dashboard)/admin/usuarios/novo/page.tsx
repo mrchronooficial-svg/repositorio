@@ -30,16 +30,17 @@ export default function NovoUsuarioPage() {
   );
   const [showPassword, setShowPassword] = useState(false);
 
-  const createMutation = useMutation({
-    ...trpc.admin.createUser.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Usuario criado com sucesso!");
-      router.push("/admin/usuarios");
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const createMutation = useMutation(
+    trpc.admin.createUser.mutationOptions({
+      onSuccess: () => {
+        toast.success("Usuario criado com sucesso!");
+        router.push("/admin/usuarios");
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
