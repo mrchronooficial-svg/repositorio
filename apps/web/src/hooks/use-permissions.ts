@@ -17,7 +17,9 @@ export interface Permissions {
   podeExcluir: boolean;
   podeEditarVendida: boolean;
   podeAcessarAdmin: boolean;
+  podeAcessarFinanceiro: boolean;
   podeCancelarVenda: boolean;
+  podeRegistrarPagamento: boolean;
   podeRegistrarRepasse: boolean;
   podeEditarDataVenda: boolean;
 
@@ -50,8 +52,14 @@ export function usePermissions(): Permissions {
   // Apenas Admin acessa painel admin
   const podeAcessarAdmin = isAdmin;
 
+  // Apenas Admin acessa módulo financeiro
+  const podeAcessarFinanceiro = isAdmin;
+
   // Sócio e Admin podem cancelar vendas
   const podeCancelarVenda = isAdmin || isSocio;
+
+  // Todos os níveis podem registrar pagamento
+  const podeRegistrarPagamento = isAdmin || isSocio || isFuncionario;
 
   // Sócio e Admin podem registrar repasse
   const podeRegistrarRepasse = isAdmin || isSocio;
@@ -67,7 +75,9 @@ export function usePermissions(): Permissions {
     podeExcluir,
     podeEditarVendida,
     podeAcessarAdmin,
+    podeAcessarFinanceiro,
     podeCancelarVenda,
+    podeRegistrarPagamento,
     podeRegistrarRepasse,
     podeEditarDataVenda,
     nivel: nivel ?? null,

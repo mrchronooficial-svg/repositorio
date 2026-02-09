@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -32,7 +33,7 @@ export default function VendaDetalhesPage() {
   const params = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { podeVerValores, podeCancelarVenda, podeRegistrarRepasse, isAdmin } = usePermissions();
+  const { podeVerValores, podeCancelarVenda, podeRegistrarPagamento, podeRegistrarRepasse, isAdmin } = usePermissions();
 
   const [pagamentoDialogOpen, setPagamentoDialogOpen] = useState(false);
   const [repasseDialogOpen, setRepasseDialogOpen] = useState(false);
@@ -51,27 +52,29 @@ export default function VendaDetalhesPage() {
     queryClient.invalidateQueries({ queryKey: queryOptions.queryKey });
   };
 
-  const cancelMutation = useMutation({
-    ...trpc.venda.cancel.mutationOptions(),
-    onSuccess: (result) => {
-      toast.success(`Venda cancelada. Nova peca criada: ${result.novoSku}`);
-      refetch();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const cancelMutation = useMutation(
+    trpc.venda.cancel.mutationOptions({
+      onSuccess: (result) => {
+        toast.success(`Venda cancelada. Nova peca criada: ${result.novoSku}`);
+        refetch();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
-  const deletarPagamentoMutation = useMutation({
-    ...trpc.venda.deletarPagamento.mutationOptions(),
-    onSuccess: () => {
-      toast.success("Pagamento removido com sucesso!");
-      refetch();
-    },
-    onError: (error: Error) => {
-      toast.error(error.message);
-    },
-  });
+  const deletarPagamentoMutation = useMutation(
+    trpc.venda.deletarPagamento.mutationOptions({
+      onSuccess: () => {
+        toast.success("Pagamento removido com sucesso!");
+        refetch();
+      },
+      onError: (error) => {
+        toast.error(error.message);
+      },
+    })
+  );
 
   if (isLoading) {
     return (
@@ -153,12 +156,12 @@ export default function VendaDetalhesPage() {
           <div className="flex gap-2 flex-wrap justify-end">
             <Button
               variant="outline"
-              onClick={() => router.push(`/vendas/${id}/editar`)}
+              onClick={() => router.push(`/vendas/${id}/editar` as Route)}
             >
               <Pencil className="h-4 w-4 mr-2" />
               Editar
             </Button>
-            {venda.statusPagamento !== "PAGO" && podeVerValores && (
+            {venda.statusPagamento !== "PAGO" && podeRegistrarPagamento && (
               <Button onClick={() => setPagamentoDialogOpen(true)}>
                 <CreditCard className="h-4 w-4 mr-2" />
                 Registrar Pagamento
@@ -201,7 +204,7 @@ export default function VendaDetalhesPage() {
             <CardContent>
               <div
                 className="flex items-start gap-4 p-4 border rounded-lg cursor-pointer hover:bg-muted/50"
-                onClick={() => router.push(`/estoque/${venda.peca.id}`)}
+                onClick={() => router.push(`/estoque/${venda.peca.id}` as Route)}
               >
                 {venda.peca.fotos?.[0] && (
                   <img
@@ -231,7 +234,7 @@ export default function VendaDetalhesPage() {
             <CardContent>
               <div
                 className="p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
-                onClick={() => router.push(`/clientes/${venda.cliente.id}`)}
+                onClick={() => router.push(`/clientes/${venda.cliente.id}` as Route)}
               >
                 <p className="font-medium">{venda.cliente.nome}</p>
                 <p className="text-sm text-muted-foreground">
