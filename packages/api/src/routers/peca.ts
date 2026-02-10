@@ -45,7 +45,7 @@ const PecaUpdateSchema = z.object({
   tamanhoCaixa: z.number().positive().optional(),
   materialCaixa: z.string().optional().nullable(),
   materialPulseira: z.string().optional().nullable(),
-  valorCompra: z.number().positive().optional(),
+  valorCompra: z.number().nonnegative().optional(),
   valorEstimadoVenda: z.number().positive().optional(),
   valorRepasse: z.number().positive().optional().nullable(),
   percentualRepasse: z.number().positive().max(100).optional().nullable(),
