@@ -113,6 +113,9 @@ export const pecaRouter = router({
             fornecedor: {
               select: { nome: true },
             },
+            venda: {
+              select: { valorFinal: true },
+            },
           },
         }),
         prisma.peca.count({ where }),
@@ -126,6 +129,7 @@ export const pecaRouter = router({
         valorRepasse: podeVerValores ? peca.valorRepasse : null,
         percentualRepasse: podeVerValores ? peca.percentualRepasse : null,
         statusPagamentoFornecedor: podeVerValores ? peca.statusPagamentoFornecedor : null,
+        venda: podeVerValores ? peca.venda : null,
       }));
 
       return {

@@ -32,6 +32,10 @@ interface Fornecedor {
   nome: string;
 }
 
+interface Venda {
+  valorFinal: Decimal;
+}
+
 interface Peca {
   id: string;
   sku: string;
@@ -42,10 +46,12 @@ interface Peca {
   valorCompra: Decimal | null;
   valorEstimadoVenda: Decimal | null;
   valorRepasse?: Decimal | null;
+  percentualRepasse?: Decimal | null;
   statusPagamentoFornecedor?: string | null;
   origemTipo?: string;
   fotos: Foto[];
   fornecedor: Fornecedor;
+  venda?: Venda | null;
 }
 
 interface PecaStatusInfo {
@@ -221,12 +227,27 @@ export function PecasTable({
             {podeVerValores && (
               <TableCell className="text-right font-medium">
                 {(() => {
-                  const valorVenda = Number(peca.valorEstimadoVenda) || 0;
+                  // Usar valor real da venda se vendida, senao estimado
+                  const valorVenda = peca.venda
+                    ? Number(peca.venda.valorFinal) || 0
+                    : Number(peca.valorEstimadoVenda) || 0;
                   if (!valorVenda) return "-";
-                  const custo =
-                    peca.origemTipo === "CONSIGNACAO"
-                      ? Number(peca.valorRepasse) || 0
-                      : Number(peca.valorCompra) || 0;
+
+                  let custo: number;
+                  if (peca.origemTipo === "CONSIGNACAO") {
+                    if (peca.valorRepasse) {
+                      // Repasse fixo
+                      custo = Number(peca.valorRepasse);
+                    } else if (peca.percentualRepasse) {
+                      // Repasse percentual: calcula sobre valor da venda
+                      custo = valorVenda * (Number(peca.percentualRepasse) / 100);
+                    } else {
+                      custo = 0;
+                    }
+                  } else {
+                    custo = Number(peca.valorCompra) || 0;
+                  }
+
                   const lucro = valorVenda - custo;
                   return (
                     <span className={lucro >= 0 ? "text-green-600" : "text-red-600"}>
