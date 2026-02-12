@@ -20,6 +20,7 @@ import { FotoUpload } from "./foto-upload";
 import { FornecedorModal } from "./fornecedor-modal";
 import { trpc } from "@/utils/trpc";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/use-permissions";
 
 interface PecaData {
   marca: string;
@@ -102,6 +103,7 @@ const materiaisPulseira = [
 
 export function PecaForm({ initialData, isEditing }: PecaFormProps) {
   const router = useRouter();
+  const { podeVerValores } = usePermissions();
   const [data, setData] = useState<PecaData>({
     ...defaultData,
     ...initialData,
@@ -180,32 +182,37 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       newErrors.tamanhoCaixa = "Tamanho da caixa e obrigatorio";
     }
 
-    // Valor de compra so e obrigatorio se for COMPRA (nao consignacao)
-    if (data.origemTipo === "COMPRA") {
-      if (!data.valorCompra || isNaN(parseFloat(data.valorCompra))) {
-        newErrors.valorCompra = "Valor de compra e obrigatorio";
+    // Validar campos monetarios apenas se o usuario pode ver valores
+    // FUNCIONARIO nao ve e nao edita valores — pula validacao
+    if (podeVerValores) {
+      // Valor de compra so e obrigatorio se for COMPRA (nao consignacao)
+      if (data.origemTipo === "COMPRA") {
+        if (!data.valorCompra || isNaN(parseFloat(data.valorCompra))) {
+          newErrors.valorCompra = "Valor de compra e obrigatorio";
+        }
+      }
+
+      if (!data.valorEstimadoVenda || isNaN(parseFloat(data.valorEstimadoVenda))) {
+        newErrors.valorEstimadoVenda = "Valor estimado e obrigatorio";
+      }
+
+      // Repasse so e obrigatorio se for CONSIGNACAO
+      if (data.origemTipo === "CONSIGNACAO") {
+        if (data.tipoRepasse === "FIXO") {
+          if (!data.valorRepasse || isNaN(parseFloat(data.valorRepasse))) {
+            newErrors.valorRepasse = "Valor de repasse e obrigatorio para consignacao";
+          }
+        } else {
+          const pct = parseFloat(data.percentualRepasse);
+          if (!data.percentualRepasse || isNaN(pct) || pct <= 0 || pct > 100) {
+            newErrors.percentualRepasse = "Percentual deve ser entre 0,01 e 100";
+          }
+        }
       }
     }
 
-    if (!data.valorEstimadoVenda || isNaN(parseFloat(data.valorEstimadoVenda))) {
-      newErrors.valorEstimadoVenda = "Valor estimado e obrigatorio";
-    }
     if (!data.fornecedorId) newErrors.fornecedorId = "Fornecedor e obrigatorio";
     if (data.fotos.length === 0) newErrors.fotos = "Minimo 1 foto obrigatoria";
-
-    // Repasse so e obrigatorio se for CONSIGNACAO
-    if (data.origemTipo === "CONSIGNACAO") {
-      if (data.tipoRepasse === "FIXO") {
-        if (!data.valorRepasse || isNaN(parseFloat(data.valorRepasse))) {
-          newErrors.valorRepasse = "Valor de repasse e obrigatorio para consignacao";
-        }
-      } else {
-        const pct = parseFloat(data.percentualRepasse);
-        if (!data.percentualRepasse || isNaN(pct) || pct <= 0 || pct > 100) {
-          newErrors.percentualRepasse = "Percentual deve ser entre 0,01 e 100";
-        }
-      }
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -243,7 +250,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
     };
 
     if (isEditing && initialData?.id) {
-      updateMutation.mutate({
+      const updatePayload: Record<string, unknown> = {
         id: initialData.id,
         marca: payload.marca,
         modelo: payload.modelo,
@@ -251,12 +258,19 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         tamanhoCaixa: payload.tamanhoCaixa,
         materialCaixa: payload.materialCaixa,
         materialPulseira: payload.materialPulseira,
-        valorCompra: payload.valorCompra,
-        valorEstimadoVenda: payload.valorEstimadoVenda,
-        valorRepasse: payload.valorRepasse ?? null,
-        percentualRepasse: payload.percentualRepasse ?? null,
         localizacao: payload.localizacao,
-      });
+      };
+
+      // Apenas enviar campos monetarios se o usuario tem permissao
+      // FUNCIONARIO nao pode ver/editar valores — nao envia para nao zerar
+      if (podeVerValores) {
+        updatePayload.valorCompra = payload.valorCompra;
+        updatePayload.valorEstimadoVenda = payload.valorEstimadoVenda;
+        updatePayload.valorRepasse = payload.valorRepasse ?? null;
+        updatePayload.percentualRepasse = payload.percentualRepasse ?? null;
+      }
+
+      updateMutation.mutate(updatePayload as Parameters<typeof updateMutation.mutate>[0]);
       // Atualizar fotos separadamente
       if (JSON.stringify(data.fotos) !== JSON.stringify(initialData.fotos)) {
         updateFotosMutation.mutate({
@@ -398,48 +412,52 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       {/* Valores e Origem */}
       <Card>
         <CardHeader>
-          <CardTitle>Valores e Origem</CardTitle>
+          <CardTitle>{podeVerValores ? "Valores e Origem" : "Origem e Localizacao"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="valorCompra">
-                Valor de Compra (R$) {data.origemTipo === "COMPRA" && "*"}
-              </Label>
-              <Input
-                id="valorCompra"
-                type="number"
-                step="0.01"
-                value={data.origemTipo === "CONSIGNACAO" ? "" : data.valorCompra}
-                onChange={(e) => handleChange("valorCompra", e.target.value)}
-                placeholder={data.origemTipo === "CONSIGNACAO" ? "N/A - Consignacao" : "0,00"}
-                disabled={data.origemTipo === "CONSIGNACAO"}
-                className={data.origemTipo === "CONSIGNACAO" ? "bg-muted" : ""}
-              />
-              {data.origemTipo === "CONSIGNACAO" && (
-                <p className="text-xs text-muted-foreground">
-                  Em consignacao nao ha valor de compra
-                </p>
-              )}
-              {errors.valorCompra && (
-                <p className="text-sm text-red-500">{errors.valorCompra}</p>
-              )}
-            </div>
+            {podeVerValores && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="valorCompra">
+                    Valor de Compra (R$) {data.origemTipo === "COMPRA" && "*"}
+                  </Label>
+                  <Input
+                    id="valorCompra"
+                    type="number"
+                    step="0.01"
+                    value={data.origemTipo === "CONSIGNACAO" ? "" : data.valorCompra}
+                    onChange={(e) => handleChange("valorCompra", e.target.value)}
+                    placeholder={data.origemTipo === "CONSIGNACAO" ? "N/A - Consignacao" : "0,00"}
+                    disabled={data.origemTipo === "CONSIGNACAO"}
+                    className={data.origemTipo === "CONSIGNACAO" ? "bg-muted" : ""}
+                  />
+                  {data.origemTipo === "CONSIGNACAO" && (
+                    <p className="text-xs text-muted-foreground">
+                      Em consignacao nao ha valor de compra
+                    </p>
+                  )}
+                  {errors.valorCompra && (
+                    <p className="text-sm text-red-500">{errors.valorCompra}</p>
+                  )}
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="valorEstimadoVenda">Valor Estimado Venda (R$) *</Label>
-              <Input
-                id="valorEstimadoVenda"
-                type="number"
-                step="0.01"
-                value={data.valorEstimadoVenda}
-                onChange={(e) => handleChange("valorEstimadoVenda", e.target.value)}
-                placeholder="0,00"
-              />
-              {errors.valorEstimadoVenda && (
-                <p className="text-sm text-red-500">{errors.valorEstimadoVenda}</p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label htmlFor="valorEstimadoVenda">Valor Estimado Venda (R$) *</Label>
+                  <Input
+                    id="valorEstimadoVenda"
+                    type="number"
+                    step="0.01"
+                    value={data.valorEstimadoVenda}
+                    onChange={(e) => handleChange("valorEstimadoVenda", e.target.value)}
+                    placeholder="0,00"
+                  />
+                  {errors.valorEstimadoVenda && (
+                    <p className="text-sm text-red-500">{errors.valorEstimadoVenda}</p>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="localizacao">Localizacao</Label>
@@ -501,7 +519,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
               </Select>
             </div>
 
-            {data.origemTipo === "CONSIGNACAO" && (
+            {podeVerValores && data.origemTipo === "CONSIGNACAO" && (
               <>
                 <div className="space-y-2">
                   <Label>Tipo de Repasse *</Label>
