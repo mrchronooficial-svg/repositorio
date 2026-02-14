@@ -34,6 +34,7 @@ export const catalogoRouter = router({
 
       const where: Record<string, unknown> = {
         arquivado: false,
+        exibirNoCatalogo: true,
         OR: [
           { status: { notIn: ["VENDIDA", "DEFEITO", "PERDA"] } },
           {
@@ -123,6 +124,7 @@ export const catalogoRouter = router({
         where: {
           id: input.pecaId,
           arquivado: false,
+          exibirNoCatalogo: true,
           OR: [
             { status: { notIn: ["VENDIDA", "DEFEITO", "PERDA"] } },
             {
@@ -173,6 +175,7 @@ export const catalogoRouter = router({
     const pecas = await prisma.peca.findMany({
       where: {
         arquivado: false,
+        exibirNoCatalogo: true,
         OR: [
           { status: { notIn: ["VENDIDA", "DEFEITO", "PERDA"] } },
           {

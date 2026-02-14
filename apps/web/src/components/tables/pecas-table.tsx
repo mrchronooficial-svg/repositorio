@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/formatters";
@@ -49,6 +50,7 @@ interface Peca {
   percentualRepasse?: Decimal | null;
   statusPagamentoFornecedor?: string | null;
   origemTipo?: string;
+  exibirNoCatalogo?: boolean;
   fotos: Foto[];
   fornecedor: Fornecedor;
   venda?: Venda | null;
@@ -69,6 +71,7 @@ interface PecasTableProps {
   onView: (id: string) => void;
   onStatusClick?: (peca: PecaStatusInfo) => void;
   onDelete?: (id: string) => Promise<void>;
+  onToggleCatalogo?: (id: string, exibir: boolean) => void;
 }
 
 export function PecasTable({
@@ -79,6 +82,7 @@ export function PecasTable({
   onView,
   onStatusClick,
   onDelete,
+  onToggleCatalogo,
 }: PecasTableProps) {
   const [selectedImage, setSelectedImage] = useState<{ url: string; sku: string } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ id: string; sku: string; marca: string; modelo: string } | null>(null);
@@ -118,6 +122,7 @@ export function PecasTable({
     <Table>
       <TableHeader>
         <TableRow>
+          {onToggleCatalogo && <TableHead className="w-10 px-2" title="Exibir no catálogo">Cat.</TableHead>}
           <TableHead className="w-24">Foto</TableHead>
           <TableHead>SKU</TableHead>
           <TableHead>Marca / Modelo</TableHead>
@@ -138,6 +143,21 @@ export function PecasTable({
             className={`cursor-pointer hover:bg-muted/50 ${peca.status === "VENDIDA" ? "bg-green-100" : ""}`}
             onClick={() => onView(peca.id)}
           >
+            {onToggleCatalogo && (
+              <TableCell className="py-2 px-2">
+                {!["VENDIDA", "DEFEITO", "PERDA"].includes(peca.status) ? (
+                  <Checkbox
+                    checked={peca.exibirNoCatalogo !== false}
+                    onCheckedChange={(checked) => {
+                      onToggleCatalogo(peca.id, !!checked);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-4 w-4"
+                    title={peca.exibirNoCatalogo !== false ? "Visível no catálogo" : "Oculto do catálogo"}
+                  />
+                ) : null}
+              </TableCell>
+            )}
             <TableCell className="py-2">
               {peca.fotos[0] ? (
                 <img

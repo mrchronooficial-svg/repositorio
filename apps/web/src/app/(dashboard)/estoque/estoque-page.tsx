@@ -81,6 +81,23 @@ export function EstoquePage() {
   // Mutation para deletar peca
   const deleteMutation = useMutation(trpc.peca.delete.mutationOptions());
 
+  // Mutation para toggle catálogo
+  const toggleCatalogoMutation = useMutation(trpc.peca.toggleCatalogo.mutationOptions());
+
+  const handleToggleCatalogo = (id: string, exibir: boolean) => {
+    toggleCatalogoMutation.mutate(
+      { id, exibirNoCatalogo: exibir },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
+        },
+        onError: () => {
+          toast.error("Erro ao atualizar visibilidade no catálogo");
+        },
+      }
+    );
+  };
+
   const handleDelete = async (id: string) => {
     try {
       await deleteMutation.mutateAsync({ id });
@@ -251,6 +268,7 @@ export function EstoquePage() {
         onView={(id) => router.push(`/estoque/${id}` as Route)}
         onStatusClick={handleStatusClick}
         onDelete={handleDelete}
+        onToggleCatalogo={handleToggleCatalogo}
       />
 
       {/* Paginacao */}

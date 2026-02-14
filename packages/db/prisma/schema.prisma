@@ -237,6 +237,7 @@ model Peca {
   updatedAt        DateTime    @updatedAt
 
   // Catálogo público
+  exibirNoCatalogo Boolean     @default(true)
   pinnedInCatalog  Boolean     @default(false)
   pinnedAt         DateTime?
 

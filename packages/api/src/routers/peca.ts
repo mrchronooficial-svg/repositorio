@@ -787,4 +787,18 @@ export const pecaRouter = router({
       valorTotalEstoque,
     };
   }),
+
+  // Toggle exibir no catálogo
+  toggleCatalogo: protectedProcedure
+    .input(z.object({
+      id: z.string().cuid(),
+      exibirNoCatalogo: z.boolean(),
+    }))
+    .mutation(async ({ input }) => {
+      await prisma.peca.update({
+        where: { id: input.id },
+        data: { exibirNoCatalogo: input.exibirNoCatalogo },
+      });
+      return { success: true };
+    }),
 });
