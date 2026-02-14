@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Wallet,
   TrendingUp,
@@ -10,17 +11,105 @@ import {
   Receipt,
   BarChart3,
   Percent,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/utils/trpc";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function DashboardFinanceiroPage() {
+  const queryClient = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+
   const { data: dashboard, isLoading } = useQuery(
     trpc.financeiro.getDashboard.queryOptions()
   );
+
+  const corrigirValorDeclaraMutation = useMutation(
+    trpc.financeiro.corrigirValorDeclarar.mutationOptions()
+  );
+
+  const repararLancamentosMutation = useMutation(
+    trpc.financeiro.repararLancamentos.mutationOptions()
+  );
+
+  const backfillVendasMutation = useMutation(
+    trpc.financeiro.backfillVendas.mutationOptions()
+  );
+
+  const backfillDespesasMutation = useMutation(
+    trpc.financeiro.backfillDespesas.mutationOptions()
+  );
+
+  async function handleSyncLancamentos() {
+    setSyncing(true);
+    try {
+      // 0. Corrigir valorDeclarar de consignações (margem em vez de repasse)
+      const resultCorrecao = await corrigirValorDeclaraMutation.mutateAsync();
+
+      // 1. Reparar lançamentos com valores divergentes
+      const resultReparo = await repararLancamentosMutation.mutateAsync();
+
+      // 2. Backfill vendas sem lançamentos
+      const resultVendas = await backfillVendasMutation.mutateAsync();
+
+      // 3. Backfill despesas recorrentes (fev/2026 em diante)
+      const now = new Date();
+      const resultDespesas = await backfillDespesasMutation.mutateAsync({
+        mesInicio: 2,
+        anoInicio: 2026,
+        mesFim: now.getMonth() + 1,
+        anoFim: now.getFullYear(),
+      });
+
+      // Montar mensagem de resultado
+      const partes: string[] = [];
+      if (resultCorrecao.corrigidas > 0) {
+        partes.push(`${resultCorrecao.corrigidas} valorDeclarar corrigido(s)`);
+      }
+      if (resultReparo.reparadas > 0) {
+        partes.push(`${resultReparo.reparadas} lançamento(s) reparado(s)`);
+      }
+      if (resultVendas.processadas > 0) {
+        partes.push(`${resultVendas.processadas} venda(s) processada(s)`);
+      }
+      if (resultVendas.erros > 0) {
+        partes.push(`${resultVendas.erros} erro(s) em vendas`);
+      }
+      if (resultDespesas.mesesProcessados > 0) {
+        partes.push(
+          `${resultDespesas.mesesProcessados} mês(es) de despesas (${resultDespesas.totalLancamentos} lançamentos)`
+        );
+      }
+      if (resultDespesas.mesesPulados > 0) {
+        partes.push(`${resultDespesas.mesesPulados} mês(es) já processado(s)`);
+      }
+
+      if (partes.length === 0) {
+        toast.info("Nenhum lançamento pendente para sincronizar");
+      } else {
+        toast.success(`Sincronização concluída: ${partes.join(", ")}`);
+      }
+
+      if (resultVendas.detalhesErros.length > 0) {
+        toast.error(`Erros: ${resultVendas.detalhesErros.join("; ")}`);
+      }
+
+      // Invalidar queries do financeiro para atualizar dashboard
+      queryClient.invalidateQueries({ queryKey: [["financeiro"]] });
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Erro ao sincronizar lançamentos"
+      );
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -47,11 +136,25 @@ export function DashboardFinanceiroPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard Financeiro</h1>
-        <p className="text-muted-foreground">
-          Visão rápida da saúde financeira da Mr. Chrono
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard Financeiro</h1>
+          <p className="text-muted-foreground">
+            Visão rápida da saúde financeira da Mr. Chrono
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleSyncLancamentos}
+          disabled={syncing}
+        >
+          {syncing ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          {syncing ? "Sincronizando..." : "Sincronizar Lançamentos"}
+        </Button>
       </div>
 
       {/* Saldo de Caixa */}

@@ -102,12 +102,14 @@ async function calcularSaldosPeriodo(
   dataInicio: Date,
   dataFim: Date
 ): Promise<SaldoConta[]> {
-  // Buscar todas as linhas de lançamento no período (excluindo estornados)
+  // Buscar todas as linhas de lançamento no período
+  // Exclui estornados (originais revertidos) E reversões (estornoDeId != null)
   const linhas = await prisma.linhaLancamento.findMany({
     where: {
       lancamento: {
         data: { gte: dataInicio, lte: dataFim },
         estornado: false,
+        estornoDeId: null,
       },
     },
     select: {

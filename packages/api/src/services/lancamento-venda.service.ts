@@ -352,11 +352,12 @@ export async function reverterLancamentosVenda(
   vendaId: string,
   userId: string
 ): Promise<number> {
-  // Buscar todos os lançamentos não estornados da venda
+  // Buscar todos os lançamentos "vivos" da venda (não estornados nem reversões)
   const lancamentos = await prisma.lancamento.findMany({
     where: {
       vendaId,
       estornado: false,
+      estornoDeId: null,
       tipo: "AUTOMATICO_VENDA",
     },
     include: { linhas: true },

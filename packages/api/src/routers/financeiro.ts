@@ -5,6 +5,7 @@ import prisma from "@gestaomrchrono/db";
 import { registrarAuditoria } from "../services/auditoria.service";
 import { gerarDRE, gerarBalanco, gerarDFC } from "../services/demonstrativos.service";
 import { calcularRBT12, calcularAliquotaEfetiva } from "../services/simples-nacional.service";
+import { criarLancamentosVenda, reverterLancamentosVenda } from "../services/lancamento-venda.service";
 
 // ============================================
 // SCHEMAS DE VALIDAÇÃO
@@ -805,6 +806,7 @@ export const financeiroRouter = router({
             lte: ultimoDia,
           },
           estornado: false,
+          estornoDeId: null,
         },
       });
 
@@ -1372,6 +1374,325 @@ export const financeiroRouter = router({
     }),
 
   // =========================================
+  // BACKFILL DE LANÇAMENTOS
+  // =========================================
+
+  // Backfill vendas — gera lançamentos contábeis para vendas que não possuem
+  backfillVendas: adminProcedure.mutation(async ({ ctx }) => {
+    // Buscar IDs de vendas que JÁ têm lançamentos contábeis
+    const vendasComLancamento = await prisma.lancamento.findMany({
+      where: {
+        vendaId: { not: null },
+        tipo: "AUTOMATICO_VENDA",
+        estornado: false,
+        estornoDeId: null,
+      },
+      select: { vendaId: true },
+      distinct: ["vendaId"],
+    });
+    const idsComLancamento = vendasComLancamento
+      .map((l) => l.vendaId)
+      .filter((id): id is string => id !== null);
+
+    // Buscar vendas não-canceladas que NÃO têm lançamentos contábeis
+    const vendasSemLancamento = await prisma.venda.findMany({
+      where: {
+        cancelada: false,
+        ...(idsComLancamento.length > 0 && { id: { notIn: idsComLancamento } }),
+      },
+      include: {
+        peca: {
+          select: {
+            sku: true,
+            origemTipo: true,
+            origemCanal: true,
+            valorCompra: true,
+            custoManutencao: true,
+          },
+        },
+      },
+      orderBy: { dataVenda: "asc" },
+    });
+
+    if (vendasSemLancamento.length === 0) {
+      return { processadas: 0, erros: 0, detalhesErros: [] as string[] };
+    }
+
+    let processadas = 0;
+    const detalhesErros: string[] = [];
+
+    for (const venda of vendasSemLancamento) {
+      try {
+        await criarLancamentosVenda(
+          {
+            id: venda.id,
+            valorFinal: Number(venda.valorFinal),
+            formaPagamento: venda.formaPagamento,
+            taxaMDR: Number(venda.taxaMDR),
+            valorRepasseDevido: venda.valorRepasseDevido
+              ? Number(venda.valorRepasseDevido)
+              : null,
+            dataVenda: venda.dataVenda,
+            peca: {
+              sku: venda.peca.sku,
+              origemTipo: venda.peca.origemTipo,
+              origemCanal: venda.peca.origemCanal,
+              valorCompra: Number(venda.peca.valorCompra),
+              custoManutencao: venda.peca.custoManutencao
+                ? Number(venda.peca.custoManutencao)
+                : null,
+            },
+          },
+          ctx.user.id
+        );
+        processadas++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        detalhesErros.push(`${venda.peca.sku}: ${msg}`);
+      }
+    }
+
+    await registrarAuditoria({
+      userId: ctx.user.id,
+      acao: "BACKFILL_VENDAS",
+      entidade: "LANCAMENTO",
+      detalhes: { processadas, erros: detalhesErros.length },
+    });
+
+    return { processadas, erros: detalhesErros.length, detalhesErros };
+  }),
+
+  // Corrigir valorDeclarar de todas as vendas (consignação: margem; compra: valorFinal)
+  corrigirValorDeclarar: adminProcedure.mutation(async ({ ctx }) => {
+    // Buscar TODAS as vendas não-canceladas
+    const vendas = await prisma.venda.findMany({
+      where: { cancelada: false },
+      select: {
+        id: true,
+        valorFinal: true,
+        valorRepasseDevido: true,
+        valorDeclarar: true,
+        peca: { select: { origemTipo: true } },
+      },
+    });
+
+    let corrigidas = 0;
+    for (const venda of vendas) {
+      const valorFinal = Number(venda.valorFinal);
+      const repasse = venda.valorRepasseDevido ? Number(venda.valorRepasseDevido) : 0;
+      const isConsignacao = venda.peca.origemTipo === "CONSIGNACAO" && repasse > 0;
+
+      // Consignação: margem; Compra: valorFinal
+      const valorCorreto = isConsignacao ? valorFinal - repasse : valorFinal;
+      const declaraAtual = venda.valorDeclarar ? Number(venda.valorDeclarar) : 0;
+
+      // Atualizar se NULL ou diferente do correto
+      if (!venda.valorDeclarar || Math.abs(declaraAtual - valorCorreto) > 0.01) {
+        await prisma.venda.update({
+          where: { id: venda.id },
+          data: { valorDeclarar: valorCorreto },
+        });
+        corrigidas++;
+      }
+    }
+
+    await registrarAuditoria({
+      userId: ctx.user.id,
+      acao: "CORRECAO_VALOR_DECLARAR",
+      entidade: "VENDA",
+      detalhes: { totalVendas: vendas.length, corrigidas },
+    });
+
+    return { totalVendas: vendas.length, corrigidas };
+  }),
+
+  // Reparar lançamentos contábeis com valores divergentes
+  repararLancamentos: adminProcedure.mutation(async ({ ctx }) => {
+    // Buscar contas de receita para comparar valores
+    const contaReceita311 = await prisma.contaContabil.findUnique({ where: { codigo: "3.1.1" } });
+    const contaReceita312 = await prisma.contaContabil.findUnique({ where: { codigo: "3.1.2" } });
+    if (!contaReceita311 || !contaReceita312) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Contas de receita não encontradas" });
+    }
+
+    // Buscar todas as vendas não-canceladas que têm lançamentos
+    const vendas = await prisma.venda.findMany({
+      where: { cancelada: false },
+      include: {
+        peca: {
+          select: { sku: true, origemTipo: true, origemCanal: true, valorCompra: true, custoManutencao: true },
+        },
+      },
+    });
+
+    let reparadas = 0;
+    const detalhes: string[] = [];
+
+    for (const venda of vendas) {
+      // Buscar lançamento de receita atual (não estornado) que credita 3.1.1 ou 3.1.2
+      const isConsignacao = venda.peca.origemTipo === "CONSIGNACAO";
+      const contaReceitaId = isConsignacao ? contaReceita312.id : contaReceita311.id;
+
+      const lancamentoReceita = await prisma.linhaLancamento.findFirst({
+        where: {
+          contaCreditoId: contaReceitaId,
+          lancamento: {
+            vendaId: venda.id,
+            tipo: "AUTOMATICO_VENDA",
+            estornado: false,
+            estornoDeId: null,
+          },
+        },
+        select: { valor: true },
+      });
+
+      if (!lancamentoReceita) continue; // sem lançamento, backfill cuida disso
+
+      // Calcular valor esperado
+      const valorFinal = Number(venda.valorFinal);
+      const repasse = venda.valorRepasseDevido ? Number(venda.valorRepasseDevido) : 0;
+      const valorEsperado = isConsignacao && repasse > 0
+        ? valorFinal - repasse  // margem
+        : valorFinal;           // receita bruta total
+
+      const valorAtual = Number(lancamentoReceita.valor);
+
+      // Se o valor diverge, estornar tudo e recriar
+      if (Math.abs(valorAtual - valorEsperado) > 0.01) {
+        await reverterLancamentosVenda(venda.id, ctx.user.id);
+        await criarLancamentosVenda(
+          {
+            id: venda.id,
+            valorFinal,
+            formaPagamento: venda.formaPagamento,
+            taxaMDR: Number(venda.taxaMDR),
+            valorRepasseDevido: repasse > 0 ? repasse : null,
+            dataVenda: venda.dataVenda,
+            peca: {
+              sku: venda.peca.sku,
+              origemTipo: venda.peca.origemTipo,
+              origemCanal: venda.peca.origemCanal,
+              valorCompra: Number(venda.peca.valorCompra),
+              custoManutencao: venda.peca.custoManutencao ? Number(venda.peca.custoManutencao) : null,
+            },
+          },
+          ctx.user.id
+        );
+        reparadas++;
+        detalhes.push(`${venda.peca.sku}: receita ${valorAtual.toFixed(2)} → ${valorEsperado.toFixed(2)}`);
+      }
+    }
+
+    await registrarAuditoria({
+      userId: ctx.user.id,
+      acao: "REPARAR_LANCAMENTOS",
+      entidade: "LANCAMENTO",
+      detalhes: { reparadas, detalhes },
+    });
+
+    return { reparadas, detalhes };
+  }),
+
+  // Backfill despesas recorrentes — executa para múltiplos meses
+  backfillDespesas: adminProcedure
+    .input(
+      z.object({
+        mesInicio: z.number().int().min(1).max(12),
+        anoInicio: z.number().int().min(2024),
+        mesFim: z.number().int().min(1).max(12),
+        anoFim: z.number().int().min(2024),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const despesas = await prisma.despesaRecorrente.findMany({
+        where: { status: "ATIVA" },
+        include: { contaContabil: true },
+      });
+
+      if (despesas.length === 0) {
+        return { mesesProcessados: 0, mesesPulados: 0, totalLancamentos: 0 };
+      }
+
+      const contaNubank = await prisma.contaContabil.findUnique({
+        where: { codigo: "1.1.1.01" },
+      });
+
+      if (!contaNubank) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Conta Nubank (1.1.1.01) nao encontrada no plano de contas",
+        });
+      }
+
+      let mesesProcessados = 0;
+      let mesesPulados = 0;
+      let totalLancamentos = 0;
+
+      // Iterar por cada mês no range
+      let ano = input.anoInicio;
+      let mes = input.mesInicio;
+
+      while (ano < input.anoFim || (ano === input.anoFim && mes <= input.mesFim)) {
+        const primeiroDia = new Date(ano, mes - 1, 1);
+        const ultimoDia = new Date(ano, mes, 0);
+
+        // Verificar se já existem lançamentos para este mês
+        const jaExecutadas = await prisma.lancamento.count({
+          where: {
+            tipo: "AUTOMATICO_DESPESA_RECORRENTE",
+            data: { gte: primeiroDia, lte: ultimoDia },
+            estornado: false,
+            estornoDeId: null,
+          },
+        });
+
+        if (jaExecutadas > 0) {
+          mesesPulados++;
+        } else {
+          // Criar lançamentos para este mês
+          for (const despesa of despesas) {
+            await prisma.lancamento.create({
+              data: {
+                data: ultimoDia,
+                descricao: `Despesa recorrente: ${despesa.nome} — ${mes}/${ano}`,
+                tipo: "AUTOMATICO_DESPESA_RECORRENTE",
+                recorrente: true,
+                despesaRecorrenteId: despesa.id,
+                userId: ctx.user.id,
+                linhas: {
+                  create: {
+                    contaDebitoId: despesa.contaContabilId,
+                    contaCreditoId: contaNubank.id,
+                    valor: despesa.valor,
+                    historico: `${despesa.nome} — ${mes}/${ano}`,
+                  },
+                },
+              },
+            });
+            totalLancamentos++;
+          }
+          mesesProcessados++;
+        }
+
+        // Avançar para o próximo mês
+        mes++;
+        if (mes > 12) {
+          mes = 1;
+          ano++;
+        }
+      }
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "BACKFILL_DESPESAS",
+        entidade: "LANCAMENTO",
+        detalhes: { mesesProcessados, mesesPulados, totalLancamentos },
+      });
+
+      return { mesesProcessados, mesesPulados, totalLancamentos };
+    }),
+
+  // =========================================
   // DASHBOARD FINANCEIRO
   // =========================================
 
@@ -1394,14 +1715,14 @@ export const financeiroRouter = router({
         const debitos = await prisma.linhaLancamento.aggregate({
           where: {
             contaDebitoId: cb.contaContabil.id,
-            lancamento: { estornado: false },
+            lancamento: { estornado: false, estornoDeId: null },
           },
           _sum: { valor: true },
         });
         const creditos = await prisma.linhaLancamento.aggregate({
           where: {
             contaCreditoId: cb.contaContabil.id,
-            lancamento: { estornado: false },
+            lancamento: { estornado: false, estornoDeId: null },
           },
           _sum: { valor: true },
         });
