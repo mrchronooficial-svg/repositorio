@@ -307,9 +307,9 @@ export const vendaRouter = router({
 
       // 6. Calcular valor a declarar automaticamente
       // COMPRA: valor a declarar = valor final da venda
-      // CONSIGNACAO: valor a declarar = valor final - valor de repasse (margem da empresa)
+      // CONSIGNACAO: valor a declarar = valor do repasse (nominal ou percentual sobre valor final)
       const valorDeclarar = peca.origemTipo === "CONSIGNACAO" && valorRepasseDevido
-        ? valorFinal - valorRepasseDevido
+        ? valorRepasseDevido
         : valorFinal;
 
       // 7. Criar venda
@@ -502,9 +502,9 @@ export const vendaRouter = router({
 
       // 5. Recalcular valor a declarar automaticamente
       // COMPRA: valor a declarar = valor final da venda
-      // CONSIGNACAO: valor a declarar = valor final - valor de repasse
+      // CONSIGNACAO: valor a declarar = valor do repasse (nominal ou percentual sobre valor final)
       const valorDeclarar = venda.peca.origemTipo === "CONSIGNACAO" && repasseDevidoAtual > 0
-        ? valorFinal - repasseDevidoAtual
+        ? repasseDevidoAtual
         : valorFinal;
       updateData.valorDeclarar = valorDeclarar;
 
