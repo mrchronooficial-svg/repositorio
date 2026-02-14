@@ -115,6 +115,7 @@ export const vendaRouter = router({
         valorRepasseDevido: v.valorRepasseDevido ? Number(v.valorRepasseDevido) : null,
         valorRepasseFeito: v.valorRepasseFeito ? Number(v.valorRepasseFeito) : null,
         taxaMDR: Number(v.taxaMDR),
+        valorDeclarar: v.valorDeclarar ? Number(v.valorDeclarar) : null,
       }));
     }),
 

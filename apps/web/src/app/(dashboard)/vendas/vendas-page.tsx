@@ -124,6 +124,7 @@ export function VendasPage() {
           "Repasse Devido": v.valorRepasseDevido ?? "-",
           "Repasse Feito": v.valorRepasseFeito ?? "-",
           "Taxa MDR (%)": v.taxaMDR,
+          "Valor a Declarar": v.valorDeclarar ?? "-",
           "Lucro Bruto": lucro,
         };
       });
@@ -151,6 +152,7 @@ export function VendasPage() {
         { wch: 14 }, // Repasse Devido
         { wch: 14 }, // Repasse Feito
         { wch: 12 }, // Taxa MDR
+        { wch: 16 }, // Valor a Declarar
         { wch: 14 }, // Lucro Bruto
       ];
 
