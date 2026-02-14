@@ -607,6 +607,97 @@ export const financeiroRouter = router({
       return lancamento;
     }),
 
+  // Importar lançamentos em lote (planilha)
+  importarLancamentos: adminProcedure
+    .input(
+      z.object({
+        lancamentos: z
+          .array(
+            z.object({
+              data: z.coerce.date(),
+              descricao: z.string().min(1, "Descricao obrigatoria"),
+              valor: z.number().positive("Valor deve ser positivo"),
+              contaDebitoId: z.string().cuid(),
+              contaCreditoId: z.string().cuid(),
+            })
+          )
+          .min(1, "Pelo menos um lancamento")
+          .max(500, "Maximo 500 lancamentos por importacao"),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Coletar todas as contas únicas
+      const contaIds = new Set<string>();
+      for (const l of input.lancamentos) {
+        contaIds.add(l.contaDebitoId);
+        contaIds.add(l.contaCreditoId);
+      }
+
+      const contas = await prisma.contaContabil.findMany({
+        where: { id: { in: Array.from(contaIds) } },
+        select: { id: true, tipo: true },
+      });
+
+      if (contas.length !== contaIds.size) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Uma ou mais contas nao foram encontradas",
+        });
+      }
+
+      const naoAnaliticas = contas.filter((c) => c.tipo !== "ANALITICA");
+      if (naoAnaliticas.length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Lancamentos so podem ser feitos em contas analiticas",
+        });
+      }
+
+      for (const l of input.lancamentos) {
+        if (l.contaDebitoId === l.contaCreditoId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Conta debito e credito nao podem ser iguais na mesma linha",
+          });
+        }
+      }
+
+      // Criar todos os lançamentos em transação
+      const resultado = await prisma.$transaction(
+        input.lancamentos.map((l) =>
+          prisma.lancamento.create({
+            data: {
+              data: l.data,
+              descricao: l.descricao,
+              tipo: "MANUAL",
+              recorrente: true,
+              userId: ctx.user.id,
+              linhas: {
+                create: {
+                  contaDebitoId: l.contaDebitoId,
+                  contaCreditoId: l.contaCreditoId,
+                  valor: l.valor,
+                },
+              },
+            },
+          })
+        )
+      );
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "CRIAR",
+        entidade: "LANCAMENTO",
+        entidadeId: resultado[0]?.id ?? "batch",
+        detalhes: {
+          tipo: "IMPORTACAO_PLANILHA",
+          quantidade: resultado.length,
+        },
+      });
+
+      return { quantidade: resultado.length };
+    }),
+
   // Estornar lançamento
   estornarLancamento: adminProcedure
     .input(z.object({ id: z.string().cuid() }))

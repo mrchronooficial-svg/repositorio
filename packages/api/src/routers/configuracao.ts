@@ -9,6 +9,7 @@ const CHAVES_CONFIGURACAO = [
   "META_VENDAS_SEMANAL",
   "ALERTA_DIAS_RELOJOEIRO",
   "dias_alerta_envio",
+  "ALIQUOTA_SIMPLES",
 ] as const;
 
 type ChaveConfiguracao = (typeof CHAVES_CONFIGURACAO)[number];
@@ -20,6 +21,7 @@ const VALORES_PADRAO: Record<ChaveConfiguracao, string> = {
   META_VENDAS_SEMANAL: "10",
   ALERTA_DIAS_RELOJOEIRO: "14",
   dias_alerta_envio: "3",
+  ALIQUOTA_SIMPLES: "auto",
 };
 
 export const configuracaoRouter = router({
@@ -85,6 +87,15 @@ export const configuracaoRouter = router({
         const taxa = parseFloat(input.valor);
         if (isNaN(taxa) || taxa < 0 || taxa > 100) {
           throw new Error("Taxa MDR deve ser um numero entre 0 e 100");
+        }
+      }
+
+      if (input.chave === "ALIQUOTA_SIMPLES") {
+        if (input.valor !== "auto") {
+          const taxa = parseFloat(input.valor);
+          if (isNaN(taxa) || taxa < 0 || taxa > 100) {
+            throw new Error("Aliquota do Simples deve ser 'auto' ou um numero entre 0 e 100");
+          }
         }
       }
 

@@ -56,9 +56,17 @@ const PecaListSchema = z.object({
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(100).default(20),
   search: z.string().optional(),
+  sku: z.string().optional(),
+  marca: z.string().optional(),
+  fornecedor: z.string().optional(),
   status: z.enum(["DISPONIVEL", "EM_TRANSITO", "REVISAO", "VENDIDA", "DEFEITO", "PERDA"]).optional(),
   localizacao: z.string().optional(),
   origemTipo: z.enum(["COMPRA", "CONSIGNACAO"]).optional(),
+  statusPagamentoFornecedor: z.enum(["PAGO", "PARCIAL", "NAO_PAGO"]).optional(),
+  valorMin: z.number().nonnegative().optional(),
+  valorMax: z.number().nonnegative().optional(),
+  sortBy: z.enum(["createdAt", "valorEstimadoVenda", "lucroBruto"]).default("createdAt"),
+  sortDir: z.enum(["asc", "desc"]).default("desc"),
   arquivado: z.boolean().default(false),
 });
 
@@ -80,31 +88,67 @@ export const pecaRouter = router({
   list: protectedProcedure
     .input(PecaListSchema)
     .query(async ({ input, ctx }) => {
-      const { page, limit, search, status, localizacao, origemTipo, arquivado } = input;
+      const {
+        page, limit, search, sku, marca, fornecedor,
+        status, localizacao, origemTipo,
+        statusPagamentoFornecedor, valorMin, valorMax,
+        sortBy, sortDir, arquivado,
+      } = input;
       const skip = (page - 1) * limit;
+
+      // Build AND conditions to avoid OR key conflicts
+      const andConditions: Record<string, unknown>[] = [];
+
+      if (marca) {
+        andConditions.push({
+          OR: [
+            { marca: { contains: marca, mode: "insensitive" as const } },
+            { modelo: { contains: marca, mode: "insensitive" as const } },
+          ],
+        });
+      }
+
+      if (search) {
+        andConditions.push({
+          OR: [
+            { sku: { contains: search, mode: "insensitive" as const } },
+            { marca: { contains: search, mode: "insensitive" as const } },
+            { modelo: { contains: search, mode: "insensitive" as const } },
+          ],
+        });
+      }
 
       const where = {
         arquivado,
         ...(status && { status }),
         ...(localizacao && { localizacao }),
         ...(origemTipo && { origemTipo }),
-        ...(search && {
-          OR: [
-            { sku: { contains: search, mode: "insensitive" as const } },
-            { marca: { contains: search, mode: "insensitive" as const } },
-            { modelo: { contains: search, mode: "insensitive" as const } },
-          ],
+        ...(statusPagamentoFornecedor && { statusPagamentoFornecedor }),
+        ...(sku && { sku: { contains: sku, mode: "insensitive" as const } }),
+        ...(fornecedor && {
+          fornecedor: { nome: { contains: fornecedor, mode: "insensitive" as const } },
         }),
+        ...((valorMin !== undefined || valorMax !== undefined) && {
+          valorEstimadoVenda: {
+            ...(valorMin !== undefined && { gte: valorMin }),
+            ...(valorMax !== undefined && { lte: valorMax }),
+          },
+        }),
+        ...(andConditions.length > 0 && { AND: andConditions }),
       };
 
       const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
+
+      // Build orderBy — lucroBruto can't be sorted at DB level, fallback to valorEstimadoVenda
+      const orderByField = sortBy === "lucroBruto" ? "valorEstimadoVenda" : sortBy;
+      const orderBy = { [orderByField]: sortDir };
 
       const [pecas, total] = await Promise.all([
         prisma.peca.findMany({
           where,
           skip,
           take: limit,
-          orderBy: { createdAt: "desc" },
+          orderBy,
           include: {
             fotos: {
               take: 1,
@@ -128,6 +172,7 @@ export const pecaRouter = router({
         valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
         valorRepasse: podeVerValores ? peca.valorRepasse : null,
         percentualRepasse: podeVerValores ? peca.percentualRepasse : null,
+        valorPagoFornecedor: podeVerValores ? peca.valorPagoFornecedor : null,
         statusPagamentoFornecedor: podeVerValores ? peca.statusPagamentoFornecedor : null,
         venda: podeVerValores ? peca.venda : null,
       }));

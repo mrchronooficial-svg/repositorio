@@ -281,7 +281,7 @@ export const vendaRouter = router({
 
       // 3. Buscar taxa MDR
       const configMDR = await prisma.configuracao.findUnique({
-        where: { chave: "taxa_mdr" },
+        where: { chave: "TAXA_MDR" },
       });
       const taxaMDR = parseFloat(configMDR?.valor || "4");
 

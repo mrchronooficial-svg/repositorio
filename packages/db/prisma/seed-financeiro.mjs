@@ -117,10 +117,10 @@ async function main() {
           nome: "Nubank PJ",
           banco: "Nubank",
           contaContabilId: nubankContaId,
-          saldoInicial: 0,
+          saldoInicial: -95938.38,
         },
       });
-      console.log("  ✓ Conta bancaria: Nubank PJ");
+      console.log("  ✓ Conta bancaria: Nubank PJ (saldo inicial: -95938.38)");
     }
 
     if (pagbankContaId) {

@@ -23,6 +23,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/formatters";
+import {
+  ColumnFilterHeader,
+  TextColumnFilter,
+  SelectColumnFilter,
+  RangeColumnFilter,
+  SortColumnFilter,
+} from "./column-filter-header";
+
 type Decimal = { toNumber(): number; toString(): string } | number | string;
 
 interface Foto {
@@ -48,6 +56,7 @@ interface Peca {
   valorEstimadoVenda: Decimal | null;
   valorRepasse?: Decimal | null;
   percentualRepasse?: Decimal | null;
+  valorPagoFornecedor?: Decimal | null;
   statusPagamentoFornecedor?: string | null;
   origemTipo?: string;
   exibirNoCatalogo?: boolean;
@@ -63,6 +72,41 @@ interface PecaStatusInfo {
   localizacao: string;
 }
 
+export interface PecaPgtoInfo {
+  id: string;
+  sku: string;
+  valorCompra: number;
+  valorPago: number;
+  origemTipo: string;
+  status: string;
+}
+
+export interface ColumnFilters {
+  sku?: string;
+  marca?: string;
+  fornecedor?: string;
+  origemTipo?: string;
+  status?: string;
+  localizacao?: string;
+  statusPagamentoFornecedor?: string;
+  valorMin?: number;
+  valorMax?: number;
+  sortBy?: string;
+  sortDir?: string;
+}
+
+export interface ColumnFilterCallbacks {
+  onSkuChange: (v: string) => void;
+  onMarcaChange: (v: string) => void;
+  onFornecedorChange: (v: string) => void;
+  onOrigemTipoChange: (v: string | undefined) => void;
+  onStatusChange: (v: string | undefined) => void;
+  onLocalizacaoChange: (v: string | undefined) => void;
+  onStatusPgtoChange: (v: string | undefined) => void;
+  onValorRangeChange: (min: number | undefined, max: number | undefined) => void;
+  onSortChange: (sortBy: string, sortDir: string) => void;
+}
+
 interface PecasTableProps {
   pecas: Peca[];
   isLoading: boolean;
@@ -72,6 +116,11 @@ interface PecasTableProps {
   onStatusClick?: (peca: PecaStatusInfo) => void;
   onDelete?: (id: string) => Promise<void>;
   onToggleCatalogo?: (id: string, exibir: boolean) => void;
+  onPgtoClick?: (peca: PecaPgtoInfo) => void;
+  // Optional column filters
+  filters?: ColumnFilters;
+  filterCallbacks?: ColumnFilterCallbacks;
+  localizacoes?: string[];
 }
 
 export function PecasTable({
@@ -83,10 +132,16 @@ export function PecasTable({
   onStatusClick,
   onDelete,
   onToggleCatalogo,
+  onPgtoClick,
+  filters,
+  filterCallbacks,
+  localizacoes,
 }: PecasTableProps) {
   const [selectedImage, setSelectedImage] = useState<{ url: string; sku: string } | null>(null);
   const [deleteDialog, setDeleteDialog] = useState<{ id: string; sku: string; marca: string; modelo: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const hasFilters = !!filters && !!filterCallbacks;
 
   const handleDelete = async () => {
     if (!deleteDialog || !onDelete) return;
@@ -117,22 +172,177 @@ export function PecasTable({
     );
   }
 
+  // Status options
+  const statusOptions = [
+    { value: "DISPONIVEL", label: "Disponivel" },
+    { value: "EM_TRANSITO", label: "Em Transito" },
+    { value: "REVISAO", label: "Em Revisao" },
+    { value: "VENDIDA", label: "Vendida" },
+    { value: "DEFEITO", label: "Defeito" },
+    { value: "PERDA", label: "Perda" },
+  ];
+
+  const origemOptions = [
+    { value: "COMPRA", label: "Compra" },
+    { value: "CONSIGNACAO", label: "Consignacao" },
+  ];
+
+  const pgtoOptions = [
+    { value: "PAGO", label: "Pago" },
+    { value: "PARCIAL", label: "Parcial" },
+    { value: "NAO_PAGO", label: "Nao Pago" },
+  ];
+
+  const locOptions = (localizacoes || []).map((loc) => ({
+    value: loc,
+    label: loc,
+  }));
+
   return (
     <>
     <Table>
       <TableHeader>
         <TableRow>
-          {onToggleCatalogo && <TableHead className="w-10 px-2" title="Exibir no catálogo">Cat.</TableHead>}
+          {onToggleCatalogo && <TableHead className="w-10 px-2" title="Exibir no catalogo">Cat.</TableHead>}
           <TableHead className="w-24">Foto</TableHead>
-          <TableHead>SKU</TableHead>
-          <TableHead>Marca / Modelo</TableHead>
-          <TableHead>Fornecedor</TableHead>
-          <TableHead>Origem</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Localizacao</TableHead>
-          {podeVerValores && <TableHead>Pgto. Fornecedor</TableHead>}
-          {podeVerValores && <TableHead className="text-right">Valor</TableHead>}
-          {podeVerValores && <TableHead className="text-right">Lucro Bruto</TableHead>}
+
+          {/* SKU */}
+          <TableHead>
+            {hasFilters ? (
+              <ColumnFilterHeader label="SKU" active={!!filters.sku}>
+                <TextColumnFilter
+                  label="SKU"
+                  value={filters.sku || ""}
+                  onChange={filterCallbacks.onSkuChange}
+                  placeholder="Ex: MRC-0001"
+                />
+              </ColumnFilterHeader>
+            ) : "SKU"}
+          </TableHead>
+
+          {/* Marca / Modelo */}
+          <TableHead>
+            {hasFilters ? (
+              <ColumnFilterHeader label="Marca / Modelo" active={!!filters.marca}>
+                <TextColumnFilter
+                  label="Marca / Modelo"
+                  value={filters.marca || ""}
+                  onChange={filterCallbacks.onMarcaChange}
+                  placeholder="Ex: Rolex, Submariner..."
+                />
+              </ColumnFilterHeader>
+            ) : "Marca / Modelo"}
+          </TableHead>
+
+          {/* Fornecedor */}
+          <TableHead>
+            {hasFilters ? (
+              <ColumnFilterHeader label="Fornecedor" active={!!filters.fornecedor}>
+                <TextColumnFilter
+                  label="Fornecedor"
+                  value={filters.fornecedor || ""}
+                  onChange={filterCallbacks.onFornecedorChange}
+                  placeholder="Nome do fornecedor..."
+                />
+              </ColumnFilterHeader>
+            ) : "Fornecedor"}
+          </TableHead>
+
+          {/* Origem */}
+          <TableHead>
+            {hasFilters ? (
+              <ColumnFilterHeader label="Origem" active={!!filters.origemTipo}>
+                <SelectColumnFilter
+                  label="Origem"
+                  value={filters.origemTipo}
+                  onChange={filterCallbacks.onOrigemTipoChange}
+                  options={origemOptions}
+                />
+              </ColumnFilterHeader>
+            ) : "Origem"}
+          </TableHead>
+
+          {/* Status */}
+          <TableHead>
+            {hasFilters ? (
+              <ColumnFilterHeader label="Status" active={!!filters.status}>
+                <SelectColumnFilter
+                  label="Status"
+                  value={filters.status}
+                  onChange={filterCallbacks.onStatusChange}
+                  options={statusOptions}
+                />
+              </ColumnFilterHeader>
+            ) : "Status"}
+          </TableHead>
+
+          {/* Localizacao */}
+          <TableHead>
+            {hasFilters ? (
+              <ColumnFilterHeader label="Localizacao" active={!!filters.localizacao}>
+                <SelectColumnFilter
+                  label="Localizacao"
+                  value={filters.localizacao}
+                  onChange={filterCallbacks.onLocalizacaoChange}
+                  options={locOptions}
+                />
+              </ColumnFilterHeader>
+            ) : "Localizacao"}
+          </TableHead>
+
+          {/* Pgto Fornecedor */}
+          {podeVerValores && (
+            <TableHead>
+              {hasFilters ? (
+                <ColumnFilterHeader label="Pgto. Fornecedor" active={!!filters.statusPagamentoFornecedor}>
+                  <SelectColumnFilter
+                    label="Pgto. Fornecedor"
+                    value={filters.statusPagamentoFornecedor}
+                    onChange={filterCallbacks.onStatusPgtoChange}
+                    options={pgtoOptions}
+                  />
+                </ColumnFilterHeader>
+              ) : "Pgto. Fornecedor"}
+            </TableHead>
+          )}
+
+          {/* Valor */}
+          {podeVerValores && (
+            <TableHead className="text-right">
+              {hasFilters ? (
+                <ColumnFilterHeader label="Valor" active={filters.valorMin !== undefined || filters.valorMax !== undefined} align="right">
+                  <RangeColumnFilter
+                    label="Valor Estimado (R$)"
+                    min={filters.valorMin}
+                    max={filters.valorMax}
+                    onChange={filterCallbacks.onValorRangeChange}
+                  />
+                </ColumnFilterHeader>
+              ) : "Valor"}
+            </TableHead>
+          )}
+
+          {/* Lucro Bruto */}
+          {podeVerValores && (
+            <TableHead className="text-right">
+              {hasFilters ? (
+                <ColumnFilterHeader
+                  label="Lucro Bruto"
+                  active={filters.sortBy === "lucroBruto"}
+                  align="right"
+                >
+                  <SortColumnFilter
+                    label="Ordenar Lucro Bruto"
+                    sortBy={filters.sortBy || "createdAt"}
+                    sortDir={filters.sortDir || "desc"}
+                    targetSortBy="lucroBruto"
+                    onChange={filterCallbacks.onSortChange}
+                  />
+                </ColumnFilterHeader>
+              ) : "Lucro Bruto"}
+            </TableHead>
+          )}
+
           {podeExcluir && <TableHead className="w-12"></TableHead>}
         </TableRow>
       </TableHeader>
@@ -152,7 +362,7 @@ export function PecasTable({
                       onToggleCatalogo(peca.id, !!checked);
                     }}
                     className="h-4 w-4"
-                    title={peca.exibirNoCatalogo !== false ? "Visível no catálogo" : "Oculto do catálogo"}
+                    title={peca.exibirNoCatalogo !== false ? "Visivel no catalogo" : "Oculto do catalogo"}
                   />
                 ) : null}
               </TableCell>
@@ -212,28 +422,44 @@ export function PecasTable({
             <TableCell className="text-sm">{peca.localizacao}</TableCell>
             {podeVerValores && (
               <TableCell>
-                {peca.origemTipo === "CONSIGNACAO" ? (
-                  // Consignação: só mostra status de repasse após a venda
-                  peca.status === "VENDIDA" ? (
+                <div
+                  className={onPgtoClick ? "cursor-pointer hover:opacity-80 inline-block" : "inline-block"}
+                  onClick={(e) => {
+                    if (onPgtoClick) {
+                      e.stopPropagation();
+                      onPgtoClick({
+                        id: peca.id,
+                        sku: peca.sku,
+                        valorCompra: Number(peca.valorCompra) || 0,
+                        valorPago: Number(peca.valorPagoFornecedor) || 0,
+                        origemTipo: peca.origemTipo || "COMPRA",
+                        status: peca.status,
+                      });
+                    }
+                  }}
+                  title={onPgtoClick ? "Clique para registrar pagamento" : undefined}
+                >
+                  {peca.origemTipo === "CONSIGNACAO" ? (
+                    peca.status === "VENDIDA" ? (
+                      <StatusBadge
+                        type="repasse"
+                        status={
+                          peca.statusPagamentoFornecedor === "PAGO" ? "FEITO" :
+                          peca.statusPagamentoFornecedor === "PARCIAL" ? "PARCIAL" : "PENDENTE"
+                        }
+                        size="sm"
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )
+                  ) : (
                     <StatusBadge
-                      type="repasse"
-                      status={
-                        peca.statusPagamentoFornecedor === "PAGO" ? "FEITO" :
-                        peca.statusPagamentoFornecedor === "PARCIAL" ? "PARCIAL" : "PENDENTE"
-                      }
+                      type="pagamento"
+                      status={peca.statusPagamentoFornecedor || "NAO_PAGO"}
                       size="sm"
                     />
-                  ) : (
-                    <span className="text-xs text-muted-foreground">-</span>
-                  )
-                ) : (
-                  // Compra: mostra status de pagamento sempre
-                  <StatusBadge
-                    type="pagamento"
-                    status={peca.statusPagamentoFornecedor || "NAO_PAGO"}
-                    size="sm"
-                  />
-                )}
+                  )}
+                </div>
               </TableCell>
             )}
             {podeVerValores && (
@@ -246,7 +472,6 @@ export function PecasTable({
             {podeVerValores && (
               <TableCell className="text-right font-medium">
                 {(() => {
-                  // Usar valor real da venda se vendida, senao estimado
                   const valorVenda = peca.venda
                     ? Number(peca.venda.valorFinal) || 0
                     : Number(peca.valorEstimadoVenda) || 0;
@@ -255,10 +480,8 @@ export function PecasTable({
                   let custo: number;
                   if (peca.origemTipo === "CONSIGNACAO") {
                     if (peca.valorRepasse) {
-                      // Repasse fixo
                       custo = Number(peca.valorRepasse);
                     } else if (peca.percentualRepasse) {
-                      // Repasse percentual: calcula sobre valor da venda
                       custo = valorVenda * (Number(peca.percentualRepasse) / 100);
                     } else {
                       custo = 0;

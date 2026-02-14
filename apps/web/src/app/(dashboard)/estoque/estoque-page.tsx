@@ -8,15 +8,11 @@ import { Archive, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { PecasTable } from "@/components/tables/pecas-table";
+import type { ColumnFilters, ColumnFilterCallbacks, PecaPgtoInfo } from "@/components/tables/pecas-table";
 import { StatusDialog } from "@/components/dialogs/status-dialog";
+import { PagamentoFornecedorDialog } from "@/components/dialogs/pagamento-fornecedor-dialog";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/formatters";
@@ -29,28 +25,74 @@ interface SelectedPeca {
   localizacao: string;
 }
 
+// Labels for active filter badges
+const STATUS_LABELS: Record<string, string> = {
+  DISPONIVEL: "Disponivel",
+  EM_TRANSITO: "Em Transito",
+  REVISAO: "Em Revisao",
+  VENDIDA: "Vendida",
+  DEFEITO: "Defeito",
+  PERDA: "Perda",
+};
+
+const ORIGEM_LABELS: Record<string, string> = {
+  COMPRA: "Compra",
+  CONSIGNACAO: "Consignacao",
+};
+
+const PGTO_LABELS: Record<string, string> = {
+  PAGO: "Pago",
+  PARCIAL: "Parcial",
+  NAO_PAGO: "Nao Pago",
+};
+
 export function EstoquePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { podeVerValores, podeExcluir } = usePermissions();
 
+  // Global search
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string | undefined>();
-  const [localizacao, setLocalizacao] = useState<string | undefined>();
   const [arquivado, setArquivado] = useState(false);
   const [page, setPage] = useState(1);
 
-  // Estado para o modal de status
+  // Column filters
+  const [sku, setSku] = useState("");
+  const [marca, setMarca] = useState("");
+  const [fornecedor, setFornecedor] = useState("");
+  const [origemTipo, setOrigemTipo] = useState<string | undefined>();
+  const [status, setStatus] = useState<string | undefined>();
+  const [localizacao, setLocalizacao] = useState<string | undefined>();
+  const [statusPgtoFornecedor, setStatusPgtoFornecedor] = useState<string | undefined>();
+  const [valorMin, setValorMin] = useState<number | undefined>();
+  const [valorMax, setValorMax] = useState<number | undefined>();
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortDir, setSortDir] = useState("desc");
+
+  // Status dialog
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [selectedPeca, setSelectedPeca] = useState<SelectedPeca | null>(null);
+
+  // Pgto fornecedor dialog
+  const [pgtoDialogOpen, setPgtoDialogOpen] = useState(false);
+  const [selectedPgto, setSelectedPgto] = useState<PecaPgtoInfo | null>(null);
 
   const { data, isLoading } = useQuery(
     trpc.peca.list.queryOptions({
       page,
       limit: 20,
       search: search || undefined,
+      sku: sku || undefined,
+      marca: marca || undefined,
+      fornecedor: fornecedor || undefined,
+      origemTipo: origemTipo as "COMPRA" | "CONSIGNACAO" | undefined,
       status: status as "DISPONIVEL" | "EM_TRANSITO" | "REVISAO" | "VENDIDA" | "DEFEITO" | "PERDA" | undefined,
       localizacao: localizacao || undefined,
+      statusPagamentoFornecedor: statusPgtoFornecedor as "PAGO" | "PARCIAL" | "NAO_PAGO" | undefined,
+      valorMin,
+      valorMax,
+      sortBy: sortBy as "createdAt" | "valorEstimadoVenda" | "lucroBruto",
+      sortDir: sortDir as "asc" | "desc",
       arquivado,
     })
   );
@@ -60,13 +102,46 @@ export function EstoquePage() {
 
   const limparFiltros = () => {
     setSearch("");
+    setSku("");
+    setMarca("");
+    setFornecedor("");
+    setOrigemTipo(undefined);
     setStatus(undefined);
     setLocalizacao(undefined);
+    setStatusPgtoFornecedor(undefined);
+    setValorMin(undefined);
+    setValorMax(undefined);
+    setSortBy("createdAt");
+    setSortDir("desc");
     setArquivado(false);
     setPage(1);
   };
 
-  const temFiltros = search || status || localizacao || arquivado;
+  const temFiltros = search || sku || marca || fornecedor || origemTipo || status ||
+    localizacao || statusPgtoFornecedor || valorMin !== undefined || valorMax !== undefined ||
+    sortBy !== "createdAt" || arquivado;
+
+  // Build active filter badges
+  const activeFilterBadges: { key: string; label: string; value: string; onClear: () => void }[] = [];
+
+  if (sku) activeFilterBadges.push({ key: "sku", label: "SKU", value: sku, onClear: () => { setSku(""); setPage(1); } });
+  if (marca) activeFilterBadges.push({ key: "marca", label: "Marca/Modelo", value: marca, onClear: () => { setMarca(""); setPage(1); } });
+  if (fornecedor) activeFilterBadges.push({ key: "fornecedor", label: "Fornecedor", value: fornecedor, onClear: () => { setFornecedor(""); setPage(1); } });
+  if (origemTipo) activeFilterBadges.push({ key: "origem", label: "Origem", value: ORIGEM_LABELS[origemTipo] || origemTipo, onClear: () => { setOrigemTipo(undefined); setPage(1); } });
+  if (status) activeFilterBadges.push({ key: "status", label: "Status", value: STATUS_LABELS[status] || status, onClear: () => { setStatus(undefined); setPage(1); } });
+  if (localizacao) activeFilterBadges.push({ key: "loc", label: "Local", value: localizacao, onClear: () => { setLocalizacao(undefined); setPage(1); } });
+  if (statusPgtoFornecedor) activeFilterBadges.push({ key: "pgto", label: "Pgto. Fornecedor", value: PGTO_LABELS[statusPgtoFornecedor] || statusPgtoFornecedor, onClear: () => { setStatusPgtoFornecedor(undefined); setPage(1); } });
+  if (valorMin !== undefined || valorMax !== undefined) {
+    const parts = [];
+    if (valorMin !== undefined) parts.push(`Min R$ ${valorMin}`);
+    if (valorMax !== undefined) parts.push(`Max R$ ${valorMax}`);
+    activeFilterBadges.push({ key: "valor", label: "Valor", value: parts.join(" - "), onClear: () => { setValorMin(undefined); setValorMax(undefined); setPage(1); } });
+  }
+  if (sortBy !== "createdAt") {
+    const sortLabel = sortBy === "lucroBruto" ? "Lucro Bruto" : "Valor";
+    const dirLabel = sortDir === "asc" ? "Menor-Maior" : "Maior-Menor";
+    activeFilterBadges.push({ key: "sort", label: "Ordem", value: `${sortLabel} ${dirLabel}`, onClear: () => { setSortBy("createdAt"); setSortDir("desc"); setPage(1); } });
+  }
 
   const handleStatusClick = (peca: SelectedPeca) => {
     setSelectedPeca(peca);
@@ -78,10 +153,16 @@ export function EstoquePage() {
     queryClient.invalidateQueries({ queryKey: ["peca", "getMetricas"] });
   };
 
-  // Mutation para deletar peca
-  const deleteMutation = useMutation(trpc.peca.delete.mutationOptions());
+  const handlePgtoClick = (info: PecaPgtoInfo) => {
+    setSelectedPgto(info);
+    setPgtoDialogOpen(true);
+  };
 
-  // Mutation para toggle catálogo
+  const handlePgtoSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
+  };
+
+  const deleteMutation = useMutation(trpc.peca.delete.mutationOptions());
   const toggleCatalogoMutation = useMutation(trpc.peca.toggleCatalogo.mutationOptions());
 
   const handleToggleCatalogo = (id: string, exibir: boolean) => {
@@ -92,7 +173,7 @@ export function EstoquePage() {
           queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
         },
         onError: () => {
-          toast.error("Erro ao atualizar visibilidade no catálogo");
+          toast.error("Erro ao atualizar visibilidade no catalogo");
         },
       }
     );
@@ -109,6 +190,33 @@ export function EstoquePage() {
       toast.error(message);
       throw error;
     }
+  };
+
+  // Column filter values and callbacks for PecasTable
+  const filters: ColumnFilters = {
+    sku,
+    marca,
+    fornecedor,
+    origemTipo,
+    status,
+    localizacao,
+    statusPagamentoFornecedor: statusPgtoFornecedor,
+    valorMin,
+    valorMax,
+    sortBy,
+    sortDir,
+  };
+
+  const filterCallbacks: ColumnFilterCallbacks = {
+    onSkuChange: (v) => { setSku(v); setPage(1); },
+    onMarcaChange: (v) => { setMarca(v); setPage(1); },
+    onFornecedorChange: (v) => { setFornecedor(v); setPage(1); },
+    onOrigemTipoChange: (v) => { setOrigemTipo(v); setPage(1); },
+    onStatusChange: (v) => { setStatus(v); setPage(1); },
+    onLocalizacaoChange: (v) => { setLocalizacao(v); setPage(1); },
+    onStatusPgtoChange: (v) => { setStatusPgtoFornecedor(v); setPage(1); },
+    onValorRangeChange: (min, max) => { setValorMin(min); setValorMax(max); setPage(1); },
+    onSortChange: (sb, sd) => { setSortBy(sb); setSortDir(sd); setPage(1); },
   };
 
   return (
@@ -173,7 +281,7 @@ export function EstoquePage() {
         )}
       </div>
 
-      {/* Header e filtros */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Estoque</h1>
@@ -187,8 +295,8 @@ export function EstoquePage() {
         </Button>
       </div>
 
-      {/* Filtros */}
-      <div className="flex gap-4 flex-wrap">
+      {/* Search bar + Arquivadas + Limpar */}
+      <div className="flex gap-4 flex-wrap items-center">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -201,45 +309,6 @@ export function EstoquePage() {
             className="pl-9"
           />
         </div>
-        <Select
-          value={status || "all"}
-          onValueChange={(value) => {
-            setStatus(value === "all" ? undefined : value);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os status</SelectItem>
-            <SelectItem value="DISPONIVEL">Disponivel</SelectItem>
-            <SelectItem value="EM_TRANSITO">Em Transito</SelectItem>
-            <SelectItem value="REVISAO">Em Revisao</SelectItem>
-            <SelectItem value="VENDIDA">Vendida</SelectItem>
-            <SelectItem value="DEFEITO">Defeito</SelectItem>
-            <SelectItem value="PERDA">Perda</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={localizacao || "all"}
-          onValueChange={(value) => {
-            setLocalizacao(value === "all" ? undefined : value);
-            setPage(1);
-          }}
-        >
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Localizacao" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
-            {localizacoes?.map((loc) => (
-              <SelectItem key={loc} value={loc}>
-                {loc}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Button
           variant={arquivado ? "default" : "outline"}
           onClick={() => {
@@ -259,6 +328,29 @@ export function EstoquePage() {
         )}
       </div>
 
+      {/* Active filter badges */}
+      {activeFilterBadges.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          {activeFilterBadges.map((badge) => (
+            <Badge
+              key={badge.key}
+              variant="secondary"
+              className="gap-1.5 px-3 py-1 text-sm font-normal"
+            >
+              <span className="text-muted-foreground">{badge.label}:</span>
+              <span className="font-medium">{badge.value}</span>
+              <button
+                type="button"
+                onClick={badge.onClear}
+                className="ml-1 hover:text-destructive transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+
       {/* Tabela */}
       <PecasTable
         pecas={data?.pecas ?? []}
@@ -269,6 +361,10 @@ export function EstoquePage() {
         onStatusClick={handleStatusClick}
         onDelete={handleDelete}
         onToggleCatalogo={handleToggleCatalogo}
+        onPgtoClick={podeVerValores ? handlePgtoClick : undefined}
+        filters={filters}
+        filterCallbacks={filterCallbacks}
+        localizacoes={localizacoes ?? []}
       />
 
       {/* Paginacao */}
@@ -303,6 +399,21 @@ export function EstoquePage() {
           currentStatus={selectedPeca.status}
           currentLocalizacao={selectedPeca.localizacao}
           onSuccess={handleStatusSuccess}
+        />
+      )}
+
+      {/* Dialog de pagamento ao fornecedor */}
+      {selectedPgto && (
+        <PagamentoFornecedorDialog
+          open={pgtoDialogOpen}
+          onOpenChange={setPgtoDialogOpen}
+          pecaId={selectedPgto.id}
+          sku={selectedPgto.sku}
+          valorCompra={selectedPgto.valorCompra}
+          valorPago={selectedPgto.valorPago}
+          origemTipo={selectedPgto.origemTipo as "COMPRA" | "CONSIGNACAO"}
+          statusPeca={selectedPgto.status}
+          onSuccess={handlePgtoSuccess}
         />
       )}
     </div>

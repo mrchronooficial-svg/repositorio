@@ -256,8 +256,29 @@ export async function criarLancamentosVenda(
   const baseSimples = isConsignacao ? margem : venda.valorFinal;
 
   if (baseSimples > 0) {
-    const rbt12 = await calcularRBT12(venda.dataVenda);
-    const { valorImposto, aliquotaEfetiva } = calcularImpostoVenda(baseSimples, rbt12);
+    // Verificar se há alíquota fixa configurada
+    const configAliquota = await prisma.configuracao.findUnique({
+      where: { chave: "ALIQUOTA_SIMPLES" },
+    });
+    const aliquotaConfig = configAliquota?.valor || "auto";
+
+    let valorImposto: number;
+    let aliquotaEfetiva: number;
+    let historicoExtra: string;
+
+    if (aliquotaConfig !== "auto") {
+      // Alíquota fixa configurada manualmente
+      aliquotaEfetiva = parseFloat(aliquotaConfig) / 100;
+      valorImposto = Math.round(baseSimples * aliquotaEfetiva * 100) / 100;
+      historicoExtra = `alíquota fixa ${(aliquotaEfetiva * 100).toFixed(2)}%`;
+    } else {
+      // Cálculo automático via RBT12
+      const rbt12 = await calcularRBT12(venda.dataVenda);
+      const resultado = calcularImpostoVenda(baseSimples, rbt12);
+      valorImposto = resultado.valorImposto;
+      aliquotaEfetiva = resultado.aliquotaEfetiva;
+      historicoExtra = `RBT12: R$${rbt12.toFixed(2)}`;
+    }
 
     if (valorImposto > 0) {
       const lancSimples = await prisma.lancamento.create({
@@ -273,7 +294,7 @@ export async function criarLancamentosVenda(
               contaDebitoId: getConta(contasMap, CONTAS.SIMPLES_NACIONAL),
               contaCreditoId: getConta(contasMap, CONTAS.SIMPLES_A_RECOLHER),
               valor: valorImposto,
-              historico: `Simples Nacional ${(aliquotaEfetiva * 100).toFixed(2)}% sobre R$${baseSimples.toFixed(2)} (RBT12: R$${rbt12.toFixed(2)})`,
+              historico: `Simples Nacional ${(aliquotaEfetiva * 100).toFixed(2)}% sobre R$${baseSimples.toFixed(2)} (${historicoExtra})`,
             },
           },
         },

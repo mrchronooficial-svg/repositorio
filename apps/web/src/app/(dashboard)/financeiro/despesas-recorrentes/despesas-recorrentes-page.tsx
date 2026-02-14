@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Pencil, Trash2, Play, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Play, Loader2, Save, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,49 @@ export function DespesasRecorrentesPage() {
   const [contaContabilId, setContaContabilId] = useState("");
   const [executeMes, setExecuteMes] = useState(new Date().getMonth() + 1);
   const [executeAno, setExecuteAno] = useState(new Date().getFullYear());
+
+  // Taxas state
+  const [taxaMDR, setTaxaMDR] = useState("");
+  const [aliquotaSimples, setAliquotaSimples] = useState("");
+  const [simplesAutomatico, setSimplesAutomatico] = useState(true);
+
+  const { data: configuracoes } = useQuery(
+    trpc.configuracao.getAll.queryOptions()
+  );
+
+  // Sync config values when loaded
+  useEffect(() => {
+    if (configuracoes) {
+      setTaxaMDR(configuracoes.TAXA_MDR || "4");
+      const aliq = configuracoes.ALIQUOTA_SIMPLES || "auto";
+      if (aliq === "auto") {
+        setSimplesAutomatico(true);
+        setAliquotaSimples("");
+      } else {
+        setSimplesAutomatico(false);
+        setAliquotaSimples(aliq);
+      }
+    }
+  }, [configuracoes]);
+
+  const salvarTaxasMutation = useMutation(
+    trpc.configuracao.updateMany.mutationOptions({
+      onSuccess: () => {
+        toast.success("Taxas atualizadas com sucesso");
+        queryClient.invalidateQueries({ queryKey: [["configuracao"]] });
+      },
+      onError: (error) => toast.error(error.message),
+    })
+  );
+
+  const handleSalvarTaxas = () => {
+    salvarTaxasMutation.mutate({
+      configuracoes: [
+        { chave: "TAXA_MDR", valor: taxaMDR },
+        { chave: "ALIQUOTA_SIMPLES", valor: simplesAutomatico ? "auto" : aliquotaSimples },
+      ],
+    });
+  };
 
   const { data: despesas, isLoading } = useQuery(
     trpc.financeiro.listDespesasRecorrentes.queryOptions()
@@ -173,6 +217,90 @@ export function DespesasRecorrentesPage() {
           </Button>
         </div>
       </div>
+
+      {/* Taxas e Impostos */}
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2">
+            <Settings2 className="h-5 w-5 text-muted-foreground" />
+            <CardTitle className="text-lg">Taxas e Impostos</CardTitle>
+          </div>
+          <CardDescription>
+            Configure as taxas aplicadas automaticamente nas vendas e na DRE
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Taxa MDR */}
+            <div className="space-y-2">
+              <Label htmlFor="taxa-mdr">Taxa MDR (%)</Label>
+              <Input
+                id="taxa-mdr"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                value={taxaMDR}
+                onChange={(e) => setTaxaMDR(e.target.value)}
+                placeholder="4"
+              />
+              <p className="text-xs text-muted-foreground">
+                Cobrada apenas em vendas com cartao de credito (a vista ou parcelado)
+              </p>
+            </div>
+
+            {/* Alíquota Simples Nacional */}
+            <div className="space-y-2">
+              <Label htmlFor="aliquota-simples">Imposto sobre Receita (%)</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="aliquota-simples"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={aliquotaSimples}
+                  onChange={(e) => setAliquotaSimples(e.target.value)}
+                  placeholder={simplesAutomatico ? "Automatico (RBT12)" : "Ex: 6"}
+                  disabled={simplesAutomatico}
+                  className={simplesAutomatico ? "opacity-50" : ""}
+                />
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <Switch
+                  id="simples-auto"
+                  checked={simplesAutomatico}
+                  onCheckedChange={(checked) => {
+                    setSimplesAutomatico(checked);
+                    if (checked) setAliquotaSimples("");
+                  }}
+                />
+                <Label htmlFor="simples-auto" className="text-xs text-muted-foreground cursor-pointer">
+                  Calculo automatico via RBT12
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Aliquota fixa do Simples Nacional aplicada sobre a receita na DRE. Ative o modo automatico para usar o calculo via RBT12.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-4">
+            <Button
+              onClick={handleSalvarTaxas}
+              disabled={salvarTaxasMutation.isPending}
+              size="sm"
+            >
+              {salvarTaxasMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Salvar Taxas
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Resumo */}
       <Card>
