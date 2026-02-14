@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Search, X } from "lucide-react";
+import { Download, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,8 @@ import {
 import { VendasTable } from "@/components/tables/vendas-table";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDate } from "@/lib/formatters";
+import * as XLSX from "xlsx";
 
 export function VendasPage() {
   const router = useRouter();
@@ -52,6 +53,120 @@ export function VendasPage() {
   };
 
   const temFiltros = search || statusPagamento || statusRepasse;
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const vendas = await queryClient.fetchQuery(
+        trpc.venda.exportList.queryOptions({
+          search: search || undefined,
+          statusPagamento: statusPagamento as "PAGO" | "PARCIAL" | "NAO_PAGO" | undefined,
+          statusRepasse: statusRepasse as "FEITO" | "PARCIAL" | "PENDENTE" | undefined,
+        })
+      );
+
+      if (!vendas || vendas.length === 0) {
+        toast.error("Nenhuma venda para exportar");
+        return;
+      }
+
+      const labelOrigem: Record<string, string> = {
+        COMPRA: "Compra",
+        CONSIGNACAO: "Consignação",
+      };
+      const labelPagamento: Record<string, string> = {
+        PIX: "PIX",
+        CREDITO_VISTA: "Crédito à Vista",
+        CREDITO_PARCELADO: "Crédito Parcelado",
+      };
+      const labelStatusPag: Record<string, string> = {
+        PAGO: "Pago",
+        PARCIAL: "Parcial",
+        NAO_PAGO: "Não Pago",
+      };
+      const labelRepasse: Record<string, string> = {
+        FEITO: "Feito",
+        PARCIAL: "Parcial",
+        PENDENTE: "Pendente",
+      };
+      const labelEnvio: Record<string, string> = {
+        PENDENTE: "Pendente",
+        ENVIADO: "Enviado",
+        ENTREGUE: "Entregue",
+      };
+
+      const rows = vendas.map((v) => {
+        const isConsignacao = v.origemTipo === "CONSIGNACAO";
+        const custo = isConsignacao
+          ? (v.valorRepasseDevido ?? 0)
+          : v.valorCompra;
+        const lucro = v.valorFinal - custo;
+
+        return {
+          "Data": formatDate(v.dataVenda),
+          "SKU": v.sku,
+          "Marca": v.marca,
+          "Modelo": v.modelo,
+          "Cliente": v.cliente,
+          "Origem": labelOrigem[v.origemTipo] ?? v.origemTipo,
+          "Fornecedor": v.fornecedor,
+          "Forma Pagamento": labelPagamento[v.formaPagamento] ?? v.formaPagamento,
+          "Status Pagamento": labelStatusPag[v.statusPagamento] ?? v.statusPagamento,
+          "Status Repasse": v.statusRepasse ? (labelRepasse[v.statusRepasse] ?? v.statusRepasse) : "-",
+          "Status Envio": labelEnvio[v.statusEnvio] ?? v.statusEnvio,
+          "Valor Original": v.valorOriginal,
+          "Desconto": v.valorDesconto,
+          "Valor Final": v.valorFinal,
+          "Custo Peça": custo,
+          "Custo Manutenção": v.custoManutencao,
+          "Repasse Devido": v.valorRepasseDevido ?? "-",
+          "Repasse Feito": v.valorRepasseFeito ?? "-",
+          "Taxa MDR (%)": v.taxaMDR,
+          "Lucro Bruto": lucro,
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+
+      // Ajustar largura das colunas
+      ws["!cols"] = [
+        { wch: 12 }, // Data
+        { wch: 14 }, // SKU
+        { wch: 15 }, // Marca
+        { wch: 20 }, // Modelo
+        { wch: 25 }, // Cliente
+        { wch: 14 }, // Origem
+        { wch: 25 }, // Fornecedor
+        { wch: 18 }, // Forma Pagamento
+        { wch: 16 }, // Status Pagamento
+        { wch: 14 }, // Status Repasse
+        { wch: 14 }, // Status Envio
+        { wch: 14 }, // Valor Original
+        { wch: 12 }, // Desconto
+        { wch: 14 }, // Valor Final
+        { wch: 14 }, // Custo Peça
+        { wch: 16 }, // Custo Manutenção
+        { wch: 14 }, // Repasse Devido
+        { wch: 14 }, // Repasse Feito
+        { wch: 12 }, // Taxa MDR
+        { wch: 14 }, // Lucro Bruto
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Vendas");
+
+      const hoje = new Date().toISOString().split("T")[0];
+      XLSX.writeFile(wb, `vendas-mrchrono-${hoje}.xlsx`);
+      toast.success("Planilha exportada com sucesso!");
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro ao exportar";
+      toast.error(message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const cancelMutation = useMutation(trpc.venda.cancel.mutationOptions());
 
@@ -141,10 +256,22 @@ export function VendasPage() {
             {data?.total ?? 0} venda(s) registrada(s)
           </p>
         </div>
-        <Button onClick={() => router.push("/vendas/nova")}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Venda
-        </Button>
+        <div className="flex gap-2">
+          {podeVerValores && (
+            <Button
+              variant="outline"
+              onClick={handleExportExcel}
+              disabled={isExporting}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {isExporting ? "Exportando..." : "Exportar Excel"}
+            </Button>
+          )}
+          <Button onClick={() => router.push("/vendas/nova")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Venda
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}

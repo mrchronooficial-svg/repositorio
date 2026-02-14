@@ -49,7 +49,75 @@ const RepasseSchema = z.object({
   valor: z.number().positive("Valor deve ser positivo"),
 });
 
+const ExportListSchema = z.object({
+  search: z.string().optional(),
+  statusPagamento: z.enum(["PAGO", "PARCIAL", "NAO_PAGO"]).optional(),
+  statusRepasse: z.enum(["FEITO", "PARCIAL", "PENDENTE"]).optional(),
+});
+
 export const vendaRouter = router({
+  // Exportar vendas (sem paginação, com dados extras para planilha)
+  exportList: socioOuAdminProcedure
+    .input(ExportListSchema)
+    .query(async ({ input }) => {
+      const { search, statusPagamento, statusRepasse } = input;
+
+      const where = {
+        cancelada: false,
+        ...(statusPagamento && { statusPagamento }),
+        ...(statusRepasse && { statusRepasse }),
+        ...(search && {
+          OR: [
+            { peca: { sku: { contains: search, mode: "insensitive" as const } } },
+            { cliente: { nome: { contains: search, mode: "insensitive" as const } } },
+          ],
+        }),
+      };
+
+      const vendas = await prisma.venda.findMany({
+        where,
+        orderBy: { dataVenda: "desc" },
+        include: {
+          peca: {
+            select: {
+              sku: true,
+              marca: true,
+              modelo: true,
+              origemTipo: true,
+              valorCompra: true,
+              custoManutencao: true,
+              fornecedor: { select: { nome: true } },
+            },
+          },
+          cliente: {
+            select: { nome: true },
+          },
+        },
+      });
+
+      return vendas.map((v) => ({
+        dataVenda: v.dataVenda,
+        sku: v.peca.sku,
+        marca: v.peca.marca,
+        modelo: v.peca.modelo,
+        cliente: v.cliente.nome,
+        origemTipo: v.peca.origemTipo,
+        fornecedor: v.peca.fornecedor.nome,
+        formaPagamento: v.formaPagamento,
+        statusPagamento: v.statusPagamento,
+        statusRepasse: v.statusRepasse,
+        statusEnvio: v.statusEnvio,
+        valorOriginal: Number(v.valorOriginal),
+        valorDesconto: Number(v.valorDesconto || 0),
+        valorFinal: Number(v.valorFinal),
+        valorCompra: Number(v.peca.valorCompra),
+        custoManutencao: Number(v.peca.custoManutencao || 0),
+        valorRepasseDevido: v.valorRepasseDevido ? Number(v.valorRepasseDevido) : null,
+        valorRepasseFeito: v.valorRepasseFeito ? Number(v.valorRepasseFeito) : null,
+        taxaMDR: Number(v.taxaMDR),
+      }));
+    }),
+
   // Listar vendas
   list: protectedProcedure
     .input(VendaListSchema)
