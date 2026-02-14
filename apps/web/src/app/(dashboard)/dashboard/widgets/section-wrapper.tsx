@@ -1,8 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import {
   GripVertical,
   X,
@@ -12,76 +10,52 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { SectionDimensions, SectionWidth, SectionHeight } from "./types";
 
-const MIN_HEIGHTS: Record<SectionHeight, string | undefined> = {
-  1: undefined,
-  2: "16rem",
-  3: "28rem",
-};
+const MAX_W = 8;
+const MIN_W = 1;
+const MAX_H = 4;
+const MIN_H = 1;
 
 interface SectionWrapperProps {
   id: string;
   isEditMode: boolean;
-  dimensions: SectionDimensions;
+  w: number;
+  h: number;
   onHide: () => void;
-  onDimensionsChange: (dims: SectionDimensions) => void;
+  onResize: (w: number, h: number) => void;
   children: ReactNode;
 }
 
 export function SectionWrapper({
   id,
   isEditMode,
-  dimensions,
+  w,
+  h,
   onHide,
-  onDimensionsChange,
+  onResize,
   children,
 }: SectionWrapperProps) {
-  const { w, h } = dimensions;
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id, disabled: !isEditMode });
-
-  const canShrinkW = w > 1;
-  const canGrowW = w < 4;
-  const canShrinkH = h > 1;
-  const canGrowH = h < 3;
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    gridColumn: `span ${w} / span ${w}`,
-    minHeight: MIN_HEIGHTS[h],
-  };
+  const canShrinkW = w > MIN_W;
+  const canGrowW = w < MAX_W;
+  const canShrinkH = h > MIN_H;
+  const canGrowH = h < MAX_H;
 
   return (
     <div
-      ref={setNodeRef}
-      style={style}
       className={cn(
-        "relative group/section",
+        "relative group/section h-full",
         isEditMode &&
-          "rounded-lg border-2 border-dashed border-muted-foreground/30 p-2",
-        isDragging && "opacity-50 z-50"
+          "rounded-lg border-2 border-dashed border-muted-foreground/30 p-2"
       )}
     >
       {isEditMode && (
         <>
-          {/* Grip handle */}
-          <button
-            type="button"
-            className="absolute -left-1 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center h-8 w-6 rounded bg-muted border border-border shadow-sm cursor-grab active:cursor-grabbing opacity-0 group-hover/section:opacity-100 transition-opacity"
-            {...attributes}
-            {...listeners}
+          {/* Grip handle for drag */}
+          <div
+            className="drag-handle absolute -left-1 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center h-8 w-6 rounded bg-muted border border-border shadow-sm cursor-grab active:cursor-grabbing opacity-0 group-hover/section:opacity-100 transition-opacity"
           >
             <GripVertical className="h-4 w-4 text-muted-foreground" />
-          </button>
+          </div>
 
           {/* Top-right controls */}
           <div className="absolute -top-3 -right-1 z-10 flex items-center gap-0.5 opacity-0 group-hover/section:opacity-100 transition-opacity">
@@ -90,10 +64,7 @@ export function SectionWrapper({
               <button
                 type="button"
                 disabled={!canShrinkW}
-                onClick={() =>
-                  canShrinkW &&
-                  onDimensionsChange({ w: (w - 1) as SectionWidth, h })
-                }
+                onClick={() => canShrinkW && onResize(w - 1, h)}
                 className={cn(
                   "flex items-center justify-center h-full w-5 rounded-l",
                   canShrinkW
@@ -109,10 +80,7 @@ export function SectionWrapper({
               <button
                 type="button"
                 disabled={!canGrowW}
-                onClick={() =>
-                  canGrowW &&
-                  onDimensionsChange({ w: (w + 1) as SectionWidth, h })
-                }
+                onClick={() => canGrowW && onResize(w + 1, h)}
                 className={cn(
                   "flex items-center justify-center h-full w-5 rounded-r",
                   canGrowW
@@ -129,10 +97,7 @@ export function SectionWrapper({
               <button
                 type="button"
                 disabled={!canShrinkH}
-                onClick={() =>
-                  canShrinkH &&
-                  onDimensionsChange({ w, h: (h - 1) as SectionHeight })
-                }
+                onClick={() => canShrinkH && onResize(w, h - 1)}
                 className={cn(
                   "flex items-center justify-center h-full w-5 rounded-l",
                   canShrinkH
@@ -148,10 +113,7 @@ export function SectionWrapper({
               <button
                 type="button"
                 disabled={!canGrowH}
-                onClick={() =>
-                  canGrowH &&
-                  onDimensionsChange({ w, h: (h + 1) as SectionHeight })
-                }
+                onClick={() => canGrowH && onResize(w, h + 1)}
                 className={cn(
                   "flex items-center justify-center h-full w-5 rounded-r",
                   canGrowH

@@ -9,9 +9,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
     "@gestaomrchrono/api": "*",
     "@gestaomrchrono/auth": "*",
     "@gestaomrchrono/env": "*",
@@ -41,6 +38,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-dropzone": "^14.3.8",
+    "react-grid-layout": "^2.2.2",
     "shadcn": "^3.6.2",
     "sonner": "^2.0.5",
     "tailwind-merge": "^3.3.1",

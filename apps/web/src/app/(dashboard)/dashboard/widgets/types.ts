@@ -19,45 +19,41 @@ export const SECTION_IDS = [
 
 export type SectionId = (typeof SECTION_IDS)[number];
 
-export type SectionWidth = 1 | 2 | 3 | 4;
-export type SectionHeight = 1 | 2 | 3;
-
-export interface SectionDimensions {
-  w: SectionWidth;
-  h: SectionHeight;
+export interface GridItem {
+  i: SectionId;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface DashboardLayout {
-  sectionOrder: SectionId[];
+  grid: GridItem[];
   hiddenSections: SectionId[];
-  sectionDimensions: Partial<Record<SectionId, SectionDimensions>>;
 }
 
-export const DEFAULT_DIMENSIONS: Record<SectionId, SectionDimensions> = {
-  utensilios: { w: 4, h: 1 },
-  kpiEstoque: { w: 1, h: 1 },
-  kpiVendas: { w: 1, h: 1 },
-  kpiFaturamento: { w: 1, h: 1 },
-  kpiLucroBruto: { w: 1, h: 1 },
-  kpiMargemBruta: { w: 1, h: 1 },
-  kpiReceber: { w: 1, h: 1 },
-  kpiPagar: { w: 1, h: 1 },
-  kpiEstoqueCusto: { w: 1, h: 1 },
-  kpiEstoqueFaturamento: { w: 1, h: 1 },
-  kpiClientes: { w: 1, h: 1 },
-  kpiEmRevisao: { w: 1, h: 1 },
-  graficos: { w: 4, h: 1 },
-  listas: { w: 4, h: 1 },
-  recebiveis: { w: 4, h: 1 },
-  dividas: { w: 4, h: 1 },
-};
-
-export const DEFAULT_SECTION_ORDER: SectionId[] = [...SECTION_IDS];
+export const DEFAULT_GRID_LAYOUT: GridItem[] = [
+  { i: "utensilios",          x: 0, y: 0,  w: 8, h: 1 },
+  { i: "kpiEstoque",          x: 0, y: 1,  w: 2, h: 1 },
+  { i: "kpiVendas",           x: 2, y: 1,  w: 2, h: 1 },
+  { i: "kpiFaturamento",      x: 4, y: 1,  w: 2, h: 1 },
+  { i: "kpiLucroBruto",       x: 6, y: 1,  w: 2, h: 1 },
+  { i: "kpiMargemBruta",      x: 0, y: 2,  w: 2, h: 1 },
+  { i: "kpiReceber",          x: 2, y: 2,  w: 2, h: 1 },
+  { i: "kpiPagar",            x: 4, y: 2,  w: 2, h: 1 },
+  { i: "kpiEstoqueCusto",     x: 6, y: 2,  w: 2, h: 1 },
+  { i: "kpiEstoqueFaturamento", x: 0, y: 3, w: 2, h: 1 },
+  { i: "kpiClientes",         x: 2, y: 3,  w: 2, h: 1 },
+  { i: "kpiEmRevisao",        x: 4, y: 3,  w: 2, h: 1 },
+  { i: "graficos",            x: 0, y: 4,  w: 8, h: 2 },
+  { i: "listas",              x: 0, y: 6,  w: 8, h: 2 },
+  { i: "recebiveis",          x: 0, y: 8,  w: 8, h: 1 },
+  { i: "dividas",             x: 0, y: 9,  w: 8, h: 1 },
+];
 
 export const DEFAULT_LAYOUT: DashboardLayout = {
-  sectionOrder: DEFAULT_SECTION_ORDER,
+  grid: DEFAULT_GRID_LAYOUT,
   hiddenSections: [],
-  sectionDimensions: {},
 };
 
 export const SECTION_LABELS: Record<SectionId, string> = {

@@ -1,27 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  rectSortingStrategy,
-} from "@dnd-kit/sortable";
+import { GridLayout, getCompactor } from "react-grid-layout";
+import type { LayoutItem } from "react-grid-layout";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 import { Settings2, RotateCcw, Eye } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useDashboardLayout } from "@/hooks/use-dashboard-layout";
-import type { SectionId } from "./widgets/types";
-import { SECTION_LABELS, DEFAULT_DIMENSIONS } from "./widgets/types";
+import type { SectionId, GridItem } from "./widgets/types";
+import { SECTION_LABELS } from "./widgets/types";
 import { SectionWrapper } from "./widgets/section-wrapper";
 import { WidgetAlertas } from "./widgets/widget-alertas";
 import { WidgetUtensilios } from "./widgets/widget-utensilios";
@@ -43,6 +35,13 @@ import { WidgetDividas } from "./widgets/widget-dividas";
 import { ModalRecebiveis } from "./widgets/modal-recebiveis";
 import { ModalDividas } from "./widgets/modal-dividas";
 
+const GRID_COLS = 8;
+const ROW_HEIGHT = 80;
+const GRID_MARGIN: [number, number] = [16, 16];
+
+// No compaction + prevent collision = free-form grid with no overlaps
+const freeFormCompactor = getCompactor(null, false, true);
+
 export function DashboardPage() {
   const queryClient = useQueryClient();
   const { podeVerValores, isAdmin } = usePermissions();
@@ -53,17 +52,29 @@ export function DashboardPage() {
     layout,
     isEditMode,
     loaded,
-    updateSectionOrder,
+    updateGrid,
     hideSection,
     showSection,
-    setSectionDimensions,
+    resizeSection,
     resetLayout,
     toggleEditMode,
   } = useDashboardLayout();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
+  // ── Container width measurement ──
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(1200);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const measure = () => setContainerWidth(el.clientWidth);
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // ── Queries ──
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery(
@@ -131,33 +142,37 @@ export function DashboardPage() {
 
   const hiddenSet = new Set(layout.hiddenSections);
 
-  const visibleSections = layout.sectionOrder.filter(
-    (id) => sectionVisibility[id] && !hiddenSet.has(id)
+  const visibleGrid = layout.grid.filter(
+    (item) => sectionVisibility[item.i] && !hiddenSet.has(item.i)
   );
 
   const restorableSections = layout.hiddenSections.filter(
     (id) => sectionVisibility[id]
   );
 
-  function getDimensions(id: SectionId) {
-    return layout.sectionDimensions[id] ?? DEFAULT_DIMENSIONS[id];
-  }
+  // ── Layout change handler ──
+  const handleLayoutChange = useCallback(
+    (newLayout: readonly LayoutItem[]) => {
+      const mapped: GridItem[] = newLayout
+        .filter((item) => layout.grid.some((g) => g.i === item.i))
+        .map((item) => ({
+          i: item.i as SectionId,
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+        }));
 
-  // ── Section DnD ──
-  function handleSectionDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+      // Merge back hidden items that aren't in the visible layout
+      const visibleIds = new Set(mapped.map((m) => m.i));
+      const hiddenItems = layout.grid.filter(
+        (item) => !visibleIds.has(item.i)
+      );
 
-    const fullOrder = layout.sectionOrder;
-    const oldIndex = fullOrder.indexOf(active.id as SectionId);
-    const newIndex = fullOrder.indexOf(over.id as SectionId);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const newOrder = [...fullOrder];
-    newOrder.splice(oldIndex, 1);
-    newOrder.splice(newIndex, 0, active.id as SectionId);
-    updateSectionOrder(newOrder);
-  }
+      updateGrid([...mapped, ...hiddenItems]);
+    },
+    [layout.grid, updateGrid]
+  );
 
   // ── Section renderers ──
   function renderSection(id: SectionId) {
@@ -389,35 +404,42 @@ export function DashboardPage() {
         alertasEnvio={alertasEnvio as any}
       />
 
-      {/* Sortable grid */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleSectionDragEnd}
-      >
-        <SortableContext
-          items={visibleSections}
-          strategy={rectSortingStrategy}
+      {/* Grid layout */}
+      <div ref={containerRef}>
+        <GridLayout
+          layout={visibleGrid}
+          onLayoutChange={handleLayoutChange}
+          width={containerWidth}
+          compactor={freeFormCompactor}
+          gridConfig={{
+            cols: GRID_COLS,
+            rowHeight: ROW_HEIGHT,
+            margin: GRID_MARGIN,
+          }}
+          dragConfig={{
+            enabled: isEditMode,
+            handle: ".drag-handle",
+          }}
+          resizeConfig={{
+            enabled: isEditMode,
+          }}
         >
-          <div className="grid grid-cols-4 gap-4">
-            {visibleSections.map((id) => {
-              const dims = getDimensions(id);
-              return (
-                <SectionWrapper
-                  key={id}
-                  id={id}
-                  isEditMode={isEditMode}
-                  dimensions={dims}
-                  onHide={() => hideSection(id)}
-                  onDimensionsChange={(d) => setSectionDimensions(id, d)}
-                >
-                  {renderSection(id)}
-                </SectionWrapper>
-              );
-            })}
-          </div>
-        </SortableContext>
-      </DndContext>
+          {visibleGrid.map((item) => (
+            <div key={item.i}>
+              <SectionWrapper
+                id={item.i}
+                isEditMode={isEditMode}
+                w={item.w}
+                h={item.h}
+                onHide={() => hideSection(item.i)}
+                onResize={(newW, newH) => resizeSection(item.i, newW, newH)}
+              >
+                {renderSection(item.i)}
+              </SectionWrapper>
+            </div>
+          ))}
+        </GridLayout>
+      </div>
 
       {/* Modals */}
       <ModalRecebiveis
