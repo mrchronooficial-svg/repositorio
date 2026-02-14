@@ -144,14 +144,13 @@ export function PecasTable({
             onClick={() => onView(peca.id)}
           >
             {onToggleCatalogo && (
-              <TableCell className="py-2 px-2">
+              <TableCell className="py-2 px-2" onClick={(e) => e.stopPropagation()}>
                 {!["VENDIDA", "DEFEITO", "PERDA"].includes(peca.status) ? (
                   <Checkbox
                     checked={peca.exibirNoCatalogo !== false}
                     onCheckedChange={(checked) => {
                       onToggleCatalogo(peca.id, !!checked);
                     }}
-                    onClick={(e) => e.stopPropagation()}
                     className="h-4 w-4"
                     title={peca.exibirNoCatalogo !== false ? "Visível no catálogo" : "Oculto do catálogo"}
                   />
