@@ -513,10 +513,11 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
   const lucrosAcumulados = somarPorPrefixo(saldos, "2.3.2");
   const distribuicaoLucros = somarPorPrefixo(saldos, "2.3.3");
 
-  // Resultado = Receitas (3.x) - Custos/Despesas (4.x)
-  const totalReceitas = somarPorPrefixo(saldos, "3");
+  // Resultado = Receita Bruta - Deduções - Custos/Despesas
+  const receitaBruta = somarPorPrefixo(saldos, "3.1");
+  const deducoesReceita = somarPorPrefixo(saldos, "3.2");
   const totalCustosDespesas = somarPorPrefixo(saldos, "4");
-  const resultadoPeriodo = round2(totalReceitas - totalCustosDespesas);
+  const resultadoPeriodo = round2(receitaBruta - deducoesReceita - totalCustosDespesas);
 
   const pl = round2(capitalSocial + lucrosAcumulados + resultadoPeriodo - distribuicaoLucros);
 

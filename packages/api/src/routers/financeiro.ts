@@ -1910,4 +1910,100 @@ export const financeiroRouter = router({
       evolucao,
     };
   }),
+
+  // =========================================
+  // RECALCULAR SIMPLES NACIONAL
+  // =========================================
+  recalcularSimples: adminProcedure
+    .input(
+      z.object({
+        novaAliquota: z.string(), // "auto" ou número (ex: "6")
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { novaAliquota } = input;
+
+      // Buscar todos os lançamentos de Simples Nacional (não estornados)
+      const lancamentosSimples = await prisma.lancamento.findMany({
+        where: {
+          descricao: { startsWith: "Simples Nacional" },
+          tipo: "AUTOMATICO_VENDA",
+          estornado: false,
+          estornoDeId: null,
+          vendaId: { not: null },
+        },
+        include: {
+          linhas: true,
+        },
+      });
+
+      if (lancamentosSimples.length === 0) {
+        return { atualizados: 0 };
+      }
+
+      // Buscar todas as vendas relacionadas de uma vez
+      const vendaIds = lancamentosSimples.map((l) => l.vendaId!).filter(Boolean);
+      const vendas = await prisma.venda.findMany({
+        where: { id: { in: vendaIds } },
+        include: { peca: { select: { sku: true, origemTipo: true } } },
+      });
+      const vendasMap = new Map(vendas.map((v) => [v.id, v]));
+
+      let atualizados = 0;
+
+      for (const lanc of lancamentosSimples) {
+        const venda = vendasMap.get(lanc.vendaId!) as any;
+        if (!venda) continue;
+
+        const isConsignacao = venda.peca?.origemTipo === "CONSIGNACAO";
+        const valorFinal = Number(venda.valorFinal);
+        const valorRepasse = Number(venda.valorRepasseDevido || 0);
+        const margem = valorFinal - valorRepasse;
+        const baseSimples = isConsignacao ? margem : valorFinal;
+
+        if (baseSimples <= 0) continue;
+
+        let aliquotaEfetiva: number;
+        let valorImposto: number;
+        let historicoExtra: string;
+
+        if (novaAliquota !== "auto") {
+          // Alíquota fixa
+          aliquotaEfetiva = parseFloat(novaAliquota) / 100;
+          valorImposto = Math.round(baseSimples * aliquotaEfetiva * 100) / 100;
+          historicoExtra = `alíquota fixa ${(aliquotaEfetiva * 100).toFixed(2)}%`;
+        } else {
+          // Cálculo automático via RBT12
+          const rbt12Val = await calcularRBT12(venda.dataVenda);
+          const resultado = calcularAliquotaEfetiva(rbt12Val);
+          aliquotaEfetiva = resultado;
+          valorImposto = Math.round(baseSimples * aliquotaEfetiva * 100) / 100;
+          historicoExtra = `RBT12: R$${rbt12Val.toFixed(2)}`;
+        }
+
+        // Atualizar descrição do lançamento
+        const novaDescricao = `Simples Nacional ${(aliquotaEfetiva * 100).toFixed(2)}% — ${venda.peca?.sku || ""}`;
+
+        // Atualizar o lançamento e sua linha
+        await prisma.lancamento.update({
+          where: { id: lanc.id },
+          data: { descricao: novaDescricao },
+        });
+
+        // Atualizar valor da linha
+        if (lanc.linhas.length > 0) {
+          await prisma.linhaLancamento.update({
+            where: { id: lanc.linhas[0]!.id },
+            data: {
+              valor: valorImposto,
+              historico: `Simples Nacional ${(aliquotaEfetiva * 100).toFixed(2)}% sobre R$${baseSimples.toFixed(2)} (${historicoExtra})`,
+            },
+          });
+        }
+
+        atualizados++;
+      }
+
+      return { atualizados };
+    }),
 });

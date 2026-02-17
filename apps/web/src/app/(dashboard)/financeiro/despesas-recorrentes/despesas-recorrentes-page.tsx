@@ -73,11 +73,26 @@ export function DespesasRecorrentesPage() {
     }
   }, [configuracoes]);
 
+  const recalcularSimplesMutation = useMutation(
+    trpc.financeiro.recalcularSimples.mutationOptions({
+      onSuccess: (data) => {
+        if (data.atualizados > 0) {
+          toast.success(`${data.atualizados} lançamento(s) de Simples Nacional recalculado(s)`);
+        }
+        queryClient.invalidateQueries({ queryKey: [["financeiro"]] });
+      },
+      onError: (error) => toast.error(`Erro ao recalcular Simples: ${error.message}`),
+    })
+  );
+
   const salvarTaxasMutation = useMutation(
     trpc.configuracao.updateMany.mutationOptions({
       onSuccess: () => {
         toast.success("Taxas atualizadas com sucesso");
         queryClient.invalidateQueries({ queryKey: [["configuracao"]] });
+        // Recalcular lançamentos de Simples Nacional existentes
+        const novaAliquota = simplesAutomatico ? "auto" : aliquotaSimples;
+        recalcularSimplesMutation.mutate({ novaAliquota });
       },
       onError: (error) => toast.error(error.message),
     })
@@ -288,15 +303,15 @@ export function DespesasRecorrentesPage() {
           <div className="flex justify-end mt-4">
             <Button
               onClick={handleSalvarTaxas}
-              disabled={salvarTaxasMutation.isPending}
+              disabled={salvarTaxasMutation.isPending || recalcularSimplesMutation.isPending}
               size="sm"
             >
-              {salvarTaxasMutation.isPending ? (
+              {salvarTaxasMutation.isPending || recalcularSimplesMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Save className="h-4 w-4 mr-2" />
               )}
-              Salvar Taxas
+              {recalcularSimplesMutation.isPending ? "Recalculando..." : "Salvar Taxas"}
             </Button>
           </div>
         </CardContent>
