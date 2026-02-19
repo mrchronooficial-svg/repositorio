@@ -22,6 +22,7 @@ const PecaCreateSchema = z.object({
   percentualRepasse: z.number().positive().max(100).optional(), // Percentual do valor final (consignacao)
   localizacao: z.string().default("Fornecedor"),
   fornecedorId: z.string().cuid("Fornecedor invalido"),
+  revisada: z.boolean().optional(),
   fotos: z.array(z.string().min(1)).min(1, "Minimo 1 foto obrigatoria"),
 }).refine(
   (data) => {
@@ -355,6 +356,7 @@ export const pecaRouter = router({
           origemCanal: input.origemCanal,
           valorRepasse: input.percentualRepasse ? null : input.valorRepasse,
           percentualRepasse: input.valorRepasse ? null : input.percentualRepasse,
+          revisada: input.revisada ?? false,
           localizacao: input.localizacao,
           status: "EM_TRANSITO",
           fornecedorId: input.fornecedorId,
@@ -844,6 +846,28 @@ export const pecaRouter = router({
         where: { id: input.id },
         data: { exibirNoCatalogo: input.exibirNoCatalogo },
       });
+      return { success: true };
+    }),
+
+  toggleRevisada: protectedProcedure
+    .input(z.object({
+      id: z.string().cuid(),
+      revisada: z.boolean(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      await prisma.peca.update({
+        where: { id: input.id },
+        data: { revisada: input.revisada },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "EDITAR",
+        entidade: "PECA",
+        entidadeId: input.id,
+        detalhes: { revisada: input.revisada },
+      });
+
       return { success: true };
     }),
 });

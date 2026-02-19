@@ -58,6 +58,7 @@ interface Peca {
   percentualRepasse?: Decimal | null;
   valorPagoFornecedor?: Decimal | null;
   statusPagamentoFornecedor?: string | null;
+  revisada?: boolean;
   origemTipo?: string;
   exibirNoCatalogo?: boolean;
   fotos: Foto[];
@@ -118,6 +119,7 @@ interface PecasTableProps {
   onDelete?: (id: string) => Promise<void>;
   onToggleCatalogo?: (id: string, exibir: boolean) => void;
   onPgtoClick?: (peca: PecaPgtoInfo) => void;
+  onRevisadaClick?: (peca: { id: string; sku: string; revisada: boolean }) => void;
   // Optional column filters
   filters?: ColumnFilters;
   filterCallbacks?: ColumnFilterCallbacks;
@@ -135,6 +137,7 @@ export function PecasTable({
   onDelete,
   onToggleCatalogo,
   onPgtoClick,
+  onRevisadaClick,
   filters,
   filterCallbacks,
   localizacoes,
@@ -292,6 +295,9 @@ export function PecasTable({
             ) : "Localizacao"}
           </TableHead>
 
+          {/* Revisao */}
+          <TableHead className="text-center">Revisao</TableHead>
+
           {/* Pgto Fornecedor */}
           {podeVerValores && (
             <TableHead>
@@ -438,6 +444,29 @@ export function PecasTable({
                 title={onLocationClick ? "Clique para alterar localizacao" : undefined}
               >
                 {peca.localizacao}
+              </span>
+            </TableCell>
+            {/* Revisao */}
+            <TableCell className="text-center">
+              <span
+                className={onRevisadaClick ? "cursor-pointer hover:underline hover:text-primary transition-colors" : ""}
+                onClick={(e) => {
+                  if (onRevisadaClick) {
+                    e.stopPropagation();
+                    onRevisadaClick({
+                      id: peca.id,
+                      sku: peca.sku,
+                      revisada: peca.revisada ?? false,
+                    });
+                  }
+                }}
+                title={onRevisadaClick ? "Clique para alterar" : undefined}
+              >
+                {peca.revisada ? (
+                  <span className="text-green-600 font-medium">Sim</span>
+                ) : (
+                  <span className="text-muted-foreground">Nao</span>
+                )}
               </span>
             </TableCell>
             {podeVerValores && (

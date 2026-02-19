@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PecasTable } from "@/components/tables/pecas-table";
 import type { ColumnFilters, ColumnFilterCallbacks, PecaPgtoInfo } from "@/components/tables/pecas-table";
 import { StatusDialog } from "@/components/dialogs/status-dialog";
@@ -81,6 +88,10 @@ export function EstoquePage() {
   // Pgto fornecedor dialog
   const [pgtoDialogOpen, setPgtoDialogOpen] = useState(false);
   const [selectedPgto, setSelectedPgto] = useState<PecaPgtoInfo | null>(null);
+
+  // Revisada dialog
+  const [revisadaDialogOpen, setRevisadaDialogOpen] = useState(false);
+  const [selectedRevisada, setSelectedRevisada] = useState<{ id: string; sku: string; revisada: boolean } | null>(null);
 
   const { data, isLoading } = useQuery(
     trpc.peca.list.queryOptions({
@@ -174,6 +185,29 @@ export function EstoquePage() {
 
   const handlePgtoSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
+  };
+
+  const handleRevisadaClick = (peca: { id: string; sku: string; revisada: boolean }) => {
+    setSelectedRevisada(peca);
+    setRevisadaDialogOpen(true);
+  };
+
+  const toggleRevisadaMutation = useMutation(trpc.peca.toggleRevisada.mutationOptions());
+
+  const handleToggleRevisada = (revisada: boolean) => {
+    if (!selectedRevisada) return;
+    toggleRevisadaMutation.mutate(
+      { id: selectedRevisada.id, revisada },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
+          setRevisadaDialogOpen(false);
+        },
+        onError: () => {
+          toast.error("Erro ao atualizar revisao");
+        },
+      }
+    );
   };
 
   const deleteMutation = useMutation(trpc.peca.delete.mutationOptions());
@@ -377,6 +411,7 @@ export function EstoquePage() {
         onDelete={handleDelete}
         onToggleCatalogo={handleToggleCatalogo}
         onPgtoClick={podeVerValores ? handlePgtoClick : undefined}
+        onRevisadaClick={handleRevisadaClick}
         filters={filters}
         filterCallbacks={filterCallbacks}
         localizacoes={localizacoes ?? []}
@@ -443,6 +478,34 @@ export function EstoquePage() {
           onSuccess={handlePgtoSuccess}
         />
       )}
+
+      {/* Dialog de revisao */}
+      <Dialog open={revisadaDialogOpen} onOpenChange={setRevisadaDialogOpen}>
+        <DialogContent className="sm:max-w-[360px]">
+          <DialogHeader>
+            <DialogTitle>Revisao — {selectedRevisada?.sku}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Esta peca foi revisada?
+          </p>
+          <DialogFooter className="flex gap-2 sm:justify-start">
+            <Button
+              variant={selectedRevisada?.revisada ? "outline" : "default"}
+              onClick={() => handleToggleRevisada(true)}
+              disabled={toggleRevisadaMutation.isPending}
+            >
+              Sim
+            </Button>
+            <Button
+              variant={!selectedRevisada?.revisada ? "outline" : "default"}
+              onClick={() => handleToggleRevisada(false)}
+              disabled={toggleRevisadaMutation.isPending}
+            >
+              Nao
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

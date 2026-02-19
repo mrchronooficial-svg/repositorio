@@ -231,6 +231,8 @@ model Peca {
   // Status e localização
   status           StatusPeca  @default(EM_TRANSITO)
   localizacao      String      @default("Fornecedor")
+  // Revisão
+  revisada         Boolean     @default(false)
   // Controle
   arquivado        Boolean     @default(false)
   createdAt        DateTime    @default(now())

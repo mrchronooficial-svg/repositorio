@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Loader2, Search } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,7 @@ interface PecaData {
   tipoRepasse: "FIXO" | "PERCENTUAL";
   valorRepasse: string;
   percentualRepasse: string;
+  revisada: boolean;
   localizacao: string;
   fornecedorId: string;
   fotos: string[];
@@ -60,6 +62,7 @@ const defaultData: PecaData = {
   tipoRepasse: "FIXO",
   valorRepasse: "",
   percentualRepasse: "",
+  revisada: false,
   localizacao: "Fornecedor",
   fornecedorId: "",
   fotos: [],
@@ -244,6 +247,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       percentualRepasse: data.origemTipo === "CONSIGNACAO" && data.tipoRepasse === "PERCENTUAL" && data.percentualRepasse
         ? parseFloat(data.percentualRepasse)
         : undefined,
+      revisada: data.revisada,
       localizacao: data.localizacao,
       fornecedorId: data.fornecedorId,
       fotos: data.fotos,
@@ -477,6 +481,17 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2">
+            <Checkbox
+              id="revisada"
+              checked={data.revisada}
+              onCheckedChange={(checked) => handleChange("revisada", !!checked)}
+            />
+            <Label htmlFor="revisada" className="cursor-pointer">
+              Peca revisada
+            </Label>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

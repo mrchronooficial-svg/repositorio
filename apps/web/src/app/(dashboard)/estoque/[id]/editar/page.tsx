@@ -73,6 +73,7 @@ export default function EditarPecaPage() {
           tipoRepasse: peca.percentualRepasse ? "PERCENTUAL" as const : "FIXO" as const,
           valorRepasse: peca.valorRepasse ? Number(peca.valorRepasse).toString() : "",
           percentualRepasse: peca.percentualRepasse ? peca.percentualRepasse.toString() : "",
+          revisada: peca.revisada ?? false,
           localizacao: peca.localizacao,
           fornecedorId: peca.fornecedorId,
           fotos: peca.fotos.map((f) => f.url),
