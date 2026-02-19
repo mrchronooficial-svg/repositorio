@@ -910,6 +910,15 @@ export const vendaRouter = router({
           status: "DISPONIVEL",
           localizacao: "Rafael",
           fornecedorId: venda.peca.fornecedorId,
+          // Copiar custoManutencao sempre (independente da origem)
+          custoManutencao: venda.peca.custoManutencao,
+          // Para COMPRA: copiar dados de pagamento ao fornecedor (já foram pagos)
+          // Para CONSIGNAÇÃO: não copiar (repasse é desfeito e será refeito na revenda)
+          ...(venda.peca.origemTipo === "COMPRA" ? {
+            statusPagamentoFornecedor: venda.peca.statusPagamentoFornecedor,
+            valorPagoFornecedor: venda.peca.valorPagoFornecedor,
+            dataPagamentoFornecedor: venda.peca.dataPagamentoFornecedor,
+          } : {}),
           historicoStatus: {
             create: {
               statusNovo: "DISPONIVEL",
