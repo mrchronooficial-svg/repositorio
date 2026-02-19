@@ -55,8 +55,9 @@ export default function VendaDetalhesPage() {
   const cancelMutation = useMutation(
     trpc.venda.cancel.mutationOptions({
       onSuccess: (result) => {
-        toast.success(`Venda cancelada. Nova peca criada: ${result.novoSku}`);
-        refetch();
+        toast.success(`Venda cancelada. Nova peça criada: ${result.novoSku}`);
+        queryClient.invalidateQueries({ queryKey: ["venda"] });
+        router.push("/vendas" as Route);
       },
       onError: (error) => {
         toast.error(error.message);
@@ -85,10 +86,10 @@ export default function VendaDetalhesPage() {
     );
   }
 
-  if (!venda) {
+  if (!venda || venda.cancelada) {
     return (
       <div className="text-center py-12">
-        <h2 className="text-xl font-semibold">Venda nao encontrada</h2>
+        <h2 className="text-xl font-semibold">Venda não encontrada</h2>
         <Button
           variant="link"
           onClick={() => router.push("/vendas")}
