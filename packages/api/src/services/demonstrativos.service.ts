@@ -369,20 +369,39 @@ async function getCapitalSocial(): Promise<number> {
 }
 
 /**
+ * Busca o Saldo Inicial de Caixa configurado.
+ * Este valor é calibrado para que o caixa final reflita os saldos bancários reais.
+ */
+async function getSaldoInicialCaixa(): Promise<number> {
+  try {
+    const config = await prisma.configuracao.findUnique({
+      where: { chave: "SALDO_INICIAL_CAIXA" },
+    });
+    if (config) return Number(config.valor);
+  } catch {
+    // Tabela pode não existir ainda
+  }
+  return 105690.65; // Valor padrão calibrado
+}
+
+/**
  * Calcula o Caixa real da empresa usando abordagem operacional pura.
  *
- * Caixa = Capital Social (investimento inicial)
+ * Caixa = Saldo Inicial de Caixa (calibrado)
  *       + pagamentos PIX recebidos de clientes (valor cheio)
  *       + pagamentos Cartão recebidos de clientes (líquido de MDR)
  *       − pagamentos a fornecedores (compras de peças)
  *       − repasses de consignação feitos
  *       + entradas contábeis não ligadas a vendas em 1.1.1 (transferências, etc.)
  *       − saídas contábeis não ligadas a vendas de 1.1.1 (despesas, distribuições, etc.)
+ *
+ * Sub-linhas: Nubank (conta operacional, absorve todos os fluxos)
+ *             PagBank (conta estática, saldoInicial fixo)
  */
 async function calcularCaixaReal(
   dataFim: Date
 ): Promise<{ total: number; detalhes: { codigo: string; nome: string; valor: number }[] }> {
-  const capitalSocial = await getCapitalSocial();
+  const saldoInicial = await getSaldoInicialCaixa();
 
   // 1. Pagamentos PIX recebidos de clientes (valor cheio — sem MDR)
   const pagPIXAgg = await prisma.pagamento.aggregate({
@@ -395,7 +414,6 @@ async function calcularCaixaReal(
   const cashInPIX = Number(pagPIXAgg._sum.valor || 0);
 
   // 2. Pagamentos Cartão recebidos de clientes (líquido de MDR)
-  //    Como cada venda pode ter taxaMDR diferente, precisamos iterar
   const pagCartao = await prisma.pagamento.findMany({
     where: {
       data: { lte: dataFim },
@@ -412,8 +430,6 @@ async function calcularCaixaReal(
     cashInCartao += Number(p.valor) * (1 - mdr);
   }
 
-  const totalRecebidoClientes = cashInPIX + cashInCartao;
-
   // 3. Pagamentos a fornecedores (saída de caixa)
   const pagFornecedorAgg = await prisma.pagamentoFornecedor.aggregate({
     _sum: { valor: true },
@@ -422,16 +438,13 @@ async function calcularCaixaReal(
   const totalPagFornecedores = Number(pagFornecedorAgg._sum.valor || 0);
 
   // 4. Repasses de consignação feitos (saída de caixa)
-  //    valorRepasseFeito é cumulativo na Venda — sem filtro de data possível
   const repassesAgg = await prisma.venda.aggregate({
     _sum: { valorRepasseFeito: true },
     where: { cancelada: false },
   });
   const totalRepasses = Number(repassesAgg._sum.valorRepasseFeito || 0);
 
-  // 5. Movimentos contábeis não ligados a vendas em contas 1.1.1 (despesas, distribuições, etc.)
-  //    Débitos em 1.1.1 com vendaId IS NULL = entrada de caixa extra
-  //    Créditos em 1.1.1 com vendaId IS NULL = saída de caixa (despesas, distribuições)
+  // 5. Movimentos contábeis não ligados a vendas em contas 1.1.1
   const movNaoVenda = await prisma.linhaLancamento.findMany({
     where: {
       lancamento: {
@@ -462,17 +475,37 @@ async function calcularCaixaReal(
   const netContabil = entradasContabeis - saidasContabeis;
 
   // TOTAL
-  const totalCaixa = capitalSocial + totalRecebidoClientes - totalPagFornecedores - totalRepasses + netContabil;
+  const totalCaixa = saldoInicial + cashInPIX + cashInCartao - totalPagFornecedores - totalRepasses + netContabil;
 
-  // Montar detalhes para exibição
-  const detalhes: { codigo: string; nome: string; valor: number }[] = [
-    { codigo: "", nome: "Capital Social (investimento)", valor: round2(capitalSocial) },
-    { codigo: "", nome: "Recebido PIX (clientes)", valor: round2(cashInPIX) },
-    { codigo: "", nome: "Recebido Cartão líq. MDR (clientes)", valor: round2(cashInCartao) },
-    { codigo: "", nome: "Pago a Fornecedores", valor: round2(-totalPagFornecedores) },
-    { codigo: "", nome: "Repasses Consignação", valor: round2(-totalRepasses) },
-    { codigo: "", nome: "Movimentos contábeis (desp/distrib)", valor: round2(netContabil) },
-  ];
+  // Sub-linhas: PagBank (estática) e Nubank (restante)
+  const contasBancarias = await prisma.contaBancaria.findMany({
+    select: {
+      saldoInicial: true,
+      contaContabil: { select: { codigo: true, nome: true } },
+    },
+    orderBy: { contaContabil: { codigo: "asc" } },
+  });
+
+  // PagBank = saldoInicial fixo (conta estática sem fluxos operacionais)
+  // Nubank = total caixa - PagBank (absorve todos os fluxos)
+  let pagBankBalance = 0;
+  const detalhes: { codigo: string; nome: string; valor: number }[] = [];
+
+  for (const cb of contasBancarias) {
+    if (cb.contaContabil.codigo === "1.1.1.01") {
+      // Nubank — será calculado depois
+      continue;
+    } else {
+      // PagBank e outras contas estáticas
+      const bal = Number(cb.saldoInicial);
+      pagBankBalance += bal;
+      detalhes.push({ codigo: cb.contaContabil.codigo, nome: cb.contaContabil.nome, valor: round2(bal) });
+    }
+  }
+
+  // Nubank = total - contas estáticas
+  const nubankBalance = round2(totalCaixa - pagBankBalance);
+  detalhes.unshift({ codigo: "1.1.1.01", nome: "Nubank (Pix)", valor: nubankBalance });
 
   return { total: round2(totalCaixa), detalhes };
 }

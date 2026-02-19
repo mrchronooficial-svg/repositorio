@@ -11,6 +11,7 @@ const CHAVES_CONFIGURACAO = [
   "dias_alerta_envio",
   "ALIQUOTA_SIMPLES",
   "CAPITAL_SOCIAL",
+  "SALDO_INICIAL_CAIXA",
 ] as const;
 
 type ChaveConfiguracao = (typeof CHAVES_CONFIGURACAO)[number];
@@ -24,6 +25,7 @@ const VALORES_PADRAO: Record<ChaveConfiguracao, string> = {
   dias_alerta_envio: "3",
   ALIQUOTA_SIMPLES: "auto",
   CAPITAL_SOCIAL: "70273.40",
+  SALDO_INICIAL_CAIXA: "105690.65",
 };
 
 export const configuracaoRouter = router({
@@ -112,10 +114,10 @@ export const configuracaoRouter = router({
         }
       }
 
-      if (input.chave === "CAPITAL_SOCIAL") {
+      if (input.chave === "CAPITAL_SOCIAL" || input.chave === "SALDO_INICIAL_CAIXA") {
         const valor = parseFloat(input.valor);
-        if (isNaN(valor) || valor < 0) {
-          throw new Error("Capital Social deve ser um valor monetario positivo");
+        if (isNaN(valor)) {
+          throw new Error(`${input.chave} deve ser um valor monetario valido`);
         }
       }
 
