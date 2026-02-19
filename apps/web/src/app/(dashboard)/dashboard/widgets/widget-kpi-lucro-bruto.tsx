@@ -17,7 +17,7 @@ export function WidgetKpiLucroBruto({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
-          Lucro Bruto do Mes
+          Lucro Bruto do Mês
         </CardTitle>
         <TrendingUp className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
@@ -26,7 +26,10 @@ export function WidgetKpiLucroBruto({
           {formatCurrency(lucroBrutoMes)}
         </div>
         <p className="text-xs text-muted-foreground">
-          {formatCurrency(lucroBrutoPorPeca)} por peca
+          {formatCurrency(lucroBrutoPorPeca)} por peça
+        </p>
+        <p className="text-[10px] text-muted-foreground/60 mt-1">
+          Já deduz impostos, MDR e manutenção
         </p>
       </CardContent>
     </Card>

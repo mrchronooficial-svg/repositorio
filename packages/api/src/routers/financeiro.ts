@@ -1867,9 +1867,16 @@ export const financeiroRouter = router({
       Number(repassesPendentes._sum.valorRepasseDevido || 0) -
       Number(repassesPendentes._sum.valorRepasseFeito || 0);
 
-    // Simples Nacional atual
+    // Simples Nacional atual — respeitar taxa manual se configurada
     const rbt12 = await calcularRBT12();
-    const aliquotaSimples = calcularAliquotaEfetiva(rbt12);
+    const configAliquota = await prisma.configuracao.findUnique({
+      where: { chave: "ALIQUOTA_SIMPLES" },
+    });
+    const aliquotaConfig = configAliquota?.valor || "auto";
+    const aliquotaModo: "auto" | "manual" = aliquotaConfig === "auto" ? "auto" : "manual";
+    const aliquotaSimples = aliquotaModo === "manual"
+      ? parseFloat(aliquotaConfig) / 100
+      : calcularAliquotaEfetiva(rbt12);
 
     // Evolução mensal (últimos 6 meses)
     const evolucao = [];
@@ -1907,6 +1914,7 @@ export const financeiroRouter = router({
       vendasPendentes: recebiveis.length,
       rbt12,
       aliquotaSimples,
+      aliquotaModo,
       evolucao,
     };
   }),

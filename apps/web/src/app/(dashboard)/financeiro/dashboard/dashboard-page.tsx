@@ -244,7 +244,9 @@ export function DashboardFinanceiroPage() {
               {formatPercent(dashboard.aliquotaSimples * 100)}
             </p>
             <p className="text-xs text-muted-foreground">
-              RBT12: {formatCurrency(dashboard.rbt12)}
+              {dashboard.aliquotaModo === "manual"
+                ? "Taxa fixa configurada"
+                : `RBT12: ${formatCurrency(dashboard.rbt12)}`}
             </p>
           </CardContent>
         </Card>

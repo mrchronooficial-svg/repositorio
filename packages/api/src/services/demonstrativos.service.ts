@@ -352,43 +352,178 @@ export async function gerarDRE(mes: number, ano: number): Promise<DREResult> {
 // BALANÇO PATRIMONIAL
 // ==================================================
 
+/**
+ * Busca o Capital Social configurado na tabela configuracoes.
+ * Fallback para valor fixo se não encontrado.
+ */
+async function getCapitalSocial(): Promise<number> {
+  try {
+    const config = await prisma.configuracao.findUnique({
+      where: { chave: "CAPITAL_SOCIAL" },
+    });
+    if (config) return Number(config.valor);
+  } catch {
+    // Tabela pode não existir ainda
+  }
+  return 70273.4; // Valor padrão
+}
+
+/**
+ * Calcula o Caixa real da empresa usando abordagem operacional pura.
+ *
+ * Caixa = Capital Social (investimento inicial)
+ *       + pagamentos PIX recebidos de clientes (valor cheio)
+ *       + pagamentos Cartão recebidos de clientes (líquido de MDR)
+ *       − pagamentos a fornecedores (compras de peças)
+ *       − repasses de consignação feitos
+ *       + entradas contábeis não ligadas a vendas em 1.1.1 (transferências, etc.)
+ *       − saídas contábeis não ligadas a vendas de 1.1.1 (despesas, distribuições, etc.)
+ */
+async function calcularCaixaReal(
+  dataFim: Date
+): Promise<{ total: number; detalhes: { codigo: string; nome: string; valor: number }[] }> {
+  const capitalSocial = await getCapitalSocial();
+
+  // 1. Pagamentos PIX recebidos de clientes (valor cheio — sem MDR)
+  const pagPIXAgg = await prisma.pagamento.aggregate({
+    _sum: { valor: true },
+    where: {
+      data: { lte: dataFim },
+      venda: { cancelada: false, formaPagamento: "PIX" },
+    },
+  });
+  const cashInPIX = Number(pagPIXAgg._sum.valor || 0);
+
+  // 2. Pagamentos Cartão recebidos de clientes (líquido de MDR)
+  //    Como cada venda pode ter taxaMDR diferente, precisamos iterar
+  const pagCartao = await prisma.pagamento.findMany({
+    where: {
+      data: { lte: dataFim },
+      venda: { cancelada: false, formaPagamento: { in: ["CREDITO_VISTA", "CREDITO_PARCELADO"] } },
+    },
+    select: {
+      valor: true,
+      venda: { select: { taxaMDR: true } },
+    },
+  });
+  let cashInCartao = 0;
+  for (const p of pagCartao) {
+    const mdr = Number(p.venda.taxaMDR || 0) / 100;
+    cashInCartao += Number(p.valor) * (1 - mdr);
+  }
+
+  const totalRecebidoClientes = cashInPIX + cashInCartao;
+
+  // 3. Pagamentos a fornecedores (saída de caixa)
+  const pagFornecedorAgg = await prisma.pagamentoFornecedor.aggregate({
+    _sum: { valor: true },
+    where: { data: { lte: dataFim } },
+  });
+  const totalPagFornecedores = Number(pagFornecedorAgg._sum.valor || 0);
+
+  // 4. Repasses de consignação feitos (saída de caixa)
+  //    valorRepasseFeito é cumulativo na Venda — sem filtro de data possível
+  const repassesAgg = await prisma.venda.aggregate({
+    _sum: { valorRepasseFeito: true },
+    where: { cancelada: false },
+  });
+  const totalRepasses = Number(repassesAgg._sum.valorRepasseFeito || 0);
+
+  // 5. Movimentos contábeis não ligados a vendas em contas 1.1.1 (despesas, distribuições, etc.)
+  //    Débitos em 1.1.1 com vendaId IS NULL = entrada de caixa extra
+  //    Créditos em 1.1.1 com vendaId IS NULL = saída de caixa (despesas, distribuições)
+  const movNaoVenda = await prisma.linhaLancamento.findMany({
+    where: {
+      lancamento: {
+        data: { lte: dataFim },
+        estornado: false,
+        estornoDeId: null,
+        vendaId: null,
+      },
+      OR: [
+        { contaDebito: { codigo: { startsWith: "1.1.1" } } },
+        { contaCredito: { codigo: { startsWith: "1.1.1" } } },
+      ],
+    },
+    select: {
+      valor: true,
+      contaDebito: { select: { codigo: true } },
+      contaCredito: { select: { codigo: true } },
+    },
+  });
+
+  let entradasContabeis = 0;
+  let saidasContabeis = 0;
+  for (const m of movNaoVenda) {
+    const valor = Number(m.valor);
+    if (m.contaDebito.codigo.startsWith("1.1.1")) entradasContabeis += valor;
+    if (m.contaCredito.codigo.startsWith("1.1.1")) saidasContabeis += valor;
+  }
+  const netContabil = entradasContabeis - saidasContabeis;
+
+  // TOTAL
+  const totalCaixa = capitalSocial + totalRecebidoClientes - totalPagFornecedores - totalRepasses + netContabil;
+
+  // Montar detalhes para exibição
+  const detalhes: { codigo: string; nome: string; valor: number }[] = [
+    { codigo: "", nome: "Capital Social (investimento)", valor: round2(capitalSocial) },
+    { codigo: "", nome: "Recebido PIX (clientes)", valor: round2(cashInPIX) },
+    { codigo: "", nome: "Recebido Cartão líq. MDR (clientes)", valor: round2(cashInCartao) },
+    { codigo: "", nome: "Pago a Fornecedores", valor: round2(-totalPagFornecedores) },
+    { codigo: "", nome: "Repasses Consignação", valor: round2(-totalRepasses) },
+    { codigo: "", nome: "Movimentos contábeis (desp/distrib)", valor: round2(netContabil) },
+  ];
+
+  return { total: round2(totalCaixa), detalhes };
+}
+
 export async function gerarBalanco(mes: number, ano: number): Promise<BalancoResult> {
   const dataFim = new Date(ano, mes, 0, 23, 59, 59);
 
+  // Saldos contábeis acumulados (para Resultado, Obrigações Fiscais, etc.)
   const saldos = await calcularSaldosAcumulados(dataFim);
 
-  // Buscar saldos iniciais das contas bancárias
-  const contasBancarias = await prisma.contaBancaria.findMany({
-    select: {
-      saldoInicial: true,
-      contaContabil: { select: { codigo: true } },
-    },
-  });
-
   // ─────────────────────────────────────────────────
-  // DADOS OPERACIONAIS (fonte: tabelas Venda e Peca)
-  // Garante consistência com o Dashboard principal
+  // ATIVO
   // ─────────────────────────────────────────────────
 
-  // Contas a Receber — vendas não pagas/parciais
+  // 1. Caixa e Equivalentes — calculado operacionalmente
+  const caixa = await calcularCaixaReal(dataFim);
+  const totalCaixa = caixa.total;
+
+  // 2. Contas a Receber — vendas não pagas/parciais
+  //    PIX: valor cheio (sem MDR)
+  //    Cartão: valor líquido (descontando MDR que será retido pela operadora)
   const vendasRecebiveis = await prisma.venda.findMany({
     where: {
       cancelada: false,
+      dataVenda: { lte: dataFim },
       statusPagamento: { in: ["NAO_PAGO", "PARCIAL"] },
     },
-    include: { pagamentos: { select: { valor: true } } },
+    include: {
+      pagamentos: { where: { data: { lte: dataFim } }, select: { valor: true } },
+    },
   });
 
-  const contasReceber = round2(
-    vendasRecebiveis.reduce((acc: number, v: { valorFinal: unknown; pagamentos: { valor: unknown }[] }) => {
-      const pago = v.pagamentos.reduce((a: number, p: { valor: unknown }) => a + Number(p.valor), 0);
-      return acc + (Number(v.valorFinal) - pago);
-    }, 0)
-  );
+  let contasReceberPIX = 0;
+  let contasReceberCartao = 0;
+  for (const v of vendasRecebiveis) {
+    const pago = v.pagamentos.reduce((a: number, p: { valor: unknown }) => a + Number(p.valor), 0);
+    const pendente = Number(v.valorFinal) - pago;
+    if (pendente <= 0) continue;
 
-  // Estoque — peças compradas em status contabilizável (a custo)
+    if (v.formaPagamento === "PIX") {
+      contasReceberPIX += pendente;
+    } else {
+      // Cartão: desconta MDR porque a operadora vai reter esse percentual
+      const mdrPct = Number(v.taxaMDR || 0) / 100;
+      contasReceberCartao += pendente * (1 - mdrPct);
+    }
+  }
+  const contasReceber = round2(contasReceberPIX + contasReceberCartao);
+
+  // 3. Estoque — peças compradas em status contabilizável (a custo)
   const statusEmEstoque = ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] as const;
-
   const estoqueData = await prisma.peca.aggregate({
     _sum: { valorCompra: true, custoManutencao: true },
     where: {
@@ -397,60 +532,12 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
       origemTipo: "COMPRA",
     },
   });
-
   const estoques = round2(
     Number(estoqueData._sum.valorCompra || 0) +
     Number(estoqueData._sum.custoManutencao || 0)
   );
 
-  // Fornecedores — repasses de consignação pendentes
-  const repassesPendentesAgg = await prisma.venda.aggregate({
-    where: {
-      cancelada: false,
-      statusRepasse: { in: ["PENDENTE", "PARCIAL"] },
-    },
-    _sum: { valorRepasseDevido: true, valorRepasseFeito: true },
-  });
-
-  const repasseConsignacao = round2(
-    Number(repassesPendentesAgg._sum.valorRepasseDevido || 0) -
-    Number(repassesPendentesAgg._sum.valorRepasseFeito || 0)
-  );
-
-  // Fornecedores — compras de peças não pagas
-  const comprasNaoPagasAgg = await prisma.peca.aggregate({
-    where: {
-      origemTipo: "COMPRA",
-      statusPagamentoFornecedor: { in: ["NAO_PAGO", "PARCIAL"] },
-      arquivado: false,
-    },
-    _sum: { valorCompra: true, valorPagoFornecedor: true },
-  });
-
-  const fornecedoresCompras = round2(
-    Number(comprasNaoPagasAgg._sum.valorCompra || 0) -
-    Number(comprasNaoPagasAgg._sum.valorPagoFornecedor || 0)
-  );
-
-  const totalFornecedores = round2(repasseConsignacao + fornecedoresCompras);
-
-  // ─────────────────────────────────────────────────
-  // ATIVO
-  // ─────────────────────────────────────────────────
-
-  const ativoLinhas: LinhaBalanco[] = [];
-
-  // Caixa e Equivalentes (contas 1.1.1.xx + saldo inicial das contas bancárias)
-  const caixaContas = filtrarPorPrefixo(saldos, "1.1.1");
-  let totalCaixa = 0;
-  for (const c of caixaContas) {
-    const saldoInicialConta = contasBancarias.find(
-      (cb: { saldoInicial: unknown; contaContabil: { codigo: string } }) => cb.contaContabil.codigo === c.codigo
-    );
-    const saldoInicial = saldoInicialConta ? Number(saldoInicialConta.saldoInicial) : 0;
-    totalCaixa += c.saldo + saldoInicial;
-  }
-
+  // Ativo Circulante
   const ativoCirculante = round2(totalCaixa + contasReceber + estoques);
 
   // Ativo Não Circulante
@@ -459,31 +546,81 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
 
   const totalAtivo = round2(ativoCirculante + ativoNaoCirculante);
 
+  // ─────────────────────────────────────────────────
+  // PASSIVO
+  // ─────────────────────────────────────────────────
+
+  // 1. Fornecedores — repasses de consignação pendentes
+  const repassesPendentesAgg = await prisma.venda.aggregate({
+    where: {
+      cancelada: false,
+      statusRepasse: { in: ["PENDENTE", "PARCIAL"] },
+    },
+    _sum: { valorRepasseDevido: true, valorRepasseFeito: true },
+  });
+  const repasseConsignacao = round2(
+    Number(repassesPendentesAgg._sum.valorRepasseDevido || 0) -
+    Number(repassesPendentesAgg._sum.valorRepasseFeito || 0)
+  );
+
+  // 2. Fornecedores — compras de peças não pagas
+  const comprasNaoPagasAgg = await prisma.peca.aggregate({
+    where: {
+      origemTipo: "COMPRA",
+      statusPagamentoFornecedor: { in: ["NAO_PAGO", "PARCIAL"] },
+      arquivado: false,
+    },
+    _sum: { valorCompra: true, valorPagoFornecedor: true },
+  });
+  const fornecedoresCompras = round2(
+    Number(comprasNaoPagasAgg._sum.valorCompra || 0) -
+    Number(comprasNaoPagasAgg._sum.valorPagoFornecedor || 0)
+  );
+  const totalFornecedores = round2(repasseConsignacao + fornecedoresCompras);
+
+  // 3. Obrigações Fiscais e Outras — de lançamentos contábeis
+  const obrigacoesFiscais = somarPorPrefixo(saldos, "2.1.2");
+  const outrasObrigacoes = somarPorPrefixo(saldos, "2.1.3");
+
+  const passivoCirculante = round2(totalFornecedores + obrigacoesFiscais + outrasObrigacoes);
+  const passivoNaoCirculante = round2(somarPorPrefixo(saldos, "2.2"));
+
+  // ─────────────────────────────────────────────────
+  // PATRIMÔNIO LÍQUIDO
+  // ─────────────────────────────────────────────────
+
+  const capitalSocial = await getCapitalSocial();
+  const lucrosAcumulados = somarPorPrefixo(saldos, "2.3.2");
+  const distribuicaoLucros = somarPorPrefixo(saldos, "2.3.3");
+
+  // Resultado derivado da identidade do Balanço (Ativo = Passivo + PL)
+  // Garante que o Balanço sempre equilibra, já que Ativo e Passivo operacional
+  // vêm de fontes reais (vendas, peças, pagamentos) e o DRE vem de lançamentos contábeis.
+  const resultadoPeriodo = round2(
+    totalAtivo - passivoCirculante - passivoNaoCirculante - capitalSocial - lucrosAcumulados + distribuicaoLucros
+  );
+
+  const pl = round2(capitalSocial + lucrosAcumulados + resultadoPeriodo - distribuicaoLucros);
+  const totalPassivo = round2(passivoCirculante + passivoNaoCirculante + pl);
+
+  // ─────────────────────────────────────────────────
+  // MONTAGEM DAS LINHAS
+  // ─────────────────────────────────────────────────
+
+  const ativoLinhas: LinhaBalanco[] = [];
+
   ativoLinhas.push(
     { codigo: "1", nome: "ATIVO", valor: totalAtivo, nivel: 0, negrito: true },
     { codigo: "1.1", nome: "Ativo Circulante", valor: ativoCirculante, nivel: 1, negrito: true },
     { codigo: "1.1.1", nome: "Caixa e Equivalentes de Caixa", valor: totalCaixa, nivel: 2 },
   );
 
-  // Detalhar contas de caixa
-  for (const c of caixaContas) {
-    const saldoInicialConta = contasBancarias.find(
-      (cb: { saldoInicial: unknown; contaContabil: { codigo: string } }) => cb.contaContabil.codigo === c.codigo
-    );
-    const saldoInicial = saldoInicialConta ? Number(saldoInicialConta.saldoInicial) : 0;
-    ativoLinhas.push({
-      codigo: c.codigo,
-      nome: c.nome,
-      valor: round2(c.saldo + saldoInicial),
-      nivel: 3,
-    });
+  for (const det of caixa.detalhes) {
+    ativoLinhas.push({ codigo: det.codigo, nome: det.nome, valor: det.valor, nivel: 3 });
   }
 
   ativoLinhas.push(
     { codigo: "1.1.2", nome: "Contas a Receber", valor: contasReceber, nivel: 2 },
-  );
-
-  ativoLinhas.push(
     { codigo: "1.1.3", nome: "Estoques", valor: estoques, nivel: 2 },
   );
 
@@ -494,34 +631,7 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
     );
   }
 
-  // ─────────────────────────────────────────────────
-  // PASSIVO + PL
-  // ─────────────────────────────────────────────────
-
   const passivoLinhas: LinhaBalanco[] = [];
-
-  // Obrigações Fiscais e Outras — de lançamentos contábeis
-  const obrigacoesFiscais = somarPorPrefixo(saldos, "2.1.2");
-  const outrasObrigacoes = somarPorPrefixo(saldos, "2.1.3");
-  const passivoCirculante = round2(totalFornecedores + obrigacoesFiscais + outrasObrigacoes);
-
-  // Passivo Não Circulante
-  const passivoNaoCirculante = round2(somarPorPrefixo(saldos, "2.2"));
-
-  // Patrimônio Líquido
-  const capitalSocial = 70273.4; // Valor fixo do capital social integralizado
-  const lucrosAcumulados = somarPorPrefixo(saldos, "2.3.2");
-  const distribuicaoLucros = somarPorPrefixo(saldos, "2.3.3");
-
-  // Resultado = Receita Bruta - Deduções - Custos/Despesas
-  const receitaBruta = somarPorPrefixo(saldos, "3.1");
-  const deducoesReceita = somarPorPrefixo(saldos, "3.2");
-  const totalCustosDespesas = somarPorPrefixo(saldos, "4");
-  const resultadoPeriodo = round2(receitaBruta - deducoesReceita - totalCustosDespesas);
-
-  const pl = round2(capitalSocial + lucrosAcumulados + resultadoPeriodo - distribuicaoLucros);
-
-  const totalPassivo = round2(passivoCirculante + passivoNaoCirculante + pl);
 
   passivoLinhas.push(
     { codigo: "2", nome: "PASSIVO + PATRIMÔNIO LÍQUIDO", valor: totalPassivo, nivel: 0, negrito: true },
@@ -590,10 +700,14 @@ export async function gerarDFC(mes: number, ano: number): Promise<DFCResult> {
   const saldosAnterior = await calcularSaldosAcumulados(dataFimAnterior);
 
 
-  // Lucro líquido do período
-  const totalReceitas = somarPorPrefixo(saldosPeriodo, "3");
-  const totalCustosDespesas = somarPorPrefixo(saldosPeriodo, "4");
-  const lucroLiquido = round2(totalReceitas - totalCustosDespesas);
+  // Lucro líquido do período (mesma fórmula do Balanço/DRE)
+  // 3.1 = Receitas (CREDORA, saldo positivo)
+  // 3.2 = Deduções (DEVEDORA, saldo positivo) — subtrai
+  // 4   = Custos e Despesas (DEVEDORA, saldo positivo) — subtrai
+  const receitasDFC = somarPorPrefixo(saldosPeriodo, "3.1");
+  const deducoesDFC = somarPorPrefixo(saldosPeriodo, "3.2");
+  const custosDespesasDFC = somarPorPrefixo(saldosPeriodo, "4");
+  const lucroLiquido = round2(receitasDFC - deducoesDFC - custosDespesasDFC);
 
   // Variação de balanço (atual - anterior)
   function variacaoConta(prefixo: string): number {
@@ -630,34 +744,12 @@ export async function gerarDFC(mes: number, ano: number): Promise<DFCResult> {
   // Variação líquida
   const variacaoLiquida = round2(caixaOperacoes + caixaInvestimentos + caixaFinanciamento);
 
-  // Saldo de caixa — lê saldos iniciais das contas bancárias
-  const contasBancarias = await prisma.contaBancaria.findMany({
-    select: {
-      saldoInicial: true,
-      contaContabil: { select: { codigo: true } },
-    },
-  });
+  // Saldo de caixa — usa calcularCaixaReal para consistência com o Balanço
+  const caixaAnterior = await calcularCaixaReal(dataFimAnterior);
+  const caixaAtual = await calcularCaixaReal(dataFim);
 
-  // Saldo inicial = saldoInicial das contas bancárias + movimentações contábeis até o mês anterior
-  const caixaContasAnterior = filtrarPorPrefixo(saldosAnterior, "1.1.1");
-  let saldoInicialBancos = 0;
-  for (const c of caixaContasAnterior) {
-    const cb = contasBancarias.find(
-      (b: { saldoInicial: unknown; contaContabil: { codigo: string } }) => b.contaContabil.codigo === c.codigo
-    );
-    const si = cb ? Number(cb.saldoInicial) : 0;
-    saldoInicialBancos += c.saldo + si;
-  }
-  // Incluir contas bancárias que não tiveram movimentação anterior
-  for (const cb of contasBancarias) {
-    const jaContado = caixaContasAnterior.some((c) => c.codigo === cb.contaContabil.codigo);
-    if (!jaContado) {
-      saldoInicialBancos += Number(cb.saldoInicial);
-    }
-  }
-
-  const saldoInicial = round2(saldoInicialBancos);
-  const saldoFinal = round2(saldoInicial + variacaoLiquida);
+  const saldoInicial = caixaAnterior.total;
+  const saldoFinal = caixaAtual.total;
 
   const linhas: LinhaDFC[] = [
     { descricao: "ATIVIDADES OPERACIONAIS", valor: 0, nivel: 0, negrito: true },

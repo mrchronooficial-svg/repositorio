@@ -1,5 +1,9 @@
 import { protectedProcedure, router } from "../index";
 import prisma from "@gestaomrchrono/db";
+import {
+  calcularRBT12,
+  calcularImpostoVenda,
+} from "../services/simples-nacional.service";
 
 export const dashboardRouter = router({
   // Metricas principais do dashboard
@@ -144,7 +148,16 @@ export const dashboardRouter = router({
           select: {
             valorFinal: true,
             valorRepasseDevido: true,
-            peca: { select: { origemTipo: true, valorCompra: true } },
+            formaPagamento: true,
+            taxaMDR: true,
+            dataVenda: true,
+            peca: {
+              select: {
+                origemTipo: true,
+                valorCompra: true,
+                custoManutencao: true,
+              },
+            },
           },
         }),
         // Vendas mes anterior (para calcular faturamento real)
@@ -228,6 +241,7 @@ export const dashboardRouter = router({
       const ticketMedio = vendasMes > 0 ? faturamentoMes / vendasMes : 0;
 
       // Calcular lucro bruto (apenas para admin)
+      // Deduz: custo de aquisição/repasse, MDR, Simples Nacional, custoManutencao (relojoeiro/restauro)
       let lucroBrutoMes: number | null = null;
       let margemBrutaMes: number | null = null;
       let lucroBrutoPorPeca: number | null = null;
@@ -238,18 +252,56 @@ export const dashboardRouter = router({
           0
         );
 
+        // Buscar configuração de alíquota do Simples
+        const configAliquota = await prisma.configuracao.findUnique({
+          where: { chave: "ALIQUOTA_SIMPLES" },
+        });
+        const aliquotaConfig = configAliquota?.valor || "auto";
+
+        // Se automático, calcular RBT12 uma vez para todas as vendas do mês
+        let rbt12: number | null = null;
+        if (aliquotaConfig === "auto" && vendasMesResult.length > 0) {
+          rbt12 = await calcularRBT12();
+        }
+
         lucroBrutoMes = vendasMesResult.reduce((total, v) => {
           const valorFinal = Number(v.valorFinal) || 0;
           const origemTipo = v.peca.origemTipo;
+          const custoManutencao = Number(v.peca.custoManutencao) || 0;
 
+          // 1. Margem bruta base (receita - custo de aquisição/repasse)
+          let lucroVenda: number;
+          let baseSimples: number;
           if (origemTipo === "CONSIGNACAO") {
             const valorRepasse = Number(v.valorRepasseDevido) || 0;
-            return total + (valorFinal - valorRepasse);
+            lucroVenda = valorFinal - valorRepasse;
+            baseSimples = valorFinal - valorRepasse; // margem
           } else {
-            // COMPRA
             const valorCompra = Number(v.peca.valorCompra) || 0;
-            return total + (valorFinal - valorCompra);
+            lucroVenda = valorFinal - valorCompra;
+            baseSimples = valorFinal; // valor total da venda
           }
+
+          // 2. Deduzir MDR (taxa de cartão)
+          const taxaMDR = Number(v.taxaMDR) || 0;
+          if (v.formaPagamento !== "PIX" && taxaMDR > 0) {
+            const valorMDR = Math.round(valorFinal * (taxaMDR / 100) * 100) / 100;
+            lucroVenda -= valorMDR;
+          }
+
+          // 3. Deduzir Simples Nacional
+          if (aliquotaConfig !== "auto") {
+            const aliquotaEfetiva = parseFloat(aliquotaConfig) / 100;
+            lucroVenda -= Math.round(baseSimples * aliquotaEfetiva * 100) / 100;
+          } else if (rbt12 !== null) {
+            const { valorImposto } = calcularImpostoVenda(baseSimples, rbt12);
+            lucroVenda -= valorImposto;
+          }
+
+          // 4. Deduzir custo de manutenção (relojoeiro/restauro)
+          lucroVenda -= custoManutencao;
+
+          return total + lucroVenda;
         }, 0);
 
         margemBrutaMes =
