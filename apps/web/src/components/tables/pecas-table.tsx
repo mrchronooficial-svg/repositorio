@@ -114,6 +114,7 @@ interface PecasTableProps {
   podeExcluir?: boolean;
   onView: (id: string) => void;
   onStatusClick?: (peca: PecaStatusInfo) => void;
+  onLocationClick?: (peca: PecaStatusInfo) => void;
   onDelete?: (id: string) => Promise<void>;
   onToggleCatalogo?: (id: string, exibir: boolean) => void;
   onPgtoClick?: (peca: PecaPgtoInfo) => void;
@@ -130,6 +131,7 @@ export function PecasTable({
   podeExcluir = false,
   onView,
   onStatusClick,
+  onLocationClick,
   onDelete,
   onToggleCatalogo,
   onPgtoClick,
@@ -419,7 +421,25 @@ export function PecasTable({
                 <StatusBadge type="peca" status={peca.status} size="sm" />
               </div>
             </TableCell>
-            <TableCell className="text-sm">{peca.localizacao}</TableCell>
+            <TableCell className="text-sm">
+              <span
+                className={onLocationClick ? "cursor-pointer hover:underline hover:text-primary inline-flex items-center gap-1 transition-colors" : ""}
+                onClick={(e) => {
+                  if (onLocationClick) {
+                    e.stopPropagation();
+                    onLocationClick({
+                      id: peca.id,
+                      sku: peca.sku,
+                      status: peca.status,
+                      localizacao: peca.localizacao,
+                    });
+                  }
+                }}
+                title={onLocationClick ? "Clique para alterar localizacao" : undefined}
+              >
+                {peca.localizacao}
+              </span>
+            </TableCell>
             {podeVerValores && (
               <TableCell>
                 <div

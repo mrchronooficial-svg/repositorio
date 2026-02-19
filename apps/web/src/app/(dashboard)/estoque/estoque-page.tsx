@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { PecasTable } from "@/components/tables/pecas-table";
 import type { ColumnFilters, ColumnFilterCallbacks, PecaPgtoInfo } from "@/components/tables/pecas-table";
 import { StatusDialog } from "@/components/dialogs/status-dialog";
+import { LocationDialog } from "@/components/dialogs/location-dialog";
 import { PagamentoFornecedorDialog } from "@/components/dialogs/pagamento-fornecedor-dialog";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -72,6 +73,10 @@ export function EstoquePage() {
   // Status dialog
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [selectedPeca, setSelectedPeca] = useState<SelectedPeca | null>(null);
+
+  // Location dialog
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  const [selectedLocationPeca, setSelectedLocationPeca] = useState<SelectedPeca | null>(null);
 
   // Pgto fornecedor dialog
   const [pgtoDialogOpen, setPgtoDialogOpen] = useState(false);
@@ -151,6 +156,15 @@ export function EstoquePage() {
   const handleStatusSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
     queryClient.invalidateQueries({ queryKey: ["peca", "getMetricas"] });
+  };
+
+  const handleLocationClick = (peca: SelectedPeca) => {
+    setSelectedLocationPeca(peca);
+    setLocationDialogOpen(true);
+  };
+
+  const handleLocationSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["peca", "list"] });
   };
 
   const handlePgtoClick = (info: PecaPgtoInfo) => {
@@ -359,6 +373,7 @@ export function EstoquePage() {
         podeExcluir={podeExcluir}
         onView={(id) => router.push(`/estoque/${id}` as Route)}
         onStatusClick={handleStatusClick}
+        onLocationClick={handleLocationClick}
         onDelete={handleDelete}
         onToggleCatalogo={handleToggleCatalogo}
         onPgtoClick={podeVerValores ? handlePgtoClick : undefined}
@@ -399,6 +414,18 @@ export function EstoquePage() {
           currentStatus={selectedPeca.status}
           currentLocalizacao={selectedPeca.localizacao}
           onSuccess={handleStatusSuccess}
+        />
+      )}
+
+      {/* Dialog de alteracao de localizacao */}
+      {selectedLocationPeca && (
+        <LocationDialog
+          open={locationDialogOpen}
+          onOpenChange={setLocationDialogOpen}
+          pecaId={selectedLocationPeca.id}
+          currentStatus={selectedLocationPeca.status}
+          currentLocalizacao={selectedLocationPeca.localizacao}
+          onSuccess={handleLocationSuccess}
         />
       )}
 
