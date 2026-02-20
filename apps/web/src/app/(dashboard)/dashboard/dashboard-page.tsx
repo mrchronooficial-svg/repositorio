@@ -30,6 +30,7 @@ import { WidgetKpiEstoqueCusto } from "./widgets/widget-kpi-estoque-custo";
 import { WidgetKpiEstoqueFaturamento } from "./widgets/widget-kpi-estoque-faturamento";
 import { WidgetGraficos } from "./widgets/widget-graficos";
 import { WidgetListas } from "./widgets/widget-listas";
+import { WidgetPaceVendas } from "./widgets/widget-pace-vendas";
 import { WidgetRecebiveis } from "./widgets/widget-recebiveis";
 import { WidgetDividas } from "./widgets/widget-dividas";
 import { ModalRecebiveis } from "./widgets/modal-recebiveis";
@@ -101,6 +102,9 @@ export function DashboardPage() {
   const { data: utensilios } = useQuery(
     trpc.utensilio.list.queryOptions()
   );
+  const { data: paceVendas, isLoading: isLoadingPace } = useQuery(
+    trpc.dashboard.getPaceVendas.queryOptions()
+  );
   const { data: valorEstoque } = useQuery(
     trpc.dashboard.getMetricasValorEstoque.queryOptions()
   );
@@ -131,6 +135,7 @@ export function DashboardPage() {
     kpiEstoqueFaturamento: podeVerValores && !!valorEstoque,
     kpiClientes: !podeVerValores,
     kpiEmRevisao: !podeVerValores,
+    paceVendas: true,
     graficos: true,
     listas: true,
     recebiveis: podeVerValores && !!recebiveis && recebiveis.length > 0,
@@ -287,6 +292,14 @@ export function DashboardPage() {
             metricas={metricas as any}
           />
         ) : null;
+
+      case "paceVendas":
+        return (
+          <WidgetPaceVendas
+            data={paceVendas as any}
+            isLoading={isLoadingPace}
+          />
+        );
 
       case "listas":
         return (

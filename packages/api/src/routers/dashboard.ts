@@ -634,6 +634,59 @@ export const dashboardRouter = router({
     };
   }),
 
+  // Pace de vendas diario por mes (cumulativo)
+  getPaceVendas: protectedProcedure.query(async () => {
+    const hoje = new Date();
+    const mesesAtras = 9;
+    const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - mesesAtras + 1, 1);
+
+    const vendas = await prisma.venda.findMany({
+      where: {
+        cancelada: false,
+        dataVenda: { gte: inicio },
+      },
+      select: { dataVenda: true },
+      orderBy: { dataVenda: "asc" },
+    });
+
+    // Agrupar por ano-mes, depois contar por dia
+    const mesesMap = new Map<string, { mes: string; ano: number; contagemPorDia: Map<number, number> }>();
+    const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+    for (const v of vendas) {
+      const d = new Date(v.dataVenda);
+      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      if (!mesesMap.has(key)) {
+        mesesMap.set(key, {
+          mes: nomesMeses[d.getMonth()]!,
+          ano: d.getFullYear(),
+          contagemPorDia: new Map(),
+        });
+      }
+      const entry = mesesMap.get(key)!;
+      const dia = d.getDate();
+      entry.contagemPorDia.set(dia, (entry.contagemPorDia.get(dia) || 0) + 1);
+    }
+
+    // Converter para formato cumulativo
+    const resultado = Array.from(mesesMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, entry]) => {
+        const dados: Array<{ dia: number; acumulado: number }> = [];
+        let acumulado = 0;
+        // Descobrir o ultimo dia do mes
+        const mesIdx = nomesMeses.indexOf(entry.mes);
+        const ultimoDia = new Date(entry.ano, mesIdx + 1, 0).getDate();
+        for (let dia = 1; dia <= ultimoDia; dia++) {
+          acumulado += entry.contagemPorDia.get(dia) || 0;
+          dados.push({ dia, acumulado });
+        }
+        return { mes: entry.mes, ano: entry.ano, dados };
+      });
+
+    return resultado;
+  }),
+
   // Recebiveis pendentes detalhados
   getRecebiveisPendentes: protectedProcedure.query(async ({ ctx }) => {
     const userNivel = ctx.session.user.nivel;
