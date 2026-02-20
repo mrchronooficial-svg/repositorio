@@ -67,12 +67,24 @@ export function WidgetPaceVendas({ data, isLoading }: WidgetPaceVendasProps) {
     );
   }
 
+  // Descobrir ultimo dia com dados por mes (mês corrente para no dia atual)
+  const hoje = new Date();
+  const mesAtual = hoje.getMonth();
+  const anoAtual = hoje.getFullYear();
+  const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
   // Construir dados para o Recharts: array de { dia, "Jun/25": N, "Jul/25": N, ... }
-  const dias = Array.from({ length: 31 }, (_, i) => i + 1);
+  // Para meses passados, mostra todos os dias; para o mês atual, só até hoje
+  const maxDia = Math.max(...mesesComVendas.map((m) => m.dados.length));
+  const dias = Array.from({ length: maxDia }, (_, i) => i + 1);
   const chartData = dias.map((dia) => {
-    const ponto: Record<string, number> = { dia };
+    const ponto: Record<string, number | undefined> = { dia };
     for (const m of mesesComVendas) {
       const key = `${m.mes}/${String(m.ano).slice(2)}`;
+      const mesIdx = nomesMeses.indexOf(m.mes);
+      const eMesAtual = m.ano === anoAtual && mesIdx === mesAtual;
+      // Se é o mês atual, não mostrar dias futuros
+      if (eMesAtual && dia > hoje.getDate()) continue;
       const d = m.dados.find((dd) => dd.dia === dia);
       if (d) ponto[key] = d.acumulado;
     }
@@ -126,8 +138,8 @@ export function WidgetPaceVendas({ data, isLoading }: WidgetPaceVendasProps) {
                 dataKey={label}
                 stroke={CORES[idx % CORES.length]}
                 strokeWidth={2}
-                dot={false}
-                connectNulls
+                dot={{ r: 3, fill: CORES[idx % CORES.length] }}
+                activeDot={{ r: 5 }}
               />
             ))}
           </LineChart>
