@@ -270,7 +270,7 @@ export function EstoquePage() {
   return (
     <div className="space-y-6">
       {/* Metricas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -307,6 +307,23 @@ export function EstoquePage() {
           <CardContent>
             <div className="text-2xl font-bold">
               {metricas?.statusCount?.REVISAO ?? 0}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Origem
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-bold">{(metricas as any)?.origemCount?.COMPRA ?? 0}</span>
+              <span className="text-xs text-muted-foreground">compra</span>
+              <span className="text-muted-foreground mx-1">/</span>
+              <span className="text-2xl font-bold">{(metricas as any)?.origemCount?.CONSIGNACAO ?? 0}</span>
+              <span className="text-xs text-muted-foreground">consig.</span>
             </div>
           </CardContent>
         </Card>

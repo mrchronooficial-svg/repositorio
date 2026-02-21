@@ -777,11 +777,21 @@ export const pecaRouter = router({
     const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
 
     // Contagem por status
-    const contagens = await prisma.peca.groupBy({
-      by: ["status"],
-      where: { arquivado: false },
-      _count: true,
-    });
+    const [contagens, contagensOrigem] = await Promise.all([
+      prisma.peca.groupBy({
+        by: ["status"],
+        where: { arquivado: false },
+        _count: true,
+      }),
+      prisma.peca.groupBy({
+        by: ["origemTipo"],
+        where: {
+          arquivado: false,
+          status: { in: ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] },
+        },
+        _count: true,
+      }),
+    ]);
 
     const statusCount: Record<string, number> = {};
     contagens.forEach((c) => {
@@ -826,8 +836,14 @@ export const pecaRouter = router({
       );
     }
 
+    const origemCount: Record<string, number> = {};
+    contagensOrigem.forEach((c) => {
+      origemCount[c.origemTipo] = c._count;
+    });
+
     return {
       statusCount,
+      origemCount,
       emEstoque,
       estoqueIdeal,
       diferenca: emEstoque - estoqueIdeal,
