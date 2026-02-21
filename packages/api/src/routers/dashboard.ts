@@ -638,7 +638,10 @@ export const dashboardRouter = router({
   getPaceVendas: protectedProcedure.query(async () => {
     const hoje = new Date();
     const mesesAtras = 9;
-    const inicio = new Date(hoje.getFullYear(), hoje.getMonth() - mesesAtras + 1, 1);
+    // Sistema começou em Fev/2025, não buscar dados anteriores
+    const inicioSistema = new Date(2025, 1, 1); // Fev 2025
+    const inicioCalc = new Date(hoje.getFullYear(), hoje.getMonth() - mesesAtras + 1, 1);
+    const inicio = inicioCalc > inicioSistema ? inicioCalc : inicioSistema;
 
     const vendas = await prisma.venda.findMany({
       where: {
