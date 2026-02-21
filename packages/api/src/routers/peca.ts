@@ -787,7 +787,7 @@ export const pecaRouter = router({
         by: ["origemTipo"],
         where: {
           arquivado: false,
-          status: { in: ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] },
+          status: { not: "VENDIDA" },
         },
         _count: true,
       }),
