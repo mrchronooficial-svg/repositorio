@@ -4,6 +4,7 @@ import {
   calcularRBT12,
   calcularImpostoVenda,
 } from "../services/simples-nacional.service";
+import { gerarDRE } from "../services/demonstrativos.service";
 
 export const dashboardRouter = router({
   // Metricas principais do dashboard
@@ -111,6 +112,8 @@ export const dashboardRouter = router({
         lucroBrutoMes: number | null;
         margemBrutaMes: number | null;
         lucroBrutoPorPeca: number | null;
+        lucroLiquidoMes: number | null;
+        lucroLiquidoPorPeca: number | null;
       } | null;
       isAdmin: boolean;
     } = {
@@ -315,6 +318,23 @@ export const dashboardRouter = router({
             : 0;
       }
 
+      // Lucro Líquido via DRE (apenas admin)
+      let lucroLiquidoMes: number | null = null;
+      let lucroLiquidoPorPeca: number | null = null;
+
+      if (userNivel === "ADMINISTRADOR") {
+        try {
+          const dre = await gerarDRE(hoje.getMonth() + 1, hoje.getFullYear());
+          lucroLiquidoMes = dre.resumo.lucroLiquido;
+          lucroLiquidoPorPeca =
+            vendasMes > 0
+              ? Math.round((dre.resumo.lucroLiquido / vendasMes) * 100) / 100
+              : 0;
+        } catch {
+          // DRE pode falhar se não há dados financeiros ainda
+        }
+      }
+
       resultado.financeiro = {
         faturamentoMes,
         faturamentoMesAnterior,
@@ -326,6 +346,8 @@ export const dashboardRouter = router({
         lucroBrutoMes,
         margemBrutaMes,
         lucroBrutoPorPeca,
+        lucroLiquidoMes,
+        lucroLiquidoPorPeca,
       };
     }
 

@@ -26,6 +26,7 @@ import { WidgetKpiClientes } from "./widgets/widget-kpi-clientes";
 import { WidgetKpiEmRevisao } from "./widgets/widget-kpi-em-revisao";
 import { WidgetKpiLucroBruto } from "./widgets/widget-kpi-lucro-bruto";
 import { WidgetKpiMargemBruta } from "./widgets/widget-kpi-margem-bruta";
+import { WidgetKpiLucroLiquido } from "./widgets/widget-kpi-lucro-liquido";
 import { WidgetKpiEstoqueCusto } from "./widgets/widget-kpi-estoque-custo";
 import { WidgetKpiEstoqueFaturamento } from "./widgets/widget-kpi-estoque-faturamento";
 import { WidgetGraficos } from "./widgets/widget-graficos";
@@ -129,6 +130,7 @@ export function DashboardPage() {
     kpiFaturamento: podeVerValores,
     kpiLucroBruto: isAdmin,
     kpiMargemBruta: isAdmin,
+    kpiLucroLiquido: isAdmin,
     kpiReceber: podeVerValores,
     kpiPagar: podeVerValores && !!dividasFornecedores,
     kpiEstoqueCusto: podeVerValores && !!valorEstoque,
@@ -227,6 +229,14 @@ export function DashboardPage() {
         return metricas?.financeiro && metricas.financeiro.margemBrutaMes != null ? (
           <WidgetKpiMargemBruta
             margemBrutaMes={metricas.financeiro.margemBrutaMes}
+          />
+        ) : null;
+
+      case "kpiLucroLiquido":
+        return metricas?.financeiro && metricas.financeiro.lucroLiquidoMes != null ? (
+          <WidgetKpiLucroLiquido
+            lucroLiquidoMes={metricas.financeiro.lucroLiquidoMes}
+            lucroLiquidoPorPeca={metricas.financeiro.lucroLiquidoPorPeca ?? 0}
           />
         ) : null;
 
