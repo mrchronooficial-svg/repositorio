@@ -888,8 +888,8 @@ export const financeiroRouter = router({
       // Data do lançamento: último dia do mês
       const ultimoDia = new Date(input.ano, input.mes, 0);
 
-      // Verificar se já foram executadas para este mês
-      const jaExecutadas = await prisma.lancamento.count({
+      // Buscar despesas que JÁ foram lançadas neste mês (ativas, não estornadas)
+      const jaLancadas = await prisma.lancamento.findMany({
         where: {
           tipo: "AUTOMATICO_DESPESA_RECORRENTE",
           data: {
@@ -899,12 +899,22 @@ export const financeiroRouter = router({
           estornado: false,
           estornoDeId: null,
         },
+        select: { despesaRecorrenteId: true },
       });
 
-      if (jaExecutadas > 0) {
+      const idsJaLancados = new Set(
+        jaLancadas.map((l) => l.despesaRecorrenteId).filter(Boolean)
+      );
+
+      // Filtrar apenas despesas que ainda não foram lançadas
+      const despesasPendentes = despesas.filter(
+        (d) => !idsJaLancados.has(d.id)
+      );
+
+      if (despesasPendentes.length === 0) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Ja existem ${jaExecutadas} lancamentos de despesas recorrentes para ${input.mes}/${input.ano}. Estorne-os primeiro se necessario.`,
+          message: `Todas as ${despesas.length} despesas recorrentes ativas ja foram lancadas para ${input.mes}/${input.ano}. Nada a fazer.`,
         });
       }
 
@@ -920,9 +930,9 @@ export const financeiroRouter = router({
         });
       }
 
-      // Criar lançamentos
+      // Criar lançamentos apenas para as despesas pendentes
       const lancamentos = [];
-      for (const despesa of despesas) {
+      for (const despesa of despesasPendentes) {
         const lancamento = await prisma.lancamento.create({
           data: {
             data: ultimoDia,
@@ -958,6 +968,7 @@ export const financeiroRouter = router({
       return {
         success: true,
         quantidade: lancamentos.length,
+        jaExistiam: idsJaLancados.size,
         lancamentos,
       };
     }),

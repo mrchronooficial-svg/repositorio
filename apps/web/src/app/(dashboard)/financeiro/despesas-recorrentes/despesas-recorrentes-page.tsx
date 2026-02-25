@@ -154,7 +154,10 @@ export function DespesasRecorrentesPage() {
   const executarMutation = useMutation(
     trpc.financeiro.executarDespesasRecorrentes.mutationOptions({
       onSuccess: (data) => {
-        toast.success(`${data.quantidade} lancamentos criados para ${executeMes}/${executeAno}`);
+        const msg = data.jaExistiam > 0
+          ? `${data.quantidade} lancamento(s) criado(s) para ${executeMes}/${executeAno} (${data.jaExistiam} ja existiam)`
+          : `${data.quantidade} lancamento(s) criado(s) para ${executeMes}/${executeAno}`;
+        toast.success(msg);
         queryClient.invalidateQueries({ queryKey: [["financeiro"]] });
         setExecuteDialogOpen(false);
       },

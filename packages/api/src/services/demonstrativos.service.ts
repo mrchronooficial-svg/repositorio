@@ -224,6 +224,60 @@ export async function gerarDRE(mes: number, ano: number): Promise<DREResult> {
 
   const saldos = await calcularSaldosPeriodo(dataInicio, dataFim);
 
+  // Buscar árvore de contas do plano de contas (para gerar linhas dinâmicas)
+  const todasContas = await prisma.contaContabil.findMany({
+    select: { id: true, codigo: true, nome: true, tipo: true, contaPaiId: true },
+    orderBy: { codigo: "asc" },
+  });
+
+  // Monta mapa de conta pai -> filhas
+  const filhasPorPai = new Map<string, typeof todasContas>();
+  const contaPorId = new Map<string, (typeof todasContas)[0]>();
+  for (const c of todasContas) {
+    contaPorId.set(c.id, c);
+    if (c.contaPaiId) {
+      const arr = filhasPorPai.get(c.contaPaiId) || [];
+      arr.push(c);
+      filhasPorPai.set(c.contaPaiId, arr);
+    }
+  }
+
+  /**
+   * Gera linhas da DRE para as filhas de um subgrupo (ex: 4.2),
+   * lendo dinamicamente do plano de contas.
+   * - Contas ANALITICA diretas viram linhas nível 2
+   * - Contas SUBGRUPO viram linhas nível 1 (cabeçalho) com suas filhas nível 3
+   * Valores aparecem negativos (são despesas/custos na DRE).
+   * Só inclui linhas com saldo != 0.
+   */
+  function gerarLinhasFilhas(codigoPai: string): LinhaDRE[] {
+    const contaPai = todasContas.find((c) => c.codigo === codigoPai);
+    if (!contaPai) return [];
+
+    const filhas = filhasPorPai.get(contaPai.id) || [];
+    const resultado: LinhaDRE[] = [];
+
+    for (const filha of filhas) {
+      const saldo = somarPorPrefixo(saldos, filha.codigo);
+      if (Math.abs(saldo) < 0.01) continue;
+
+      if (filha.tipo === "ANALITICA") {
+        resultado.push({ codigo: filha.codigo, nome: filha.nome, valor: -saldo, nivel: 2 });
+      } else {
+        // SUBGRUPO — cabeçalho + filhas analíticas
+        resultado.push({ codigo: filha.codigo, nome: filha.nome, valor: -saldo, nivel: 1 });
+        const netas = filhasPorPai.get(filha.id) || [];
+        for (const neta of netas) {
+          const saldoNeta = somarPorPrefixo(saldos, neta.codigo);
+          if (Math.abs(saldoNeta) < 0.01) continue;
+          resultado.push({ codigo: neta.codigo, nome: neta.nome, valor: -saldoNeta, nivel: 3 });
+        }
+      }
+    }
+
+    return resultado;
+  }
+
   // Receita Bruta
   const receitaEstoqueProprio = somarPorPrefixo(saldos, "3.1.1");
   const receitaConsignacao = somarPorPrefixo(saldos, "3.1.2");
@@ -237,40 +291,21 @@ export async function gerarDRE(mes: number, ano: number): Promise<DREResult> {
   // Receita Líquida
   const receitaLiquida = round2(receitaBruta - deducoes);
 
-  // CMV
-  const cmvLeilao = somarPorPrefixo(saldos, "4.1.1");
-  const cmvEbay = somarPorPrefixo(saldos, "4.1.2");
-  const cmvPF = somarPorPrefixo(saldos, "4.1.3");
-  const cmvManutencao = somarPorPrefixo(saldos, "4.1.4");
-  const cmv = round2(cmvLeilao + cmvEbay + cmvPF + cmvManutencao);
-
-  // Lucro Bruto
+  // CMV (4.1) — dinâmico
+  const cmv = round2(somarPorPrefixo(saldos, "4.1"));
   const lucroBruto = round2(receitaLiquida - cmv);
   const margemBruta = pct(lucroBruto, receitaLiquida);
 
-  // Despesas Operacionais (4.2.x)
-  const despAds = somarPorPrefixo(saldos, "4.2.1");
-  const despFrete = somarPorPrefixo(saldos, "4.2.2");
-  const despEditor = somarPorPrefixo(saldos, "4.2.3");
-  const despContabilidade = somarPorPrefixo(saldos, "4.2.4");
-  const despDacto = somarPorPrefixo(saldos, "4.2.5");
-  const despManychat = somarPorPrefixo(saldos, "4.2.6.01");
-  const despPoli = somarPorPrefixo(saldos, "4.2.6.02");
-  const despMLC = somarPorPrefixo(saldos, "4.2.6.03");
-  const despFerramentas = somarPorPrefixo(saldos, "4.2.6");
-  const despMateriais = somarPorPrefixo(saldos, "4.2.7");
-  const despOutrasRecorrentes = somarPorPrefixo(saldos, "4.2.8");
+  // Despesas Operacionais (4.2) — dinâmico
   const despesasOperacionais = round2(somarPorPrefixo(saldos, "4.2"));
 
-  // Despesas Financeiras (4.3.x)
-  const despAntecipacao = somarPorPrefixo(saldos, "4.3.1");
+  // Despesas Financeiras (4.3) — dinâmico
   const despesasFinanceiras = round2(somarPorPrefixo(saldos, "4.3"));
 
   // Lucro Operacional (EBIT)
   const lucroOperacional = round2(lucroBruto - despesasOperacionais - despesasFinanceiras);
 
-  // Despesas Não Recorrentes (4.4.x)
-  const despNaoRecorrentes = somarPorPrefixo(saldos, "4.4.1");
+  // Despesas Não Recorrentes (4.4) — dinâmico
   const despesasNaoRecorrentes = round2(somarPorPrefixo(saldos, "4.4"));
 
   // Lucro Líquido
@@ -281,7 +316,7 @@ export async function gerarDRE(mes: number, ano: number): Promise<DREResult> {
   const lucroAjustado = round2(lucroOperacional);
   const margemAjustada = pct(lucroAjustado, receitaLiquida);
 
-  // Montar linhas da DRE
+  // Montar linhas da DRE — estrutura fixa, conteúdo dinâmico
   const linhas: LinhaDRE[] = [
     { codigo: "", nome: "RECEITA BRUTA DE VENDAS", valor: receitaBruta, nivel: 0, negrito: true },
     { codigo: "3.1.1", nome: "Venda de Peças — Estoque Próprio", valor: receitaEstoqueProprio, nivel: 2 },
@@ -292,32 +327,19 @@ export async function gerarDRE(mes: number, ano: number): Promise<DREResult> {
     { codigo: "", nome: "= RECEITA LÍQUIDA", valor: receitaLiquida, nivel: 0, negrito: true },
     { codigo: "", nome: "", valor: 0, nivel: -1 }, // separador
     { codigo: "", nome: "(−) CUSTO DAS MERCADORIAS VENDIDAS (CMV)", valor: -cmv, nivel: 0, negrito: true },
-    { codigo: "4.1.1", nome: "Custo de Aquisição — Leilão", valor: -cmvLeilao, nivel: 2 },
-    { codigo: "4.1.2", nome: "Custo de Aquisição — eBay", valor: -cmvEbay, nivel: 2 },
-    { codigo: "4.1.3", nome: "Custo de Aquisição — Pessoa Física", valor: -cmvPF, nivel: 2 },
-    { codigo: "4.1.4", nome: "Manutenção e Restauro", valor: -cmvManutencao, nivel: 2 },
+    ...gerarLinhasFilhas("4.1"),
     { codigo: "", nome: "= LUCRO BRUTO", valor: lucroBruto, nivel: 0, negrito: true, percentual: margemBruta },
     { codigo: "", nome: "", valor: 0, nivel: -1 }, // separador
     { codigo: "", nome: "(−) DESPESAS OPERACIONAIS", valor: -despesasOperacionais, nivel: 0, negrito: true },
-    { codigo: "4.2.1", nome: "Marketing e Publicidade (Ads)", valor: -despAds, nivel: 2 },
-    { codigo: "4.2.2", nome: "Frete de Envio ao Cliente", valor: -despFrete, nivel: 2 },
-    { codigo: "4.2.3", nome: "Editor de Vídeo", valor: -despEditor, nivel: 2 },
-    { codigo: "4.2.4", nome: "Contabilidade", valor: -despContabilidade, nivel: 2 },
-    { codigo: "4.2.5", nome: "Dacto", valor: -despDacto, nivel: 2 },
-    { codigo: "4.2.6", nome: "Ferramentas e Sistemas", valor: -despFerramentas, nivel: 1 },
-    { codigo: "4.2.6.01", nome: "Manychat", valor: -despManychat, nivel: 3 },
-    { codigo: "4.2.6.02", nome: "Poli Digital", valor: -despPoli, nivel: 3 },
-    { codigo: "4.2.6.03", nome: "Minha Loja Conectada", valor: -despMLC, nivel: 3 },
-    { codigo: "4.2.7", nome: "Materiais Diversos", valor: -despMateriais, nivel: 2 },
-    { codigo: "4.2.8", nome: "Outras Despesas Recorrentes", valor: -despOutrasRecorrentes, nivel: 2 },
+    ...gerarLinhasFilhas("4.2"),
     { codigo: "", nome: "", valor: 0, nivel: -1 }, // separador
     { codigo: "", nome: "(−) DESPESAS FINANCEIRAS", valor: -despesasFinanceiras, nivel: 0, negrito: true },
-    { codigo: "4.3.1", nome: "Taxa de Antecipação de Recebíveis", valor: -despAntecipacao, nivel: 2 },
+    ...gerarLinhasFilhas("4.3"),
     { codigo: "", nome: "", valor: 0, nivel: -1 }, // separador
     { codigo: "", nome: "= LUCRO OPERACIONAL (EBIT)", valor: lucroOperacional, nivel: 0, negrito: true },
     { codigo: "", nome: "", valor: 0, nivel: -1 }, // separador
     { codigo: "", nome: "(−) DESPESAS NÃO RECORRENTES (ONE-OFFS)", valor: -despesasNaoRecorrentes, nivel: 0, negrito: true },
-    { codigo: "4.4.1", nome: "Itens Não Recorrentes", valor: -despNaoRecorrentes, nivel: 2 },
+    ...gerarLinhasFilhas("4.4"),
     { codigo: "", nome: "", valor: 0, nivel: -1 }, // separador
     { codigo: "", nome: "= LUCRO LÍQUIDO", valor: lucroLiquido, nivel: 0, negrito: true, percentual: margemLiquida },
     { codigo: "", nome: "", valor: 0, nivel: -1 }, // separador
