@@ -366,13 +366,12 @@ export const vendaRouter = router({
         where: { id: input.pecaId },
         data: {
           status: "VENDIDA",
-          localizacao: "Cliente Final",
           historicoStatus: {
             create: {
               statusAnterior: peca.status,
               statusNovo: "VENDIDA",
               localizacaoAnterior: peca.localizacao,
-              localizacaoNova: "Cliente Final",
+              localizacaoNova: peca.localizacao,
               userId: ctx.user.id,
             },
           },
