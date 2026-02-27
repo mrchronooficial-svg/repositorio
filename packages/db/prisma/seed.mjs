@@ -56,7 +56,7 @@ async function seed() {
     ["taxa_mdr", "4"],
     ["lead_time_dias", "20"],
     ["meta_vendas_semana", "10"],
-    ["localizacoes", "Rafael,Pedro,Heitor,Tampograth,Fornecedor,Cliente Final"],
+    ["localizacoes", "Rafael,Pedro,Heitor,Tampograth,Horloge Brasil,UTI dos Relógios,Fornecedor,Cliente Final"],
     ["alerta_relojoeiro_dias", "14"],
   ];
 
