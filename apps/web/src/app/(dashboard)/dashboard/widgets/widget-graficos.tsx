@@ -87,8 +87,8 @@ export function WidgetGraficos({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm">Estoque Atual</span>
-            <span className="font-bold">{metricas.estoque.emEstoque}</span>
+            <span className="text-sm">Disponiveis</span>
+            <span className="font-bold">{metricas.estoque.disponivel}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm">Estoque Ideal</span>
@@ -107,7 +107,7 @@ export function WidgetGraficos({
                 )}
                 style={{
                   width: `${Math.min(
-                    (metricas.estoque.emEstoque /
+                    (metricas.estoque.disponivel /
                       (metricas.estoque.estoqueIdeal || 1)) *
                       100,
                     100
@@ -124,7 +124,7 @@ export function WidgetGraficos({
               )}
             >
               {metricas.estoque.abaixoIdeal
-                ? `Faltam ${metricas.estoque.estoqueIdeal - metricas.estoque.emEstoque} pecas`
+                ? `Faltam ${metricas.estoque.estoqueIdeal - metricas.estoque.disponivel} pecas`
                 : "Estoque adequado"}
             </p>
           </div>
