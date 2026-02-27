@@ -279,9 +279,6 @@ export function EstoquePage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metricas?.emEstoque ?? 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Ideal: {metricas?.estoqueIdeal ?? 0}
-            </p>
           </CardContent>
         </Card>
 
@@ -295,6 +292,9 @@ export function EstoquePage() {
             <div className="text-2xl font-bold">
               {metricas?.statusCount?.DISPONIVEL ?? 0}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Ideal: {metricas?.estoqueIdeal ?? 0}
+            </p>
           </CardContent>
         </Card>
 

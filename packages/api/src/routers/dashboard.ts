@@ -124,7 +124,7 @@ export const dashboardRouter = router({
         total: pecasTotal,
         emEstoque: pecasEmEstoque,
         estoqueIdeal,
-        abaixoIdeal: pecasEmEstoque < estoqueIdeal,
+        abaixoIdeal: pecasDisponiveis < estoqueIdeal,
       },
       vendas: {
         mes: vendasMes,

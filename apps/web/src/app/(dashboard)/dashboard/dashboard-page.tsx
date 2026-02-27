@@ -419,7 +419,7 @@ export function DashboardPage() {
           metricas?.estoque.abaixoIdeal
             ? {
                 abaixoIdeal: true,
-                emEstoque: metricas.estoque.emEstoque,
+                emEstoque: metricas.estoque.disponivel,
                 estoqueIdeal: metricas.estoque.estoqueIdeal,
               }
             : undefined

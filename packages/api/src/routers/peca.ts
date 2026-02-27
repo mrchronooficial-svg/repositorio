@@ -845,8 +845,9 @@ export const pecaRouter = router({
       statusCount,
       origemCount,
       emEstoque,
+      disponiveis: statusCount["DISPONIVEL"] || 0,
       estoqueIdeal,
-      diferenca: emEstoque - estoqueIdeal,
+      diferenca: (statusCount["DISPONIVEL"] || 0) - estoqueIdeal,
       valorTotalEstoque,
     };
   }),
