@@ -154,6 +154,8 @@ export const LOCALIZACOES_PADRAO = [
   "Pedro",
   "Heitor",
   "Tampograth",
+  "Horloge Brasil",
+  "UTI dos Relógios",
   "Fornecedor",
   "Cliente Final",
 ];
