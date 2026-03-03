@@ -147,7 +147,7 @@ export const STATUS_DESPESA_RECORRENTE_COLORS: Record<string, string> = {
   INATIVA: "bg-gray-100 text-gray-800",
 };
 
-export const SOCIOS = ["Rafael", "João"] as const;
+export const SOCIOS = ["Rafael", "João", "Pedro"] as const;
 
 export const LOCALIZACOES_PADRAO = [
   "Rafael",
