@@ -15,6 +15,7 @@ import {
   PackageCheck,
   FileText,
   DollarSign,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,12 @@ const menuItems = [
     href: "/vendas",
     icon: ShoppingCart,
     color: "from-sky-400 to-sky-600",
+  },
+  {
+    label: "Drop do Dia",
+    href: "/drop-do-dia",
+    icon: Zap,
+    color: "from-orange-500 to-red-500",
   },
   {
     label: "Logistica",

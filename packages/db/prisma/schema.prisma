@@ -250,6 +250,7 @@ model Peca {
   historicoStatus        HistoricoStatus[]
   venda                  Venda?
   pagamentosFornecedor   PagamentoFornecedor[]
+  dropItems              DropItem[]
 
   @@index([sku])
   @@index([status])
@@ -343,6 +344,7 @@ model Venda {
 
   // Relações
   pagamentos Pagamento[]
+  dropItem   DropItem?
 
   @@index([clienteId])
   @@index([dataVenda])
@@ -727,4 +729,58 @@ model CatalogoEvento {
   @@index([pecaId])
   @@index([createdAt])
   @@map("catalogo_eventos")
+}
+
+// ============================================
+// DROP DO DIA
+// ============================================
+
+enum DropStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+}
+
+enum DropItemStatus {
+  AVAILABLE
+  SOLD
+}
+
+model Drop {
+  id             String     @id @default(cuid())
+  date           DateTime   // Data do drop (apenas date, sem hora)
+  launchTime     String     // Horário de lançamento (ex: "20:00")
+  launchDateTime DateTime   // Data + hora combinados (para queries e countdown)
+  status         DropStatus @default(SCHEDULED)
+  viewersBase    Int        @default(100)
+  messagesBase   Int        @default(30)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  items DropItem[]
+
+  @@index([status])
+  @@index([launchDateTime])
+  @@map("drops")
+}
+
+model DropItem {
+  id            String         @id @default(cuid())
+  dropId        String
+  drop          Drop           @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  pecaId        String
+  peca          Peca           @relation(fields: [pecaId], references: [id])
+  dropPrice     Decimal        @db.Decimal(10, 2)
+  originalPrice Decimal        @db.Decimal(10, 2)
+  status        DropItemStatus @default(AVAILABLE)
+  soldAt        DateTime?
+  vendaId       String?        @unique
+  venda         Venda?         @relation(fields: [vendaId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([dropId])
+  @@index([pecaId])
+  @@index([status])
+  @@map("drop_items")
 }
