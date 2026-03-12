@@ -130,7 +130,7 @@ export function DashboardPage() {
     kpiFaturamento: podeVerValores,
     kpiLucroBruto: isAdmin,
     kpiMargemBruta: isAdmin,
-    kpiLucroLiquido: isAdmin,
+    kpiLucroLiquido: podeVerValores,
     kpiReceber: podeVerValores,
     kpiPagar: podeVerValores && !!dividasFornecedores,
     kpiEstoqueCusto: podeVerValores && !!valorEstoque,

@@ -49,10 +49,14 @@ export function WidgetPaceVendas({ data, isLoading }: WidgetPaceVendasProps) {
     );
   }
 
-  // Filtrar meses que tenham pelo menos 1 venda
-  const mesesComVendas = data.filter(
-    (m) => m.dados.some((d) => d.acumulado > 0)
-  );
+  // Filtrar meses que tenham pelo menos 1 venda e ordenar cronologicamente
+  const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const mesesComVendas = data
+    .filter((m) => m.dados.some((d) => d.acumulado > 0))
+    .sort((a, b) => {
+      if (a.ano !== b.ano) return a.ano - b.ano;
+      return nomesMeses.indexOf(a.mes) - nomesMeses.indexOf(b.mes);
+    });
 
   if (mesesComVendas.length === 0) {
     return (
@@ -71,7 +75,6 @@ export function WidgetPaceVendas({ data, isLoading }: WidgetPaceVendasProps) {
   const hoje = new Date();
   const mesAtual = hoje.getMonth();
   const anoAtual = hoje.getFullYear();
-  const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
   // Construir dados para o Recharts: array de { dia, "Jun/25": N, "Jul/25": N, ... }
   // Para meses passados, mostra todos os dias; para o mês atual, só até hoje
