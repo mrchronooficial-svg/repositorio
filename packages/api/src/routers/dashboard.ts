@@ -658,25 +658,38 @@ export const dashboardRouter = router({
 
   // Pace de vendas diario por mes (cumulativo)
   getPaceVendas: protectedProcedure.query(async () => {
-    const hoje = new Date();
-    const mesesAtras = 9;
-    // Sistema começou em Fev/2025, não buscar dados anteriores
-    const inicioSistema = new Date(2025, 1, 1); // Fev 2025
-    const inicioCalc = new Date(hoje.getFullYear(), hoje.getMonth() - mesesAtras + 1, 1);
-    const inicio = inicioCalc > inicioSistema ? inicioCalc : inicioSistema;
+    const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+    // ============================================
+    // DADOS HISTÓRICOS (Jun/2025 – Jan/2026)
+    // Acumulado de peças vendidas por dia do mês
+    // ============================================
+    const dadosHistoricos: Array<{ mes: string; ano: number; dados: Array<{ dia: number; acumulado: number }> }> = [
+      { mes: "Jun", ano: 2025, dados: [0,0,1,2,3,5,8,10,11,11,11,11,12,12,12,15,15,15,16,17,17,17,17,17,18,21,22,24,24,24].map((v, i) => ({ dia: i + 1, acumulado: v })) },
+      { mes: "Jul", ano: 2025, dados: [0,2,2,2,2,2,3,3,4,7,8,8,11,14,15,15,15,15,15,15,16,18,19,20,20,20,23,25,25,25,25].map((v, i) => ({ dia: i + 1, acumulado: v })) },
+      { mes: "Ago", ano: 2025, dados: [0,1,1,1,6,8,8,9,9,9,10,11,11,13,13,13,14,16,16,17,18,18,18,18,19,20,20,21,23,24,24].map((v, i) => ({ dia: i + 1, acumulado: v })) },
+      { mes: "Set", ano: 2025, dados: [1,1,1,1,2,2,4,5,6,7,9,11,11,11,13,13,13,13,13,13,13,15,18,19,21,23,23,25,26,26].map((v, i) => ({ dia: i + 1, acumulado: v })) },
+      { mes: "Out", ano: 2025, dados: [2,2,4,5,6,6,6,6,10,11,11,11,13,15,16,16,17,18,19,19,21,24,25,25,27,27,29,31,32,35,35].map((v, i) => ({ dia: i + 1, acumulado: v })) },
+      { mes: "Nov", ano: 2025, dados: [0,0,1,2,2,3,4,4,5,6,6,8,11,13,13,15,16,17,19,19,20,21,21,21,21,22,24,25,26,28].map((v, i) => ({ dia: i + 1, acumulado: v })) },
+      { mes: "Dez", ano: 2025, dados: [1,2,4,4,4,4,6,6,8,8,8,8,8,9,10,10,10,10,11,11,13,13,13,15,16,17,19,20,20,20,20].map((v, i) => ({ dia: i + 1, acumulado: v })) },
+      { mes: "Jan", ano: 2026, dados: [0,0,0,0,0,0,4,6,7,7,7,8,11,14,14,14,17,18,21,21,23,24,27,32,34,36,38,40,42,43,46,51].map((v, i) => ({ dia: i + 1, acumulado: v })) },
+    ];
+
+    // ============================================
+    // DADOS DO BANCO (Fev/2026 em diante)
+    // ============================================
+    const inicioDb = new Date(2026, 1, 1); // Fev 2026
 
     const vendas = await prisma.venda.findMany({
       where: {
         cancelada: false,
-        dataVenda: { gte: inicio },
+        dataVenda: { gte: inicioDb },
       },
       select: { dataVenda: true },
       orderBy: { dataVenda: "asc" },
     });
 
-    // Agrupar por ano-mes, depois contar por dia
     const mesesMap = new Map<string, { mes: string; ano: number; contagemPorDia: Map<number, number> }>();
-    const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
     for (const v of vendas) {
       const d = new Date(v.dataVenda);
@@ -693,13 +706,11 @@ export const dashboardRouter = router({
       entry.contagemPorDia.set(dia, (entry.contagemPorDia.get(dia) || 0) + 1);
     }
 
-    // Converter para formato cumulativo
-    const resultado = Array.from(mesesMap.entries())
+    const dadosBanco = Array.from(mesesMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([, entry]) => {
         const dados: Array<{ dia: number; acumulado: number }> = [];
         let acumulado = 0;
-        // Descobrir o ultimo dia do mes
         const mesIdx = nomesMeses.indexOf(entry.mes);
         const ultimoDia = new Date(entry.ano, mesIdx + 1, 0).getDate();
         for (let dia = 1; dia <= ultimoDia; dia++) {
@@ -708,6 +719,17 @@ export const dashboardRouter = router({
         }
         return { mes: entry.mes, ano: entry.ano, dados };
       });
+
+    // Filtrar históricos para exibir apenas os últimos 9 meses
+    const hoje = new Date();
+    const limiteInferior = new Date(hoje.getFullYear(), hoje.getMonth() - 8, 1);
+    const todosOsMeses = [...dadosHistoricos, ...dadosBanco];
+
+    const resultado = todosOsMeses.filter((m) => {
+      const mesIdx = nomesMeses.indexOf(m.mes);
+      const dataMes = new Date(m.ano, mesIdx, 1);
+      return dataMes >= limiteInferior;
+    });
 
     return resultado;
   }),

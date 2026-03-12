@@ -144,7 +144,7 @@ export const dropRouter = router({
       },
     };
 
-    const [active, scheduled, history] = await Promise.all([
+    const [active, scheduled, paused, history] = await Promise.all([
       prisma.drop.findMany({
         where: { status: "ACTIVE" },
         orderBy: { launchDateTime: "desc" },
@@ -164,6 +164,15 @@ export const dropRouter = router({
         },
       }),
       prisma.drop.findMany({
+        where: { status: "PAUSED" },
+        orderBy: { launchDateTime: "desc" },
+        include: {
+          items: {
+            include: { peca: { select: pecaSummary } },
+          },
+        },
+      }),
+      prisma.drop.findMany({
         where: { status: "COMPLETED" },
         orderBy: { launchDateTime: "desc" },
         take: 20,
@@ -175,7 +184,7 @@ export const dropRouter = router({
       }),
     ]);
 
-    return { active, scheduled, history };
+    return { active, scheduled, paused, history };
   }),
 
   // ============================================
@@ -445,6 +454,85 @@ export const dropRouter = router({
     }),
 
   // ============================================
+  // ADMIN — pause (ACTIVE → PAUSED)
+  // ============================================
+  pause: socioOuAdminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const existing = await prisma.drop.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Drop não encontrado",
+        });
+      }
+
+      if (existing.status !== "ACTIVE" && existing.status !== "SCHEDULED") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Apenas drops ativos ou agendados podem ser pausados",
+        });
+      }
+
+      const drop = await prisma.drop.update({
+        where: { id: input.id },
+        data: { status: "PAUSED" },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "PAUSAR",
+        entidade: "DROP",
+        entidadeId: input.id,
+        detalhes: { previousStatus: existing.status },
+      });
+
+      return drop;
+    }),
+
+  // ============================================
+  // ADMIN — resume (PAUSED → ACTIVE)
+  // ============================================
+  resume: socioOuAdminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const existing = await prisma.drop.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Drop não encontrado",
+        });
+      }
+
+      if (existing.status !== "PAUSED") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Apenas drops pausados podem ser retomados",
+        });
+      }
+
+      const drop = await prisma.drop.update({
+        where: { id: input.id },
+        data: { status: "ACTIVE" },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "RETOMAR",
+        entidade: "DROP",
+        entidadeId: input.id,
+      });
+
+      return drop;
+    }),
+
+  // ============================================
   // ADMIN — delete
   // ============================================
   delete: socioOuAdminProcedure
@@ -461,10 +549,10 @@ export const dropRouter = router({
         });
       }
 
-      if (existing.status !== "SCHEDULED") {
+      if (existing.status === "COMPLETED") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Apenas drops agendados podem ser excluídos",
+          message: "Drops concluídos não podem ser excluídos",
         });
       }
 

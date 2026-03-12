@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { Zap, Plus, Calendar, Clock, ShoppingBag, Eye, MessageCircle } from "lucide-react";
+import { Zap, Plus, Calendar, Clock, ShoppingBag, Eye, MessageCircle, Pause, Play, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +59,8 @@ function getStatusBadge(status: string) {
       return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Ativo</Badge>;
     case "SCHEDULED":
       return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Agendado</Badge>;
+    case "PAUSED":
+      return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pausado</Badge>;
     case "COMPLETED":
       return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Encerrado</Badge>;
     default:
@@ -68,19 +70,45 @@ function getStatusBadge(status: string) {
 
 function DropCard({
   drop,
-  showActions,
   onMarkSold,
 }: {
   drop: DropData;
-  showActions: "active" | "scheduled" | "history";
   onMarkSold?: (item: DropItemData) => void;
 }) {
   const queryClient = useQueryClient();
 
+  const invalidateList = () => {
+    queryClient.invalidateQueries({ queryKey: trpc.drop.list.queryKey() });
+  };
+
+  const pauseMutation = useMutation(
+    trpc.drop.pause.mutationOptions({
+      onSuccess: () => {
+        invalidateList();
+        toast.success("Drop pausado com sucesso");
+      },
+      onError: (error: { message: string }) => {
+        toast.error(error.message);
+      },
+    })
+  );
+
+  const resumeMutation = useMutation(
+    trpc.drop.resume.mutationOptions({
+      onSuccess: () => {
+        invalidateList();
+        toast.success("Drop retomado com sucesso");
+      },
+      onError: (error: { message: string }) => {
+        toast.error(error.message);
+      },
+    })
+  );
+
   const deleteMutation = useMutation(
     trpc.drop.delete.mutationOptions({
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.drop.list.queryKey() });
+        invalidateList();
         toast.success("Drop excluído com sucesso");
       },
       onError: (error: { message: string }) => {
@@ -88,6 +116,12 @@ function DropCard({
       },
     })
   );
+
+  const isActioning = pauseMutation.isPending || resumeMutation.isPending || deleteMutation.isPending;
+  const canPause = drop.status === "ACTIVE" || drop.status === "SCHEDULED";
+  const canResume = drop.status === "PAUSED";
+  const canDelete = drop.status !== "COMPLETED";
+  const canEdit = drop.status === "SCHEDULED" || drop.status === "PAUSED";
 
   return (
     <Card className="mb-4">
@@ -114,24 +148,58 @@ function DropCard({
               {drop.messagesBase}
             </div>
 
-            {showActions === "scheduled" && (
-              <div className="flex items-center gap-2 ml-2">
+            <div className="flex items-center gap-2 ml-2">
+              {canEdit && (
                 <Link href={`/drop-do-dia/${drop.id}/editar` as Route}>
                   <Button variant="outline" size="sm">
                     Editar
                   </Button>
                 </Link>
+              )}
+
+              {canPause && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-yellow-600 hover:text-yellow-700"
+                  onClick={() => pauseMutation.mutate({ id: drop.id })}
+                  disabled={isActioning}
+                >
+                  <Pause className="h-3.5 w-3.5 mr-1" />
+                  Pausar
+                </Button>
+              )}
+
+              {canResume && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-green-600 hover:text-green-700"
+                  onClick={() => resumeMutation.mutate({ id: drop.id })}
+                  disabled={isActioning}
+                >
+                  <Play className="h-3.5 w-3.5 mr-1" />
+                  Retomar
+                </Button>
+              )}
+
+              {canDelete && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="text-red-600 hover:text-red-700"
-                  onClick={() => deleteMutation.mutate({ id: drop.id })}
-                  disabled={deleteMutation.isPending}
+                  onClick={() => {
+                    if (confirm("Tem certeza que deseja excluir este drop?")) {
+                      deleteMutation.mutate({ id: drop.id });
+                    }
+                  }}
+                  disabled={isActioning}
                 >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
                   Excluir
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -183,7 +251,7 @@ function DropCard({
                     <Badge className="bg-red-100 text-red-800 hover:bg-red-100">
                       Vendido
                     </Badge>
-                  ) : showActions === "active" && onMarkSold ? (
+                  ) : drop.status === "ACTIVE" && onMarkSold ? (
                     <Button
                       size="sm"
                       variant="default"
@@ -213,11 +281,12 @@ export default function DropDoDiaPage() {
 
   const { data, isLoading } = useQuery(trpc.drop.list.queryOptions());
 
-  const result = data as { active: DropData[]; scheduled: DropData[]; history: DropData[] } | undefined;
+  const result = data as { active: DropData[]; scheduled: DropData[]; paused: DropData[]; history: DropData[] } | undefined;
   const activeDrops = result?.active ?? [];
   const scheduledDrops = result?.scheduled ?? [];
+  const pausedDrops = result?.paused ?? [];
   const completedDrops = result?.history ?? [];
-  const totalDrops = activeDrops.length + scheduledDrops.length + completedDrops.length;
+  const totalDrops = activeDrops.length + scheduledDrops.length + pausedDrops.length + completedDrops.length;
 
   function handleMarkSold(item: DropItemData) {
     setSelectedItem(item);
@@ -275,7 +344,6 @@ export default function DropDoDiaPage() {
             <DropCard
               key={drop.id}
               drop={drop}
-              showActions="active"
               onMarkSold={handleMarkSold}
             />
           ))}
@@ -289,7 +357,19 @@ export default function DropDoDiaPage() {
             Drops Agendados
           </h2>
           {scheduledDrops.map((drop) => (
-            <DropCard key={drop.id} drop={drop} showActions="scheduled" />
+            <DropCard key={drop.id} drop={drop} />
+          ))}
+        </section>
+      )}
+
+      {pausedDrops.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-lg font-medium mb-3 flex items-center gap-2">
+            <Pause className="h-4 w-4 text-yellow-500" />
+            Drops Pausados
+          </h2>
+          {pausedDrops.map((drop) => (
+            <DropCard key={drop.id} drop={drop} />
           ))}
         </section>
       )}
@@ -300,7 +380,7 @@ export default function DropDoDiaPage() {
             Histórico
           </h2>
           {completedDrops.map((drop) => (
-            <DropCard key={drop.id} drop={drop} showActions="history" />
+            <DropCard key={drop.id} drop={drop} />
           ))}
         </section>
       )}

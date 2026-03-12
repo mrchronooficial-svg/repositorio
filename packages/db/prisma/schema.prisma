@@ -738,6 +738,7 @@ model CatalogoEvento {
 enum DropStatus {
   SCHEDULED
   ACTIVE
+  PAUSED
   COMPLETED
 }
 
