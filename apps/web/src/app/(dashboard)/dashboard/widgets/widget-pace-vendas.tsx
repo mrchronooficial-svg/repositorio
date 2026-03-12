@@ -104,7 +104,7 @@ export function WidgetPaceVendas({ data, isLoading }: WidgetPaceVendasProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="pr-2">
-        <ResponsiveContainer width="100%" height={240}>
+        <ResponsiveContainer width="100%" height={480}>
           <LineChart data={chartData}>
             <XAxis
               dataKey="dia"
