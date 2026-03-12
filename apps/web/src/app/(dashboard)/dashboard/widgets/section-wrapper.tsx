@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 const MAX_W = 8;
 const MIN_W = 1;
-const MAX_H = 4;
+const MAX_H = 12;
 const MIN_H = 1;
 
 interface SectionWrapperProps {
