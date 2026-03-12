@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -11,6 +12,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { GripHorizontal } from "lucide-react";
 
 interface PaceVendasData {
   mes: string;
@@ -35,7 +37,37 @@ const CORES = [
   "#14b8a6", // teal
 ];
 
+const MIN_HEIGHT = 200;
+
 export function WidgetPaceVendas({ data, isLoading }: WidgetPaceVendasProps) {
+  const [chartHeight, setChartHeight] = useState(480);
+  const isDragging = useRef(false);
+  const startY = useRef(0);
+  const startHeight = useRef(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    startY.current = e.clientY;
+    startHeight.current = chartHeight;
+    e.preventDefault();
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = ev.clientY - startY.current;
+      const newHeight = Math.max(MIN_HEIGHT, startHeight.current + delta);
+      setChartHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [chartHeight]);
+
   if (isLoading || !data) {
     return (
       <Card className="h-full">
@@ -104,7 +136,7 @@ export function WidgetPaceVendas({ data, isLoading }: WidgetPaceVendasProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="pr-2">
-        <ResponsiveContainer width="100%" height={480}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <LineChart data={chartData}>
             <XAxis
               dataKey="dia"
@@ -144,6 +176,14 @@ export function WidgetPaceVendas({ data, isLoading }: WidgetPaceVendasProps) {
             ))}
           </LineChart>
         </ResponsiveContainer>
+
+        {/* Handle de redimensionamento */}
+        <div
+          onMouseDown={handleMouseDown}
+          className="flex items-center justify-center py-1 cursor-row-resize group hover:bg-muted/50 rounded-b-lg transition-colors select-none"
+        >
+          <GripHorizontal className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground" />
+        </div>
       </CardContent>
     </Card>
   );
