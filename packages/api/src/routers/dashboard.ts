@@ -318,11 +318,11 @@ export const dashboardRouter = router({
             : 0;
       }
 
-      // Lucro Líquido via DRE (apenas admin)
+      // Lucro Líquido via DRE (admin e sócio)
       let lucroLiquidoMes: number | null = null;
       let lucroLiquidoPorPeca: number | null = null;
 
-      if (userNivel === "ADMINISTRADOR") {
+      if (userNivel === "ADMINISTRADOR" || userNivel === "SOCIO") {
         try {
           const dre = await gerarDRE(hoje.getMonth() + 1, hoje.getFullYear());
           lucroLiquidoMes = dre.resumo.lucroLiquido;
