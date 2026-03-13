@@ -308,86 +308,99 @@ export const pecaRouter = router({
   create: protectedProcedure
     .input(PecaCreateSchema)
     .mutation(async ({ input, ctx }) => {
-      // Validar consignacao - exigir pelo menos um tipo de repasse
-      if (input.origemTipo === "CONSIGNACAO") {
-        if (!input.valorRepasse && !input.percentualRepasse) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Valor de repasse ou percentual e obrigatorio para consignacao",
-          });
+      try {
+        // Validar consignacao - exigir pelo menos um tipo de repasse
+        if (input.origemTipo === "CONSIGNACAO") {
+          if (!input.valorRepasse && !input.percentualRepasse) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Valor de repasse ou percentual e obrigatorio para consignacao",
+            });
+          }
+          if (input.valorRepasse && input.percentualRepasse) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Informe apenas valor fixo OU percentual, nao ambos",
+            });
+          }
         }
-        if (input.valorRepasse && input.percentualRepasse) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Informe apenas valor fixo OU percentual, nao ambos",
-          });
-        }
-      }
 
-      // Verificar se fornecedor existe
-      const fornecedor = await prisma.fornecedor.findUnique({
-        where: { id: input.fornecedorId },
-      });
-
-      if (!fornecedor) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Fornecedor nao encontrado",
+        // Verificar se fornecedor existe
+        const fornecedor = await prisma.fornecedor.findUnique({
+          where: { id: input.fornecedorId },
         });
-      }
 
-      // Gerar SKU
-      const sku = await gerarProximoSKU();
+        if (!fornecedor) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Fornecedor nao encontrado",
+          });
+        }
 
-      // Criar peca com fotos
-      const peca = await prisma.peca.create({
-        data: {
-          sku,
-          skuBase: sku,
-          marca: input.marca,
-          modelo: input.modelo,
-          ano: input.ano,
-          tamanhoCaixa: input.tamanhoCaixa,
-          materialCaixa: input.materialCaixa,
-          materialPulseira: input.materialPulseira,
-          valorCompra: input.valorCompra,
-          valorEstimadoVenda: input.valorEstimadoVenda,
-          origemTipo: input.origemTipo,
-          origemCanal: input.origemCanal,
-          valorRepasse: input.percentualRepasse ? null : input.valorRepasse,
-          percentualRepasse: input.valorRepasse ? null : input.percentualRepasse,
-          revisada: input.revisada ?? false,
-          localizacao: input.localizacao,
-          status: "EM_TRANSITO",
-          fornecedorId: input.fornecedorId,
-          fotos: {
-            create: input.fotos.map((url, index) => ({
-              url,
-              ordem: index,
-            })),
-          },
-          historicoStatus: {
-            create: {
-              statusNovo: "EM_TRANSITO",
-              localizacaoNova: input.localizacao,
-              userId: ctx.user.id,
+        // Gerar SKU
+        const sku = await gerarProximoSKU();
+
+        // Criar peca com fotos
+        const peca = await prisma.peca.create({
+          data: {
+            sku,
+            skuBase: sku,
+            marca: input.marca,
+            modelo: input.modelo,
+            ano: input.ano,
+            tamanhoCaixa: input.tamanhoCaixa,
+            materialCaixa: input.materialCaixa,
+            materialPulseira: input.materialPulseira,
+            valorCompra: input.valorCompra,
+            valorEstimadoVenda: input.valorEstimadoVenda,
+            origemTipo: input.origemTipo,
+            origemCanal: input.origemCanal,
+            valorRepasse: input.percentualRepasse ? null : input.valorRepasse,
+            percentualRepasse: input.valorRepasse ? null : input.percentualRepasse,
+            revisada: input.revisada ?? false,
+            localizacao: input.localizacao,
+            status: "EM_TRANSITO",
+            fornecedorId: input.fornecedorId,
+            fotos: {
+              create: input.fotos.map((url, index) => ({
+                url,
+                ordem: index,
+              })),
+            },
+            historicoStatus: {
+              create: {
+                statusNovo: "EM_TRANSITO",
+                localizacaoNova: input.localizacao,
+                userId: ctx.user.id,
+              },
             },
           },
-        },
-        include: {
-          fotos: true,
-        },
-      });
+          include: {
+            fotos: true,
+          },
+        });
 
-      await registrarAuditoria({
-        userId: ctx.user.id,
-        acao: "CRIAR",
-        entidade: "PECA",
-        entidadeId: peca.id,
-        detalhes: { sku: peca.sku, marca: peca.marca, modelo: peca.modelo },
-      });
+        await registrarAuditoria({
+          userId: ctx.user.id,
+          acao: "CRIAR",
+          entidade: "PECA",
+          entidadeId: peca.id,
+          detalhes: { sku: peca.sku, marca: peca.marca, modelo: peca.modelo },
+        });
 
-      return peca;
+        return peca;
+      } catch (error) {
+        // Re-throw TRPCError as-is
+        if (error instanceof TRPCError) throw error;
+        // Log and wrap unknown errors with the actual message
+        console.error("[peca.create] Erro:", error);
+        const message = error instanceof Error ? error.message : "Erro desconhecido ao criar peca";
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message,
+          cause: error,
+        });
+      }
     }),
 
   // Atualizar peca
