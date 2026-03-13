@@ -24,6 +24,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
@@ -316,6 +317,7 @@ export default function NfePage() {
       {/* Modal de visualizacao da imagem */}
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="max-w-3xl p-2">
+          <DialogTitle className="sr-only">Visualizar imagem</DialogTitle>
           {selectedImage && (
             <div className="flex flex-col items-center">
               <img

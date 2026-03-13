@@ -394,6 +394,7 @@ export default function LogisticaPage() {
       {/* Modal de visualizacao da imagem */}
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="max-w-3xl p-2">
+          <DialogTitle className="sr-only">Visualizar imagem</DialogTitle>
           {selectedImage && (
             <div className="flex flex-col items-center">
               <img
