@@ -3,14 +3,14 @@ import prisma from "@gestaomrchrono/db";
 /**
  * Gera o proximo SKU sequencial
  * Formato: MRC-0001, MRC-0002, etc.
+ * Busca o maior skuBase existente (incluindo devolucoes) para evitar duplicatas.
  */
 export async function gerarProximoSKU(): Promise<string> {
-  // Buscar ultimo SKU base (sem sufixo de devolucao)
   const ultimaPeca = await prisma.peca.findFirst({
     where: {
-      numeroDevolucoes: 0,
+      skuBase: { startsWith: "MRC-" },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { skuBase: "desc" },
     select: { skuBase: true },
   });
 
