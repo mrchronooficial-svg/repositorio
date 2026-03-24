@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+function getR2Client() {
+  const accountId = process.env.R2_ACCOUNT_ID;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+
+  if (!accountId || !accessKeyId || !secretAccessKey) return null;
+
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,35 +47,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Gerar nome unico
     const ext = file.name.split(".").pop();
     const uniqueName = `${nanoid()}.${ext}`;
+    const key = `uploads/${uniqueName}`;
 
-    // Verificar se tem token do Vercel Blob (producao)
-    const hasVercelBlob = process.env.BLOB_READ_WRITE_TOKEN;
+    const r2 = getR2Client();
 
-    if (hasVercelBlob) {
-      // Upload para Vercel Blob (producao)
-      const blob = await put(`uploads/${uniqueName}`, file, {
-        access: "public",
-      });
-      return NextResponse.json({ url: blob.url });
+    if (r2) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+
+      await r2.send(
+        new PutObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME!,
+          Key: key,
+          Body: buffer,
+          ContentType: file.type,
+        })
+      );
+
+      const publicUrl = `${process.env.R2_PUBLIC_URL}/${key}`;
+      return NextResponse.json({ url: publicUrl });
     } else {
-      // Salvar localmente (desenvolvimento)
       const uploadDir = path.join(process.cwd(), "public", "uploads");
-
-      // Criar diretorio se nao existir
       await mkdir(uploadDir, { recursive: true });
-
-      // Converter File para Buffer
       const bytes = await file.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-
-      // Salvar arquivo
-      const filePath = path.join(uploadDir, uniqueName);
-      await writeFile(filePath, buffer);
-
-      // Retornar URL local
+      await writeFile(path.join(uploadDir, uniqueName), Buffer.from(bytes));
       return NextResponse.json({ url: `/uploads/${uniqueName}` });
     }
   } catch (error) {
