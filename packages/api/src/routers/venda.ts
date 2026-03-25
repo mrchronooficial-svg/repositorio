@@ -55,7 +55,99 @@ const ExportListSchema = z.object({
   statusRepasse: z.enum(["FEITO", "PARCIAL", "PENDENTE"]).optional(),
 });
 
+const ExportNFeSchema = z.object({
+  meses: z.array(z.string().regex(/^\d{4}-\d{2}$/, "Formato deve ser YYYY-MM")).min(1, "Selecione ao menos um mês"),
+});
+
 export const vendaRouter = router({
+  // Listar meses com vendas (para seleção na exportação NFe)
+  mesesComVendas: socioOuAdminProcedure
+    .query(async () => {
+      const vendas = await prisma.venda.findMany({
+        where: { cancelada: false },
+        select: { dataVenda: true },
+        orderBy: { dataVenda: "desc" },
+      });
+
+      const mesesSet = new Set<string>();
+      for (const v of vendas) {
+        const d = new Date(v.dataVenda);
+        const mes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        mesesSet.add(mes);
+      }
+
+      return Array.from(mesesSet).sort().reverse();
+    }),
+
+  // Exportar vendas no formato CSV do eNotas
+  exportarNFe: socioOuAdminProcedure
+    .input(ExportNFeSchema)
+    .query(async ({ input }) => {
+      const { meses } = input;
+
+      // Construir filtro de datas para os meses selecionados
+      const dateFilters = meses.map((mes) => {
+        const [ano, mesNum] = mes.split("-").map(Number);
+        const inicio = new Date(ano!, mesNum! - 1, 1);
+        const fim = new Date(ano!, mesNum!, 1); // primeiro dia do mês seguinte
+        return { dataVenda: { gte: inicio, lt: fim } };
+      });
+
+      const vendas = await prisma.venda.findMany({
+        where: {
+          cancelada: false,
+          OR: dateFilters,
+        },
+        orderBy: { dataVenda: "asc" },
+        include: {
+          peca: {
+            select: {
+              sku: true,
+              marca: true,
+              modelo: true,
+            },
+          },
+          cliente: {
+            select: {
+              nome: true,
+              cpfCnpj: true,
+              email: true,
+              telefone: true,
+              cep: true,
+              rua: true,
+              numero: true,
+              complemento: true,
+              bairro: true,
+              cidade: true,
+              estado: true,
+            },
+          },
+        },
+      });
+
+      return vendas.map((v) => {
+        const dataVenda = new Date(v.dataVenda);
+        const dataFormatada = `${String(dataVenda.getDate()).padStart(2, "0")}/${String(dataVenda.getMonth() + 1).padStart(2, "0")}/${dataVenda.getFullYear()}`;
+
+        return {
+          nomeCliente: v.cliente.nome,
+          documento: v.cliente.cpfCnpj,
+          email: v.cliente.email || "",
+          cidade: v.cliente.cidade,
+          uf: v.cliente.estado,
+          cep: v.cliente.cep,
+          endereco: v.cliente.rua,
+          numero: v.cliente.numero,
+          complemento: v.cliente.complemento || "",
+          bairro: v.cliente.bairro,
+          telefone: v.cliente.telefone,
+          produto: `${v.peca.marca} ${v.peca.modelo}`,
+          valorDeclarar: v.valorDeclarar ? Number(v.valorDeclarar) : Number(v.valorFinal),
+          dataVenda: dataFormatada,
+        };
+      });
+    }),
+
   // Exportar vendas (sem paginação, com dados extras para planilha)
   exportList: socioOuAdminProcedure
     .input(ExportListSchema)
