@@ -8,7 +8,6 @@
     "start": "next start"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1016.0",
     "@base-ui/react": "^1.0.0",
     "@gestaomrchrono/api": "*",
     "@gestaomrchrono/auth": "*",
@@ -25,6 +24,7 @@
     "@trpc/client": "^11.7.2",
     "@trpc/server": "^11.7.2",
     "@trpc/tanstack-react-query": "^11.7.2",
+    "@vercel/blob": "^2.3.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "better-auth": "^1.4.9",
     "class-variance-authority": "^0.7.1",
