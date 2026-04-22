@@ -54,10 +54,18 @@ export const CORES_MOSTRADOR = [
 ] as const;
 
 export const TAMANHOS_CAIXA = [
-  "Até 36mm",
-  "37–39mm",
-  "40–42mm",
-  "43mm+",
+  "22mm",
+  "24mm",
+  "26mm",
+  "28mm",
+  "30mm",
+  "32mm",
+  "34mm",
+  "36mm",
+  "38mm",
+  "40mm",
+  "42mm",
+  "44mm",
   "Sem preferência",
 ] as const;
 
