@@ -451,8 +451,10 @@ model User {
   ultimoAcesso DateTime?
 
   // Relações de negócio
-  auditorias      Auditoria[]
-  historicoStatus HistoricoStatus[]
+  auditorias           Auditoria[]
+  historicoStatus      HistoricoStatus[]
+  notasLead            NotaLead[]
+  historicoStatusLead  HistoricoStatusLead[]
 
   @@unique([email])
   @@map("user")
@@ -747,6 +749,29 @@ enum DropItemStatus {
   SOLD
 }
 
+// ============================================
+// ENUMS — LEADS (WATCH FIT)
+// ============================================
+
+enum StatusLead {
+  NOVO
+  EM_CONTATO
+  NEGOCIANDO
+  CONVERTIDO
+  ARQUIVADO
+}
+
+enum TipoBuscaLead {
+  ESPECIFICO
+  DESCOBERTA
+}
+
+enum CondicaoLead {
+  COMPLETO
+  SOMENTE_RELOGIO
+  TANTO_FAZ
+}
+
 model Drop {
   id             String     @id @default(cuid())
   date           DateTime   // Data do drop (apenas date, sem hora)
@@ -784,4 +809,83 @@ model DropItem {
   @@index([pecaId])
   @@index([status])
   @@map("drop_items")
+}
+
+// ============================================
+// LEADS — WATCH FIT (FORMULÁRIO PÚBLICO)
+// ============================================
+
+model Lead {
+  id        String     @id @default(cuid())
+  status    StatusLead @default(NOVO)
+  // Dados pessoais
+  nome      String
+  email     String
+  whatsapp  String
+  instagram String?
+  // Tipo de busca
+  tipoBusca TipoBuscaLead
+  // Modelo específico (preenchido se tipoBusca = ESPECIFICO)
+  modeloMarca        String?
+  modeloNome         String?
+  modeloTamanhoCaixa String?
+  modeloReferencia   String?
+  modeloCondicao     CondicaoLead?
+  modeloLinkExemplo  String?
+  modeloObservacoes  String?
+  // Descoberta / curadoria (preenchido se tipoBusca = DESCOBERTA)
+  descobertaEstilo            String[] @default([])
+  descobertaMarcasInteresse   String[] @default([])
+  descobertaTipoPulseira      String[] @default([])
+  descobertaCorMostrador      String[] @default([])
+  descobertaTamanhoCaixa      String?
+  descobertaFaixaInvestimento String?
+  descobertaObservacoes       String?
+  // Aceite de comunicação (LGPD)
+  aceiteComunicacao Boolean @default(false)
+  // Metadados de origem (para auditoria/anti-spam)
+  ipOrigem  String?
+  userAgent String?
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações
+  notas           NotaLead[]
+  historicoStatus HistoricoStatusLead[]
+
+  @@index([status])
+  @@index([tipoBusca])
+  @@index([createdAt])
+  @@index([email])
+  @@map("leads")
+}
+
+model NotaLead {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  conteudo  String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("notas_lead")
+}
+
+model HistoricoStatusLead {
+  id             String      @id @default(cuid())
+  leadId         String
+  lead           Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  statusAnterior StatusLead?
+  statusNovo     StatusLead
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("historico_status_lead")
 }

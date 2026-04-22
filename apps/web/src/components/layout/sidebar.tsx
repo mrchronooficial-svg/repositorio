@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Package,
@@ -16,8 +17,10 @@ import {
   FileText,
   DollarSign,
   Zap,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/utils/trpc";
 
 interface SidebarProps {
   userLevel: string;
@@ -72,6 +75,12 @@ const menuItems = [
     icon: Truck,
     color: "from-rose-400 to-rose-600",
   },
+  {
+    label: "Leads",
+    href: "/leads",
+    icon: UserPlus,
+    color: "from-amber-500 to-yellow-600",
+  },
 ];
 
 const financeiroItems = [
@@ -97,6 +106,15 @@ export function Sidebar({ userLevel }: SidebarProps) {
   const isAdmin = userLevel === "ADMINISTRADOR";
 
   const items = isAdmin ? [...menuItems, ...adminItems] : menuItems;
+
+  // Contador de leads novos (refresca a cada minuto)
+  const { data: leadStats } = useQuery(
+    trpc.lead.stats.queryOptions(undefined, {
+      staleTime: 30_000,
+      refetchInterval: 60_000,
+    }),
+  );
+  const leadsNovos = leadStats?.novos ?? 0;
 
   return (
     <aside className="w-72 min-h-[calc(100vh-4rem)] gradient-sidebar border-r border-white/[0.08] relative">
@@ -126,6 +144,7 @@ export function Sidebar({ userLevel }: SidebarProps) {
         {menuItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
+          const showLeadBadge = item.href === "/leads" && leadsNovos > 0;
 
           return (
             <Link
@@ -155,7 +174,15 @@ export function Sidebar({ userLevel }: SidebarProps) {
                 />
               </div>
               <span className="flex-1">{item.label}</span>
-              {isActive && (
+              {showLeadBadge && (
+                <span
+                  className="inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-sm shadow-amber-500/40"
+                  aria-label={`${leadsNovos} leads novos`}
+                >
+                  {leadsNovos > 99 ? "99+" : leadsNovos}
+                </span>
+              )}
+              {isActive && !showLeadBadge && (
                 <div className="w-2 h-2 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm shadow-amber-500/50" />
               )}
             </Link>

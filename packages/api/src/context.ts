@@ -23,9 +23,18 @@ export async function createContext(req: NextRequest) {
     });
   }
 
+  // Extrair IP do cliente (suporta proxy/edge: x-forwarded-for, x-real-ip)
+  const forwardedFor = req.headers.get("x-forwarded-for");
+  const ip =
+    forwardedFor?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    "unknown";
+
   return {
     session,
     user,
+    ip,
+    userAgent: req.headers.get("user-agent") || null,
   };
 }
 

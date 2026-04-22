@@ -10,10 +10,11 @@ export async function middleware(request: NextRequest) {
   const isApiAuth = path.startsWith("/api/auth");
   const isApiTrpc = path.startsWith("/api/trpc");
   const isCatalogo = path.startsWith("/catalogo");
+  const isWatchFit = path.startsWith("/watch-fit");
   const isStaticFile = path.startsWith("/_next") || path.includes(".");
 
-  // Permitir rotas públicas, catálogo, API e arquivos estáticos
-  if (isPublicPath || isApiAuth || isApiTrpc || isCatalogo || isStaticFile) {
+  // Permitir rotas públicas, catálogo, watch-fit, API e arquivos estáticos
+  if (isPublicPath || isApiAuth || isApiTrpc || isCatalogo || isWatchFit || isStaticFile) {
     return NextResponse.next();
   }
 
