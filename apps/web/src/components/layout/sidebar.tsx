@@ -107,14 +107,20 @@ export function Sidebar({ userLevel }: SidebarProps) {
 
   const items = isAdmin ? [...menuItems, ...adminItems] : menuItems;
 
-  // Contador de leads novos (refresca a cada minuto)
+  // Contador de leads novos — soma Watch Fit + VIP Chrono (refresca a cada minuto)
   const { data: leadStats } = useQuery(
     trpc.lead.stats.queryOptions(undefined, {
       staleTime: 30_000,
       refetchInterval: 60_000,
     }),
   );
-  const leadsNovos = leadStats?.novos ?? 0;
+  const { data: leadVipStats } = useQuery(
+    trpc.leadVip.stats.queryOptions(undefined, {
+      staleTime: 30_000,
+      refetchInterval: 60_000,
+    }),
+  );
+  const leadsNovos = (leadStats?.novos ?? 0) + (leadVipStats?.novos ?? 0);
 
   return (
     <aside className="w-72 min-h-[calc(100vh-4rem)] gradient-sidebar border-r border-white/[0.08] relative">

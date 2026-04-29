@@ -451,10 +451,12 @@ model User {
   ultimoAcesso DateTime?
 
   // Relações de negócio
-  auditorias           Auditoria[]
-  historicoStatus      HistoricoStatus[]
-  notasLead            NotaLead[]
-  historicoStatusLead  HistoricoStatusLead[]
+  auditorias              Auditoria[]
+  historicoStatus         HistoricoStatus[]
+  notasLead               NotaLead[]
+  historicoStatusLead     HistoricoStatusLead[]
+  notasLeadVip            NotaLeadVip[]
+  historicoStatusLeadVip  HistoricoStatusLeadVip[]
 
   @@unique([email])
   @@map("user")
@@ -772,6 +774,27 @@ enum CondicaoLead {
   TANTO_FAZ
 }
 
+// ============================================
+// ENUMS — LEADS VIP CHRONO
+// ============================================
+
+enum FaixaRendaAnualVip {
+  ATE_100K
+  DE_100K_A_250K
+  DE_250K_A_500K
+  DE_500K_A_1M
+  ACIMA_1M
+  PREFIRO_NAO_INFORMAR
+}
+
+enum ObjetivoComunidadeVip {
+  MELHORES_PRECOS
+  NETWORKING
+  EVENTOS
+  ACESSO_ANTECIPADO
+  WATCH_HUNT
+}
+
 model Drop {
   id             String     @id @default(cuid())
   date           DateTime   // Data do drop (apenas date, sem hora)
@@ -888,4 +911,74 @@ model HistoricoStatusLead {
   @@index([leadId])
   @@index([createdAt])
   @@map("historico_status_lead")
+}
+
+// ============================================
+// LEADS — VIP CHRONO (FORMULÁRIO PÚBLICO)
+// ============================================
+
+model LeadVip {
+  id        String     @id @default(cuid())
+  status    StatusLead @default(NOVO)
+  // Dados pessoais
+  nome            String
+  celular         String
+  email           String
+  nascimento      DateTime
+  profissao       String
+  faixaRendaAnual FaixaRendaAnualVip
+  linkedinUrl     String?
+  // Coleção
+  jaColeciona    Boolean
+  marcasColecao  String[] @default([])
+  marcaPreferida String?
+  // Sonhos / valor pago
+  relogioDosSonhos  String?
+  maximoPagoRelogio String?
+  // Comunidade
+  objetivosComunidade ObjetivoComunidadeVip[] @default([])
+  // Metadados de origem (auditoria/anti-spam)
+  ipOrigem  String?
+  userAgent String?
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relações
+  notas           NotaLeadVip[]
+  historicoStatus HistoricoStatusLeadVip[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([email])
+  @@map("leads_vip")
+}
+
+model NotaLeadVip {
+  id        String   @id @default(cuid())
+  leadVipId String
+  leadVip   LeadVip  @relation(fields: [leadVipId], references: [id], onDelete: Cascade)
+  conteudo  String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([leadVipId])
+  @@index([createdAt])
+  @@map("notas_lead_vip")
+}
+
+model HistoricoStatusLeadVip {
+  id             String      @id @default(cuid())
+  leadVipId      String
+  leadVip        LeadVip     @relation(fields: [leadVipId], references: [id], onDelete: Cascade)
+  statusAnterior StatusLead?
+  statusNovo     StatusLead
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id])
+  createdAt      DateTime    @default(now())
+
+  @@index([leadVipId])
+  @@index([createdAt])
+  @@map("historico_status_lead_vip")
 }

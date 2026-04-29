@@ -11,10 +11,19 @@ export async function middleware(request: NextRequest) {
   const isApiTrpc = path.startsWith("/api/trpc");
   const isCatalogo = path.startsWith("/catalogo");
   const isWatchFit = path.startsWith("/watch-fit");
+  const isComunidadeVip = path.startsWith("/comunidade-vip");
   const isStaticFile = path.startsWith("/_next") || path.includes(".");
 
-  // Permitir rotas públicas, catálogo, watch-fit, API e arquivos estáticos
-  if (isPublicPath || isApiAuth || isApiTrpc || isCatalogo || isWatchFit || isStaticFile) {
+  // Permitir rotas públicas, catálogo, watch-fit, comunidade-vip, API e arquivos estáticos
+  if (
+    isPublicPath ||
+    isApiAuth ||
+    isApiTrpc ||
+    isCatalogo ||
+    isWatchFit ||
+    isComunidadeVip ||
+    isStaticFile
+  ) {
     return NextResponse.next();
   }
 
