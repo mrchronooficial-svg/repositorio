@@ -51,6 +51,7 @@ interface Venda {
   statusEnvio: string;
   peca: Peca;
   cliente: Cliente;
+  lucroBruto?: number | null;
 }
 
 interface VendasTableProps {
@@ -175,20 +176,17 @@ export function VendasTable({
               )}
               {podeVerValores && (
                 <TableCell className="text-right font-medium">
-                  {(() => {
-                    const valorFinal = Number(venda.valorFinal) || 0;
-                    if (!valorFinal) return "-";
-                    const custo =
-                      venda.peca.origemTipo === "CONSIGNACAO"
-                        ? Number(venda.valorRepasseDevido) || 0
-                        : Number(venda.peca.valorCompra) || 0;
-                    const lucro = valorFinal - custo;
-                    return (
-                      <span className={lucro >= 0 ? "text-green-600" : "text-red-600"}>
-                        {formatCurrency(lucro)}
-                      </span>
-                    );
-                  })()}
+                  {venda.lucroBruto == null ? (
+                    "-"
+                  ) : (
+                    <span
+                      className={
+                        venda.lucroBruto >= 0 ? "text-green-600" : "text-red-600"
+                      }
+                    >
+                      {formatCurrency(venda.lucroBruto)}
+                    </span>
+                  )}
                 </TableCell>
               )}
               {(onEdit || podeExcluir) && (

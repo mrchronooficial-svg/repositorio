@@ -6,6 +6,8 @@ import { registrarAuditoria } from "../services/auditoria.service";
 import { criarAlertaRepassePendente } from "../services/alerta.service";
 import { gerarSKUDevolucao } from "../services/sku.service";
 import { criarLancamentosVenda, reverterLancamentosVenda } from "../services/lancamento-venda.service";
+import { brtMonthOf, brtMonthStart, brtToday } from "../utils/brt-date";
+import { calcularLucroBruto, carregarImpostoConfig } from "../utils/lucro-bruto";
 
 // Schemas
 const VendaCreateSchema = z.object({
@@ -71,8 +73,8 @@ export const vendaRouter = router({
 
       const mesesSet = new Set<string>();
       for (const v of vendas) {
-        const d = new Date(v.dataVenda);
-        const mes = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const { year, month } = brtMonthOf(new Date(v.dataVenda));
+        const mes = `${year}-${String(month + 1).padStart(2, "0")}`;
         mesesSet.add(mes);
       }
 
@@ -85,11 +87,11 @@ export const vendaRouter = router({
     .query(async ({ input }) => {
       const { meses } = input;
 
-      // Construir filtro de datas para os meses selecionados
+      // Construir filtro de datas para os meses selecionados (em BRT)
       const dateFilters = meses.map((mes) => {
         const [ano, mesNum] = mes.split("-").map(Number);
-        const inicio = new Date(ano!, mesNum! - 1, 1);
-        const fim = new Date(ano!, mesNum!, 1); // primeiro dia do mês seguinte
+        const inicio = brtMonthStart(ano!, mesNum! - 1);
+        const fim = brtMonthStart(ano!, mesNum!); // primeiro dia do mes seguinte em BRT
         return { dataVenda: { gte: inicio, lt: fim } };
       });
 
@@ -126,8 +128,12 @@ export const vendaRouter = router({
       });
 
       return vendas.map((v) => {
-        const dataVenda = new Date(v.dataVenda);
-        const dataFormatada = `${String(dataVenda.getDate()).padStart(2, "0")}/${String(dataVenda.getMonth() + 1).padStart(2, "0")}/${dataVenda.getFullYear()}`;
+        const { year, month, day } = (() => {
+          const ms = new Date(v.dataVenda).getTime() - 3 * 60 * 60 * 1000;
+          const d = new Date(ms);
+          return { year: d.getUTCFullYear(), month: d.getUTCMonth(), day: d.getUTCDate() };
+        })();
+        const dataFormatada = `${String(day).padStart(2, "0")}/${String(month + 1).padStart(2, "0")}/${year}`;
 
         return {
           nomeCliente: v.cliente.nome,
@@ -187,28 +193,54 @@ export const vendaRouter = router({
         },
       });
 
-      return vendas.map((v) => ({
-        dataVenda: v.dataVenda,
-        sku: v.peca.sku,
-        marca: v.peca.marca,
-        modelo: v.peca.modelo,
-        cliente: v.cliente.nome,
-        origemTipo: v.peca.origemTipo,
-        fornecedor: v.peca.fornecedor.nome,
-        formaPagamento: v.formaPagamento,
-        statusPagamento: v.statusPagamento,
-        statusRepasse: v.statusRepasse,
-        statusEnvio: v.statusEnvio,
-        valorOriginal: Number(v.valorOriginal),
-        valorDesconto: Number(v.valorDesconto || 0),
-        valorFinal: Number(v.valorFinal),
-        valorCompra: Number(v.peca.valorCompra),
-        custoManutencao: Number(v.peca.custoManutencao || 0),
-        valorRepasseDevido: v.valorRepasseDevido ? Number(v.valorRepasseDevido) : null,
-        valorRepasseFeito: v.valorRepasseFeito ? Number(v.valorRepasseFeito) : null,
-        taxaMDR: Number(v.taxaMDR),
-        valorDeclarar: v.valorDeclarar ? Number(v.valorDeclarar) : null,
-      }));
+      const impostoConfig = await carregarImpostoConfig();
+
+      return vendas.map((v) => {
+        const valorFinal = Number(v.valorFinal);
+        const valorCompra = Number(v.peca.valorCompra);
+        const custoManutencao = Number(v.peca.custoManutencao || 0);
+        const valorRepasseDevido = v.valorRepasseDevido
+          ? Number(v.valorRepasseDevido)
+          : null;
+        const taxaMDR = Number(v.taxaMDR);
+
+        const lucroBruto = calcularLucroBruto(
+          {
+            valorFinal,
+            formaPagamento: v.formaPagamento,
+            taxaMDR,
+            valorRepasseDevido,
+            origemTipo: v.peca.origemTipo,
+            valorCompra,
+            custoManutencao,
+          },
+          impostoConfig
+        );
+
+        return {
+          dataVenda: v.dataVenda,
+          sku: v.peca.sku,
+          marca: v.peca.marca,
+          modelo: v.peca.modelo,
+          cliente: v.cliente.nome,
+          origemTipo: v.peca.origemTipo,
+          fornecedor: v.peca.fornecedor.nome,
+          formaPagamento: v.formaPagamento,
+          statusPagamento: v.statusPagamento,
+          statusRepasse: v.statusRepasse,
+          statusEnvio: v.statusEnvio,
+          valorOriginal: Number(v.valorOriginal),
+          valorDesconto: Number(v.valorDesconto || 0),
+          valorFinal,
+          valorCompra,
+          custoManutencao,
+          valorRepasseDevido,
+          valorRepasseFeito: v.valorRepasseFeito ? Number(v.valorRepasseFeito) : null,
+          taxaMDR,
+          valorDeclarar: v.valorDeclarar ? Number(v.valorDeclarar) : null,
+          lucroBruto,
+        };
+      });
     }),
 
   // Listar vendas
@@ -247,6 +279,7 @@ export const vendaRouter = router({
                 modelo: true,
                 origemTipo: true,
                 valorCompra: true,
+                custoManutencao: true,
                 fotos: { take: 1, select: { url: true } },
               },
             },
@@ -258,18 +291,46 @@ export const vendaRouter = router({
         prisma.venda.count({ where }),
       ]);
 
-      const vendasFormatadas = vendas.map((v) => ({
-        ...v,
-        valorOriginal: podeVerValores ? v.valorOriginal : null,
-        valorDesconto: podeVerValores ? v.valorDesconto : null,
-        valorFinal: podeVerValores ? v.valorFinal : null,
-        valorRepasseDevido: podeVerValores ? v.valorRepasseDevido : null,
-        valorRepasseFeito: podeVerValores ? v.valorRepasseFeito : null,
-        peca: {
-          ...v.peca,
-          valorCompra: podeVerValores ? v.peca.valorCompra : null,
-        },
-      }));
+      // Lucro bruto e calculado server-side para garantir formula consistente
+      // (deduz MDR + Simples Nacional + custo da peca/repasse + custo manutencao).
+      const impostoConfig = podeVerValores
+        ? await carregarImpostoConfig()
+        : null;
+
+      const vendasFormatadas = vendas.map((v) => {
+        const lucroBruto =
+          podeVerValores && impostoConfig
+            ? calcularLucroBruto(
+                {
+                  valorFinal: Number(v.valorFinal),
+                  formaPagamento: v.formaPagamento,
+                  taxaMDR: Number(v.taxaMDR),
+                  valorRepasseDevido: v.valorRepasseDevido
+                    ? Number(v.valorRepasseDevido)
+                    : null,
+                  origemTipo: v.peca.origemTipo,
+                  valorCompra: Number(v.peca.valorCompra),
+                  custoManutencao: Number(v.peca.custoManutencao || 0),
+                },
+                impostoConfig
+              )
+            : null;
+
+        return {
+          ...v,
+          valorOriginal: podeVerValores ? v.valorOriginal : null,
+          valorDesconto: podeVerValores ? v.valorDesconto : null,
+          valorFinal: podeVerValores ? v.valorFinal : null,
+          valorRepasseDevido: podeVerValores ? v.valorRepasseDevido : null,
+          valorRepasseFeito: podeVerValores ? v.valorRepasseFeito : null,
+          peca: {
+            ...v.peca,
+            valorCompra: podeVerValores ? v.peca.valorCompra : null,
+            custoManutencao: podeVerValores ? v.peca.custoManutencao : null,
+          },
+          lucroBruto,
+        };
+      });
 
       return {
         vendas: vendasFormatadas,
@@ -1104,10 +1165,9 @@ export const vendaRouter = router({
   getMetricas: protectedProcedure.query(async ({ ctx }) => {
     const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
 
-    // Vendas do mes atual
-    const inicioMes = new Date();
-    inicioMes.setDate(1);
-    inicioMes.setHours(0, 0, 0, 0);
+    // Vendas do mes atual (em horario de Brasilia)
+    const hojeBrt = brtToday();
+    const inicioMes = brtMonthStart(hojeBrt.year, hojeBrt.month);
 
     const [vendasMes, totalVendas] = await Promise.all([
       prisma.venda.count({

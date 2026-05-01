@@ -1,10 +1,17 @@
 import { protectedProcedure, router } from "../index";
 import prisma from "@gestaomrchrono/db";
-import {
-  calcularRBT12,
-  calcularImpostoVenda,
-} from "../services/simples-nacional.service";
 import { gerarDRE } from "../services/demonstrativos.service";
+import {
+  brtMonthEnd,
+  brtMonthStart,
+  brtToday,
+} from "../utils/brt-date";
+import {
+  HISTORICO_TOTAIS,
+  HISTORICO_VENDAS,
+  NOMES_MESES,
+} from "../utils/historico-vendas";
+import { calcularLucroBruto, carregarImpostoConfig } from "../utils/lucro-bruto";
 
 export const dashboardRouter = router({
   // Metricas principais do dashboard
@@ -12,11 +19,17 @@ export const dashboardRouter = router({
     const userNivel = ctx.session.user.nivel;
     const podeVerValores = userNivel === "ADMINISTRADOR" || userNivel === "SOCIO";
 
-    // Datas para filtros
-    const hoje = new Date();
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const inicioMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-    const fimMesAnterior = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
+    // Datas para filtros (em horario de Brasilia)
+    const hojeBrt = brtToday();
+    const inicioMes = brtMonthStart(hojeBrt.year, hojeBrt.month);
+    let mesAntIdx = hojeBrt.month - 1;
+    let anoAnt = hojeBrt.year;
+    if (mesAntIdx < 0) {
+      mesAntIdx = 11;
+      anoAnt -= 1;
+    }
+    const inicioMesAnterior = brtMonthStart(anoAnt, mesAntIdx);
+    const fimMesAnterior = brtMonthStart(hojeBrt.year, hojeBrt.month);
 
     // Configuracoes
     const configLeadTime = await prisma.configuracao.findUnique({
@@ -67,7 +80,7 @@ export const dashboardRouter = router({
       }),
       prisma.venda.count({
         where: {
-          dataVenda: { gte: inicioMesAnterior, lte: fimMesAnterior },
+          dataVenda: { gte: inicioMesAnterior, lt: fimMesAnterior },
           cancelada: false,
         },
       }),
@@ -166,7 +179,7 @@ export const dashboardRouter = router({
         // Vendas mes anterior (para calcular faturamento real)
         prisma.venda.findMany({
           where: {
-            dataVenda: { gte: inicioMesAnterior, lte: fimMesAnterior },
+            dataVenda: { gte: inicioMesAnterior, lt: fimMesAnterior },
             cancelada: false,
           },
           select: { valorFinal: true, valorRepasseDevido: true },
@@ -255,57 +268,31 @@ export const dashboardRouter = router({
           0
         );
 
-        // Buscar configuração de alíquota do Simples
-        const configAliquota = await prisma.configuracao.findUnique({
-          where: { chave: "ALIQUOTA_SIMPLES" },
-        });
-        const aliquotaConfig = configAliquota?.valor || "auto";
+        const impostoConfig = vendasMesResult.length > 0
+          ? await carregarImpostoConfig()
+          : null;
 
-        // Se automático, calcular RBT12 uma vez para todas as vendas do mês
-        let rbt12: number | null = null;
-        if (aliquotaConfig === "auto" && vendasMesResult.length > 0) {
-          rbt12 = await calcularRBT12();
-        }
-
-        lucroBrutoMes = vendasMesResult.reduce((total, v) => {
-          const valorFinal = Number(v.valorFinal) || 0;
-          const origemTipo = v.peca.origemTipo;
-          const custoManutencao = Number(v.peca.custoManutencao) || 0;
-
-          // 1. Margem bruta base (receita - custo de aquisição/repasse)
-          let lucroVenda: number;
-          let baseSimples: number;
-          if (origemTipo === "CONSIGNACAO") {
-            const valorRepasse = Number(v.valorRepasseDevido) || 0;
-            lucroVenda = valorFinal - valorRepasse;
-            baseSimples = valorFinal - valorRepasse; // margem
-          } else {
-            const valorCompra = Number(v.peca.valorCompra) || 0;
-            lucroVenda = valorFinal - valorCompra;
-            baseSimples = valorFinal; // valor total da venda
-          }
-
-          // 2. Deduzir MDR (taxa de cartão)
-          const taxaMDR = Number(v.taxaMDR) || 0;
-          if (v.formaPagamento !== "PIX" && taxaMDR > 0) {
-            const valorMDR = Math.round(valorFinal * (taxaMDR / 100) * 100) / 100;
-            lucroVenda -= valorMDR;
-          }
-
-          // 3. Deduzir Simples Nacional
-          if (aliquotaConfig !== "auto") {
-            const aliquotaEfetiva = parseFloat(aliquotaConfig) / 100;
-            lucroVenda -= Math.round(baseSimples * aliquotaEfetiva * 100) / 100;
-          } else if (rbt12 !== null) {
-            const { valorImposto } = calcularImpostoVenda(baseSimples, rbt12);
-            lucroVenda -= valorImposto;
-          }
-
-          // 4. Deduzir custo de manutenção (relojoeiro/restauro)
-          lucroVenda -= custoManutencao;
-
-          return total + lucroVenda;
-        }, 0);
+        lucroBrutoMes = impostoConfig
+          ? vendasMesResult.reduce((total, v) => {
+              return (
+                total +
+                calcularLucroBruto(
+                  {
+                    valorFinal: Number(v.valorFinal) || 0,
+                    formaPagamento: v.formaPagamento,
+                    taxaMDR: Number(v.taxaMDR) || 0,
+                    valorRepasseDevido: v.valorRepasseDevido
+                      ? Number(v.valorRepasseDevido)
+                      : null,
+                    origemTipo: v.peca.origemTipo,
+                    valorCompra: Number(v.peca.valorCompra) || 0,
+                    custoManutencao: Number(v.peca.custoManutencao) || 0,
+                  },
+                  impostoConfig
+                )
+              );
+            }, 0)
+          : 0;
 
         margemBrutaMes =
           somaValorFinal > 0
@@ -324,7 +311,7 @@ export const dashboardRouter = router({
 
       if (userNivel === "ADMINISTRADOR" || userNivel === "SOCIO") {
         try {
-          const dre = await gerarDRE(hoje.getMonth() + 1, hoje.getFullYear());
+          const dre = await gerarDRE(hojeBrt.month + 1, hojeBrt.year);
           lucroLiquidoMes = dre.resumo.lucroLiquido;
           lucroLiquidoPorPeca =
             vendasMes > 0
@@ -355,6 +342,10 @@ export const dashboardRouter = router({
   }),
 
   // Dados para grafico de evolucao de vendas (ultimos 6 meses)
+  // Para meses cobertos pelo historico manual (ate Jan/2026), usa o total
+  // hardcoded em HISTORICO_VENDAS para manter consistencia com o "Pace de
+  // Vendas". Demais meses sao contados a partir do banco usando fronteiras
+  // de mes em horario de Brasilia (BRT).
   getEvolucaoVendas: protectedProcedure.query(async ({ ctx }) => {
     const userNivel = ctx.session.user.nivel;
     const podeVerValores = userNivel === "ADMINISTRADOR" || userNivel === "SOCIO";
@@ -365,29 +356,51 @@ export const dashboardRouter = router({
       faturamento: number | null;
     }[] = [];
 
-    for (let i = 5; i >= 0; i--) {
-      const data = new Date();
-      data.setMonth(data.getMonth() - i);
-      const inicioMes = new Date(data.getFullYear(), data.getMonth(), 1);
-      const fimMes = new Date(data.getFullYear(), data.getMonth() + 1, 0, 23, 59, 59);
+    const hoje = brtToday();
 
-      const [countVendas, vendasDoMes] = await Promise.all([
-        prisma.venda.count({
-          where: {
-            dataVenda: { gte: inicioMes, lte: fimMes },
-            cancelada: false,
-          },
-        }),
-        podeVerValores
-          ? prisma.venda.findMany({
-              where: {
-                dataVenda: { gte: inicioMes, lte: fimMes },
-                cancelada: false,
-              },
-              select: { valorFinal: true, valorRepasseDevido: true },
-            })
-          : null,
-      ]);
+    for (let i = 5; i >= 0; i--) {
+      // Mes alvo em BRT: hoje - i meses
+      let ano = hoje.year;
+      let mesIdx = hoje.month - i;
+      while (mesIdx < 0) {
+        mesIdx += 12;
+        ano -= 1;
+      }
+
+      const inicioMes = brtMonthStart(ano, mesIdx);
+      const fimMes = brtMonthEnd(ano, mesIdx);
+
+      // Total da fonte historica (se aplicavel) tem prioridade
+      const chaveHistorico = `${ano}-${String(mesIdx).padStart(2, "0")}`;
+      const totalHistorico = HISTORICO_TOTAIS.get(chaveHistorico);
+
+      let countVendas: number;
+      let vendasDoMes: { valorFinal: unknown; valorRepasseDevido: unknown }[] | null = null;
+
+      if (totalHistorico !== undefined) {
+        countVendas = totalHistorico;
+        // Faturamento dos meses historicos nao foi imputado: mantem null
+      } else {
+        const [count, valores] = await Promise.all([
+          prisma.venda.count({
+            where: {
+              dataVenda: { gte: inicioMes, lt: fimMes },
+              cancelada: false,
+            },
+          }),
+          podeVerValores
+            ? prisma.venda.findMany({
+                where: {
+                  dataVenda: { gte: inicioMes, lt: fimMes },
+                  cancelada: false,
+                },
+                select: { valorFinal: true, valorRepasseDevido: true },
+              })
+            : null,
+        ]);
+        countVendas = count;
+        vendasDoMes = valores;
+      }
 
       // Calcular faturamento real (consignação = margem)
       let faturamento: number | null = null;
@@ -399,10 +412,8 @@ export const dashboardRouter = router({
         }, 0);
       }
 
-      const nomeMes = inicioMes.toLocaleDateString("pt-BR", { month: "short" });
-
       meses.push({
-        mes: nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1),
+        mes: NOMES_MESES[mesIdx]!,
         vendas: countVendas,
         faturamento,
       });
@@ -657,28 +668,11 @@ export const dashboardRouter = router({
   }),
 
   // Pace de vendas diario por mes (cumulativo)
+  // Historico manual: ate Jan/2026 (fonte: utils/historico-vendas.ts)
+  // Banco: Fev/2026 em diante, agrupado por dia em horario de Brasilia (BRT)
   getPaceVendas: protectedProcedure.query(async () => {
-    const nomesMeses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-    // ============================================
-    // DADOS HISTÓRICOS (Jun/2025 – Jan/2026)
-    // Acumulado de peças vendidas por dia do mês
-    // ============================================
-    const dadosHistoricos: Array<{ mes: string; ano: number; dados: Array<{ dia: number; acumulado: number }> }> = [
-      { mes: "Jun", ano: 2025, dados: [0,0,1,2,3,5,8,10,11,11,11,11,12,12,12,15,15,15,16,17,17,17,17,17,18,21,22,24,24,24].map((v, i) => ({ dia: i + 1, acumulado: v })) },
-      { mes: "Jul", ano: 2025, dados: [0,2,2,2,2,2,3,3,4,7,8,8,11,14,15,15,15,15,15,15,16,18,19,20,20,20,23,25,25,25,25].map((v, i) => ({ dia: i + 1, acumulado: v })) },
-      { mes: "Ago", ano: 2025, dados: [0,1,1,1,6,8,8,9,9,9,10,11,11,13,13,13,14,16,16,17,18,18,18,18,19,20,20,21,23,24,24].map((v, i) => ({ dia: i + 1, acumulado: v })) },
-      { mes: "Set", ano: 2025, dados: [1,1,1,1,2,2,4,5,6,7,9,11,11,11,13,13,13,13,13,13,13,15,18,19,21,23,23,25,26,26].map((v, i) => ({ dia: i + 1, acumulado: v })) },
-      { mes: "Out", ano: 2025, dados: [2,2,4,5,6,6,6,6,10,11,11,11,13,15,16,16,17,18,19,19,21,24,25,25,27,27,29,31,32,35,35].map((v, i) => ({ dia: i + 1, acumulado: v })) },
-      { mes: "Nov", ano: 2025, dados: [0,0,1,2,2,3,4,4,5,6,6,8,11,13,13,15,16,17,19,19,20,21,21,21,21,22,24,25,26,28].map((v, i) => ({ dia: i + 1, acumulado: v })) },
-      { mes: "Dez", ano: 2025, dados: [1,2,4,4,4,4,6,6,8,8,8,8,8,9,10,10,10,10,11,11,13,13,13,15,16,17,19,20,20,20,20].map((v, i) => ({ dia: i + 1, acumulado: v })) },
-      { mes: "Jan", ano: 2026, dados: [0,0,0,0,0,4,6,7,7,7,8,11,14,14,14,17,18,21,21,23,24,27,32,34,36,38,40,42,43,46,51].map((v, i) => ({ dia: i + 1, acumulado: v })) },
-    ];
-
-    // ============================================
-    // DADOS DO BANCO (Fev/2026 em diante)
-    // ============================================
-    const inicioDb = new Date(2026, 1, 1); // Fev 2026
+    // Inicio de Fev/2026 em BRT
+    const inicioDb = brtMonthStart(2026, 1);
 
     const vendas = await prisma.venda.findMany({
       where: {
@@ -689,20 +683,27 @@ export const dashboardRouter = router({
       orderBy: { dataVenda: "asc" },
     });
 
-    const mesesMap = new Map<string, { mes: string; ano: number; contagemPorDia: Map<number, number> }>();
+    const mesesMap = new Map<
+      string,
+      { mes: string; ano: number; contagemPorDia: Map<number, number> }
+    >();
 
     for (const v of vendas) {
-      const d = new Date(v.dataVenda);
-      const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, "0")}`;
+      const ms = new Date(v.dataVenda).getTime() - 3 * 60 * 60 * 1000;
+      const brt = new Date(ms);
+      const ano = brt.getUTCFullYear();
+      const mesIdx = brt.getUTCMonth();
+      const dia = brt.getUTCDate();
+
+      const key = `${ano}-${String(mesIdx).padStart(2, "0")}`;
       if (!mesesMap.has(key)) {
         mesesMap.set(key, {
-          mes: nomesMeses[d.getMonth()]!,
-          ano: d.getFullYear(),
+          mes: NOMES_MESES[mesIdx]!,
+          ano,
           contagemPorDia: new Map(),
         });
       }
       const entry = mesesMap.get(key)!;
-      const dia = d.getDate();
       entry.contagemPorDia.set(dia, (entry.contagemPorDia.get(dia) || 0) + 1);
     }
 
@@ -711,8 +712,8 @@ export const dashboardRouter = router({
       .map(([, entry]) => {
         const dados: Array<{ dia: number; acumulado: number }> = [];
         let acumulado = 0;
-        const mesIdx = nomesMeses.indexOf(entry.mes);
-        const ultimoDia = new Date(entry.ano, mesIdx + 1, 0).getDate();
+        const mesIdx = NOMES_MESES.indexOf(entry.mes);
+        const ultimoDia = new Date(Date.UTC(entry.ano, mesIdx + 1, 0)).getUTCDate();
         for (let dia = 1; dia <= ultimoDia; dia++) {
           acumulado += entry.contagemPorDia.get(dia) || 0;
           dados.push({ dia, acumulado });
@@ -720,15 +721,23 @@ export const dashboardRouter = router({
         return { mes: entry.mes, ano: entry.ano, dados };
       });
 
-    // Filtrar históricos para exibir apenas os últimos 9 meses
-    const hoje = new Date();
-    const limiteInferior = new Date(hoje.getFullYear(), hoje.getMonth() - 8, 1);
-    const todosOsMeses = [...dadosHistoricos, ...dadosBanco];
+    // Filtrar historicos para exibir apenas os ultimos 9 meses (em BRT)
+    const hoje = brtToday();
+    let anoLimite = hoje.year;
+    let mesLimite = hoje.month - 8;
+    while (mesLimite < 0) {
+      mesLimite += 12;
+      anoLimite -= 1;
+    }
+    const todosOsMeses = [...HISTORICO_VENDAS, ...dadosBanco];
 
     const resultado = todosOsMeses.filter((m) => {
-      const mesIdx = nomesMeses.indexOf(m.mes);
-      const dataMes = new Date(m.ano, mesIdx, 1);
-      return dataMes >= limiteInferior;
+      const mesIdx = NOMES_MESES.indexOf(m.mes);
+      // m.ano/mesIdx >= anoLimite/mesLimite
+      return (
+        m.ano > anoLimite ||
+        (m.ano === anoLimite && mesIdx >= mesLimite)
+      );
     });
 
     return resultado;

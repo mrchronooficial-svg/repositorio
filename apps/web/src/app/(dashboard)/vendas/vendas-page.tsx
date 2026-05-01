@@ -218,7 +218,6 @@ export function VendasPage() {
         const custo = isConsignacao
           ? (v.valorRepasseDevido ?? 0)
           : v.valorCompra;
-        const lucro = v.valorFinal - custo;
 
         return {
           "Data": formatDate(v.dataVenda),
@@ -241,7 +240,7 @@ export function VendasPage() {
           "Repasse Feito": v.valorRepasseFeito ?? "-",
           "Taxa MDR (%)": v.taxaMDR,
           "Valor a Declarar": v.valorDeclarar ?? "-",
-          "Lucro Bruto": lucro,
+          "Lucro Bruto": v.lucroBruto,
         };
       });
 
