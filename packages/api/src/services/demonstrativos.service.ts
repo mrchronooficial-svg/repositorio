@@ -11,6 +11,7 @@
  */
 
 import prisma from "@gestaomrchrono/db";
+import { brtMonthStart, brtMonthEnd } from "../utils/brt-date";
 
 // ==================================================
 // TIPOS
@@ -96,18 +97,21 @@ export interface DFCResult {
 // ==================================================
 
 /**
- * Calcula saldos de todas as contas analíticas em um período
+ * Calcula saldos de todas as contas analíticas em um período.
+ * dataFimExclusivo é o início do mês seguinte em BRT (filtro `lt`),
+ * garantindo que vendas próximas da meia-noite BRT caiam no mês correto
+ * mesmo quando o servidor (Vercel) roda em UTC.
  */
 async function calcularSaldosPeriodo(
   dataInicio: Date,
-  dataFim: Date
+  dataFimExclusivo: Date
 ): Promise<SaldoConta[]> {
   // Buscar todas as linhas de lançamento no período
   // Exclui estornados (originais revertidos) E reversões (estornoDeId != null)
   const linhas = await prisma.linhaLancamento.findMany({
     where: {
       lancamento: {
-        data: { gte: dataInicio, lte: dataFim },
+        data: { gte: dataInicio, lt: dataFimExclusivo },
         estornado: false,
         estornoDeId: null,
       },
@@ -184,9 +188,10 @@ async function calcularSaldosPeriodo(
 
 /**
  * Calcula saldos acumulados (balanço) — desde o início dos tempos até a data
+ * (exclusiva — passar início do mês seguinte em BRT).
  */
-async function calcularSaldosAcumulados(dataFim: Date): Promise<SaldoConta[]> {
-  return calcularSaldosPeriodo(new Date(2000, 0, 1), dataFim);
+async function calcularSaldosAcumulados(dataFimExclusivo: Date): Promise<SaldoConta[]> {
+  return calcularSaldosPeriodo(new Date(2000, 0, 1), dataFimExclusivo);
 }
 
 /**
@@ -219,10 +224,11 @@ function pct(parte: number, total: number): number {
 // ==================================================
 
 export async function gerarDRE(mes: number, ano: number): Promise<DREResult> {
-  const dataInicio = new Date(ano, mes - 1, 1);
-  const dataFim = new Date(ano, mes, 0, 23, 59, 59);
+  // Fronteira de mês em horário de Brasília (BRT, UTC-3) — fixa, sem horário de verão.
+  const dataInicio = brtMonthStart(ano, mes - 1);
+  const dataFimExclusivo = brtMonthEnd(ano, mes - 1);
 
-  const saldos = await calcularSaldosPeriodo(dataInicio, dataFim);
+  const saldos = await calcularSaldosPeriodo(dataInicio, dataFimExclusivo);
 
   // Buscar árvore de contas do plano de contas (para gerar linhas dinâmicas)
   const todasContas = await prisma.contaContabil.findMany({
@@ -421,7 +427,7 @@ async function getSaldoInicialCaixa(): Promise<number> {
  *             PagBank (conta estática, saldoInicial fixo)
  */
 async function calcularCaixaReal(
-  dataFim: Date
+  dataFimExclusivo: Date
 ): Promise<{ total: number; detalhes: { codigo: string; nome: string; valor: number }[] }> {
   const saldoInicial = await getSaldoInicialCaixa();
 
@@ -429,7 +435,7 @@ async function calcularCaixaReal(
   const pagPIXAgg = await prisma.pagamento.aggregate({
     _sum: { valor: true },
     where: {
-      data: { lte: dataFim },
+      data: { lt: dataFimExclusivo },
       venda: { cancelada: false, formaPagamento: "PIX" },
     },
   });
@@ -438,7 +444,7 @@ async function calcularCaixaReal(
   // 2. Pagamentos Cartão recebidos de clientes (líquido de MDR)
   const pagCartao = await prisma.pagamento.findMany({
     where: {
-      data: { lte: dataFim },
+      data: { lt: dataFimExclusivo },
       venda: { cancelada: false, formaPagamento: { in: ["CREDITO_VISTA", "CREDITO_PARCELADO"] } },
     },
     select: {
@@ -455,7 +461,7 @@ async function calcularCaixaReal(
   // 3. Pagamentos a fornecedores (saída de caixa)
   const pagFornecedorAgg = await prisma.pagamentoFornecedor.aggregate({
     _sum: { valor: true },
-    where: { data: { lte: dataFim } },
+    where: { data: { lt: dataFimExclusivo } },
   });
   const totalPagFornecedores = Number(pagFornecedorAgg._sum.valor || 0);
 
@@ -470,7 +476,7 @@ async function calcularCaixaReal(
   const movNaoVenda = await prisma.linhaLancamento.findMany({
     where: {
       lancamento: {
-        data: { lte: dataFim },
+        data: { lt: dataFimExclusivo },
         estornado: false,
         estornoDeId: null,
         vendaId: null,
@@ -533,17 +539,18 @@ async function calcularCaixaReal(
 }
 
 export async function gerarBalanco(mes: number, ano: number): Promise<BalancoResult> {
-  const dataFim = new Date(ano, mes, 0, 23, 59, 59);
+  // Fronteira em BRT: balanço "ao final do mês" significa até o início do mês seguinte BRT.
+  const dataFimExclusivo = brtMonthEnd(ano, mes - 1);
 
   // Saldos contábeis acumulados (para Resultado, Obrigações Fiscais, etc.)
-  const saldos = await calcularSaldosAcumulados(dataFim);
+  const saldos = await calcularSaldosAcumulados(dataFimExclusivo);
 
   // ─────────────────────────────────────────────────
   // ATIVO
   // ─────────────────────────────────────────────────
 
   // 1. Caixa e Equivalentes — calculado operacionalmente
-  const caixa = await calcularCaixaReal(dataFim);
+  const caixa = await calcularCaixaReal(dataFimExclusivo);
   const totalCaixa = caixa.total;
 
   // 2. Contas a Receber — vendas não pagas/parciais
@@ -552,11 +559,11 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
   const vendasRecebiveis = await prisma.venda.findMany({
     where: {
       cancelada: false,
-      dataVenda: { lte: dataFim },
+      dataVenda: { lt: dataFimExclusivo },
       statusPagamento: { in: ["NAO_PAGO", "PARCIAL"] },
     },
     include: {
-      pagamentos: { where: { data: { lte: dataFim } }, select: { valor: true } },
+      pagamentos: { where: { data: { lt: dataFimExclusivo } }, select: { valor: true } },
     },
   });
 
@@ -726,7 +733,9 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
     passivoLinhas.push({ codigo: "2.3.3", nome: "(−) Distribuição de Lucros", valor: -distribuicaoLucros, nivel: 2 });
   }
 
-  const dataStr = `${dataFim.getDate().toString().padStart(2, "0")}/${mes.toString().padStart(2, "0")}/${ano}`;
+  // Último dia do mês (em BRT — Brasil não observa horário de verão)
+  const ultimoDiaMes = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+  const dataStr = `${ultimoDiaMes.toString().padStart(2, "0")}/${mes.toString().padStart(2, "0")}/${ano}`;
 
   return {
     data: dataStr,
@@ -743,16 +752,18 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
 // ==================================================
 
 export async function gerarDFC(mes: number, ano: number): Promise<DFCResult> {
-  const dataInicio = new Date(ano, mes - 1, 1);
-  const dataFim = new Date(ano, mes, 0, 23, 59, 59);
-  const dataFimAnterior = new Date(ano, mes - 1, 0, 23, 59, 59);
+  // Fronteiras em BRT
+  const dataInicio = brtMonthStart(ano, mes - 1);
+  const dataFimExclusivo = brtMonthEnd(ano, mes - 1);
+  // Fim do mês anterior (exclusivo) = início do mês atual em BRT
+  const dataFimAnteriorExclusivo = dataInicio;
 
   // Saldos do período atual (DRE — para lucro líquido)
-  const saldosPeriodo = await calcularSaldosPeriodo(dataInicio, dataFim);
+  const saldosPeriodo = await calcularSaldosPeriodo(dataInicio, dataFimExclusivo);
 
   // Saldos acumulados (balanço) do mês atual e anterior
-  const saldosAtual = await calcularSaldosAcumulados(dataFim);
-  const saldosAnterior = await calcularSaldosAcumulados(dataFimAnterior);
+  const saldosAtual = await calcularSaldosAcumulados(dataFimExclusivo);
+  const saldosAnterior = await calcularSaldosAcumulados(dataFimAnteriorExclusivo);
 
 
   // Lucro líquido do período (mesma fórmula do Balanço/DRE)
@@ -800,8 +811,8 @@ export async function gerarDFC(mes: number, ano: number): Promise<DFCResult> {
   const variacaoLiquida = round2(caixaOperacoes + caixaInvestimentos + caixaFinanciamento);
 
   // Saldo de caixa — usa calcularCaixaReal para consistência com o Balanço
-  const caixaAnterior = await calcularCaixaReal(dataFimAnterior);
-  const caixaAtual = await calcularCaixaReal(dataFim);
+  const caixaAnterior = await calcularCaixaReal(dataFimAnteriorExclusivo);
+  const caixaAtual = await calcularCaixaReal(dataFimExclusivo);
 
   const saldoInicial = caixaAnterior.total;
   const saldoFinal = caixaAtual.total;

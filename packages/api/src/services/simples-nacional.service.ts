@@ -10,6 +10,7 @@
  */
 
 import prisma from "@gestaomrchrono/db";
+import { brtMonthOf, brtMonthStart } from "../utils/brt-date";
 
 // Tabela do Simples Nacional — Anexo I (Comércio)
 // Faixas de receita bruta acumulada nos últimos 12 meses (RBT12)
@@ -70,17 +71,21 @@ export function calcularAliquotaEfetiva(rbt12: number): number {
 export async function calcularRBT12(dataReferencia?: Date): Promise<number> {
   const ref = dataReferencia || new Date();
 
-  // Início: 12 meses atrás do primeiro dia do mês de referência
-  const inicio = new Date(ref.getFullYear(), ref.getMonth() - 12, 1);
-  // Fim: último dia do mês anterior ao de referência
-  const fim = new Date(ref.getFullYear(), ref.getMonth(), 0, 23, 59, 59);
+  // Mês/ano da referência em BRT (evita virar de mês quando o servidor UTC já passou
+  // da meia-noite mas no Brasil ainda é o dia anterior).
+  const { year, month } = brtMonthOf(ref);
+
+  // Início: 12 meses atrás do primeiro dia do mês de referência (em BRT)
+  const inicio = brtMonthStart(year, month - 12);
+  // Fim: início do mês de referência (exclusivo) — pega tudo até o último instante do mês anterior em BRT
+  const fimExclusivo = brtMonthStart(year, month);
 
   const vendas = await prisma.venda.findMany({
     where: {
       cancelada: false,
       dataVenda: {
         gte: inicio,
-        lte: fim,
+        lt: fimExclusivo,
       },
     },
     select: {

@@ -6,6 +6,7 @@ import { registrarAuditoria } from "../services/auditoria.service";
 import { gerarDRE, gerarBalanco, gerarDFC } from "../services/demonstrativos.service";
 import { calcularRBT12, calcularAliquotaEfetiva } from "../services/simples-nacional.service";
 import { criarLancamentosVenda, reverterLancamentosVenda } from "../services/lancamento-venda.service";
+import { brtToday } from "../utils/brt-date";
 
 // ============================================
 // SCHEMAS DE VALIDAÇÃO
@@ -1799,9 +1800,11 @@ export const financeiroRouter = router({
   // =========================================
 
   getDashboard: adminProcedure.query(async () => {
-    const now = new Date();
-    const mesAtual = now.getMonth() + 1;
-    const anoAtual = now.getFullYear();
+    // "Hoje" em horário de Brasília — evita virar para o mês seguinte quando
+    // o servidor (Vercel UTC) já passou da meia-noite UTC mas no Brasil ainda é dia anterior.
+    const hoje = brtToday();
+    const mesAtual = hoje.month + 1;
+    const anoAtual = hoje.year;
 
     // Saldos de caixa
     const contasBancarias = await prisma.contaBancaria.findMany({
