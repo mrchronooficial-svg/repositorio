@@ -16,6 +16,7 @@ export const SECTION_IDS = [
   "listas",
   "recebiveis",
   "paceVendas",
+  "paceLucroBruto",
   "dividas",
 ] as const;
 
@@ -51,8 +52,9 @@ export const DEFAULT_GRID_LAYOUT: GridItem[] = [
   { i: "graficos",            x: 0, y: 4,  w: 8, h: 2 },
   { i: "listas",              x: 0, y: 6,  w: 8, h: 2 },
   { i: "paceVendas",          x: 0, y: 8,  w: 8, h: 3 },
-  { i: "recebiveis",          x: 0, y: 11, w: 8, h: 1 },
-  { i: "dividas",             x: 0, y: 12, w: 8, h: 1 },
+  { i: "paceLucroBruto",      x: 0, y: 11, w: 8, h: 3 },
+  { i: "recebiveis",          x: 0, y: 14, w: 8, h: 1 },
+  { i: "dividas",             x: 0, y: 15, w: 8, h: 1 },
 ];
 
 export const DEFAULT_LAYOUT: DashboardLayout = {
@@ -77,6 +79,7 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   graficos: "Graficos",
   listas: "Vendas Recentes / Revisao",
   paceVendas: "Pace de Vendas",
+  paceLucroBruto: "Pace de Lucro Bruto",
   recebiveis: "Recebiveis Pendentes",
   dividas: "Repasses / Pagamentos",
 };

@@ -32,6 +32,7 @@ import { WidgetKpiEstoqueFaturamento } from "./widgets/widget-kpi-estoque-fatura
 import { WidgetGraficos } from "./widgets/widget-graficos";
 import { WidgetListas } from "./widgets/widget-listas";
 import { WidgetPaceVendas } from "./widgets/widget-pace-vendas";
+import { WidgetPaceLucroBruto } from "./widgets/widget-pace-lucro-bruto";
 import { WidgetRecebiveis } from "./widgets/widget-recebiveis";
 import { WidgetDividas } from "./widgets/widget-dividas";
 import { ModalRecebiveis } from "./widgets/modal-recebiveis";
@@ -106,6 +107,9 @@ export function DashboardPage() {
   const { data: paceVendas, isLoading: isLoadingPace } = useQuery(
     trpc.dashboard.getPaceVendas.queryOptions()
   );
+  const { data: paceLucroBruto, isLoading: isLoadingPaceLucroBruto } = useQuery(
+    trpc.dashboard.getPaceLucroBruto.queryOptions()
+  );
   const { data: valorEstoque } = useQuery(
     trpc.dashboard.getMetricasValorEstoque.queryOptions()
   );
@@ -138,6 +142,7 @@ export function DashboardPage() {
     kpiClientes: !podeVerValores,
     kpiEmRevisao: !podeVerValores,
     paceVendas: true,
+    paceLucroBruto: isAdmin,
     graficos: true,
     listas: true,
     recebiveis: podeVerValores && !!recebiveis && recebiveis.length > 0,
@@ -308,6 +313,14 @@ export function DashboardPage() {
           <WidgetPaceVendas
             data={paceVendas as any}
             isLoading={isLoadingPace}
+          />
+        );
+
+      case "paceLucroBruto":
+        return (
+          <WidgetPaceLucroBruto
+            data={paceLucroBruto as any}
+            isLoading={isLoadingPaceLucroBruto}
           />
         );
 

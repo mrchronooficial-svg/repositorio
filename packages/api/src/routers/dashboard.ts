@@ -743,6 +743,106 @@ export const dashboardRouter = router({
     return resultado;
   }),
 
+  // Pace de Lucro Bruto diario por mes (cumulativo, em R$)
+  // Apenas para ADMINISTRADOR (igual ao KPI Lucro Bruto).
+  // Considera vendas a partir de Fev/2026 em diante (em BRT).
+  // IMPORTANTE: para esse grafico, custoManutencao (relojoeiro/restauro) e
+  // ignorado, pois e input manual e gerenciado a parte. Demais deducoes
+  // (CMV/repasse, MDR, Simples Nacional) seguem a formula padrao.
+  getPaceLucroBruto: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.session.user.nivel !== "ADMINISTRADOR") {
+      return [] as Array<{
+        mes: string;
+        ano: number;
+        dados: Array<{ dia: number; acumulado: number }>;
+      }>;
+    }
+
+    const inicioDb = brtMonthStart(2026, 1);
+
+    const vendas = await prisma.venda.findMany({
+      where: {
+        cancelada: false,
+        dataVenda: { gte: inicioDb },
+      },
+      select: {
+        dataVenda: true,
+        valorFinal: true,
+        formaPagamento: true,
+        taxaMDR: true,
+        valorRepasseDevido: true,
+        peca: {
+          select: {
+            origemTipo: true,
+            valorCompra: true,
+          },
+        },
+      },
+      orderBy: { dataVenda: "asc" },
+    });
+
+    if (vendas.length === 0) {
+      return [];
+    }
+
+    const impostoConfig = await carregarImpostoConfig();
+
+    const mesesMap = new Map<
+      string,
+      { mes: string; ano: number; valorPorDia: Map<number, number> }
+    >();
+
+    for (const v of vendas) {
+      const ms = new Date(v.dataVenda).getTime() - 3 * 60 * 60 * 1000;
+      const brt = new Date(ms);
+      const ano = brt.getUTCFullYear();
+      const mesIdx = brt.getUTCMonth();
+      const dia = brt.getUTCDate();
+
+      const lucro = calcularLucroBruto(
+        {
+          valorFinal: Number(v.valorFinal) || 0,
+          formaPagamento: v.formaPagamento,
+          taxaMDR: Number(v.taxaMDR) || 0,
+          valorRepasseDevido: v.valorRepasseDevido
+            ? Number(v.valorRepasseDevido)
+            : null,
+          origemTipo: v.peca.origemTipo,
+          valorCompra: Number(v.peca.valorCompra) || 0,
+          custoManutencao: 0, // ignorado neste grafico
+        },
+        impostoConfig
+      );
+
+      const key = `${ano}-${String(mesIdx).padStart(2, "0")}`;
+      if (!mesesMap.has(key)) {
+        mesesMap.set(key, {
+          mes: NOMES_MESES[mesIdx]!,
+          ano,
+          valorPorDia: new Map(),
+        });
+      }
+      const entry = mesesMap.get(key)!;
+      entry.valorPorDia.set(dia, (entry.valorPorDia.get(dia) || 0) + lucro);
+    }
+
+    const resultado = Array.from(mesesMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, entry]) => {
+        const dados: Array<{ dia: number; acumulado: number }> = [];
+        let acumulado = 0;
+        const mesIdx = NOMES_MESES.indexOf(entry.mes);
+        const ultimoDia = new Date(Date.UTC(entry.ano, mesIdx + 1, 0)).getUTCDate();
+        for (let dia = 1; dia <= ultimoDia; dia++) {
+          acumulado += entry.valorPorDia.get(dia) || 0;
+          dados.push({ dia, acumulado: Math.round(acumulado * 100) / 100 });
+        }
+        return { mes: entry.mes, ano: entry.ano, dados };
+      });
+
+    return resultado;
+  }),
+
   // Recebiveis pendentes detalhados
   getRecebiveisPendentes: protectedProcedure.query(async ({ ctx }) => {
     const userNivel = ctx.session.user.nivel;
