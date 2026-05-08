@@ -35,14 +35,14 @@ const CORES = [
   "#14b8a6", // teal
 ];
 
-const formatCompactBRL = (v: number): string => {
-  if (v === 0) return "R$ 0";
+const formatCompactTick = (v: number): string => {
+  if (v === 0) return "0";
   const abs = Math.abs(v);
   if (abs >= 1_000_000)
-    return `R$ ${(v / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}M`;
+    return `${(v / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}M`;
   if (abs >= 1_000)
-    return `R$ ${(v / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}k`;
-  return `R$ ${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+    return `${(v / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}k`;
+  return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 };
 
 const formatBRL = (v: number): string =>
@@ -146,11 +146,12 @@ export function WidgetPaceLucroBruto({
               axisLine={false}
             />
             <YAxis
+              allowDecimals={false}
               tick={{ fontSize: 11 }}
               tickLine={false}
               axisLine={false}
-              width={60}
-              tickFormatter={formatCompactBRL}
+              width={30}
+              tickFormatter={formatCompactTick}
             />
             <Tooltip
               contentStyle={{
