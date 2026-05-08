@@ -45,13 +45,21 @@ const formatCompactTick = (v: number): string => {
   return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
 };
 
-const formatBRL = (v: number): string =>
-  v.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+const formatCompactBRL = (v: number): string => {
+  if (v === 0) return "R$ 0";
+  const abs = Math.abs(v);
+  if (abs >= 1_000_000)
+    return `R$ ${(v / 1_000_000).toLocaleString("pt-BR", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })}M`;
+  if (abs >= 1_000)
+    return `R$ ${(v / 1_000).toLocaleString("pt-BR", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })}k`;
+  return `R$ ${v.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`;
+};
 
 export function WidgetPaceLucroBruto({
   data,
@@ -160,9 +168,9 @@ export function WidgetPaceLucroBruto({
                 border: "1px solid #e5e7eb",
               }}
               labelFormatter={(v) => `Dia ${v}`}
-              formatter={(value) => [
-                formatBRL(Number(value) || 0),
-                "",
+              formatter={(value, name) => [
+                formatCompactBRL(Number(value) || 0),
+                name,
               ]}
             />
             <Legend
