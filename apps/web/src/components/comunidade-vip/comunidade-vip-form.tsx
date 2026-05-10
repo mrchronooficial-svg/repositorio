@@ -556,12 +556,12 @@ function Footer() {
       <div className="max-w-[640px] mx-auto px-5 sm:px-8 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-[#6B6B6B]">
         <span className="tracking-[0.2em] uppercase">Mr. Chrono &copy; {new Date().getFullYear()}</span>
         <a
-          href="https://instagram.com/mrchrono"
+          href="https://www.instagram.com/mrchrono.oficial"
           target="_blank"
           rel="noopener noreferrer"
           className="hover:text-[#C9A84C] transition-colors"
         >
-          @mrchrono
+          @mrchrono.oficial
         </a>
       </div>
     </footer>
@@ -605,18 +605,18 @@ function SuccessScreen() {
       <p className="text-[15px] sm:text-base leading-relaxed text-[#A0A0A0] max-w-md mb-10">
         Enquanto isso, siga{" "}
         <a
-          href="https://instagram.com/mrchrono"
+          href="https://www.instagram.com/mrchrono.oficial"
           target="_blank"
           rel="noopener noreferrer"
           className="text-[#C9A84C] hover:underline underline-offset-4"
         >
-          @mrchrono
+          @mrchrono.oficial
         </a>{" "}
         para acompanhar as novidades.
       </p>
 
       <a
-        href="https://instagram.com/mrchrono"
+        href="https://www.instagram.com/mrchrono.oficial"
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center justify-center gap-2 min-h-12 px-8 rounded-sm

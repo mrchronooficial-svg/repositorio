@@ -86,4 +86,4 @@ export const CONDICOES = [
 ] as const;
 
 // Link configurável para "Voltar ao site" na tela de sucesso
-export const SITE_URL = "https://www.instagram.com/mrchrono";
+export const SITE_URL = "https://www.instagram.com/mrchrono.oficial";

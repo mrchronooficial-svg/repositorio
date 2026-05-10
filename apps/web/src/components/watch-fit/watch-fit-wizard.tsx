@@ -862,12 +862,12 @@ function SuccessScreen() {
       <p className="text-[15px] sm:text-base leading-relaxed text-[#5C5852] max-w-md mb-10">
         Enquanto isso, acompanhe nossas novidades no Instagram:{" "}
         <a
-          href="https://instagram.com/mrchrono"
+          href="https://www.instagram.com/mrchrono.oficial"
           target="_blank"
           rel="noopener noreferrer"
           className="text-[#B8960C] hover:underline underline-offset-4"
         >
-          @mrchrono
+          @mrchrono.oficial
         </a>
       </p>
 
