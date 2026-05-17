@@ -67,12 +67,18 @@ const LeadVipListSchema = z.object({
   status: StatusLeadEnum.optional(),
   faixaRendaAnual: FaixaRendaAnualEnum.optional(),
   jaColeciona: z.boolean().optional(),
+  comunidadeVip: z.boolean().optional(),
   objetivos: z.array(ObjetivoComunidadeEnum).max(10).optional(),
   dataInicio: z.string().optional(),
   dataFim: z.string().optional(),
   incluirArquivados: z.boolean().default(false),
   sortBy: z.enum(["createdAt", "nome", "status"]).default("createdAt"),
   sortDir: z.enum(["asc", "desc"]).default("desc"),
+});
+
+const LeadVipSetComunidadeVipSchema = z.object({
+  id: z.string().cuid(),
+  comunidadeVip: z.boolean(),
 });
 
 const LeadVipUpdateStatusSchema = z.object({
@@ -95,7 +101,7 @@ export const leadVipRouter = router({
     .input(LeadVipListSchema)
     .query(async ({ input }) => {
       const {
-        page, limit, search, status, faixaRendaAnual, jaColeciona,
+        page, limit, search, status, faixaRendaAnual, jaColeciona, comunidadeVip,
         objetivos, dataInicio, dataFim, incluirArquivados, sortBy, sortDir,
       } = input;
       const skip = (page - 1) * limit;
@@ -129,6 +135,7 @@ export const leadVipRouter = router({
             : {}),
         ...(faixaRendaAnual && { faixaRendaAnual }),
         ...(jaColeciona !== undefined && { jaColeciona }),
+        ...(comunidadeVip !== undefined && { comunidadeVip }),
         ...((dataInicio || dataFim) && {
           createdAt: {
             ...(dataInicio && { gte: new Date(dataInicio) }),
@@ -155,6 +162,7 @@ export const leadVipRouter = router({
             profissao: true,
             faixaRendaAnual: true,
             jaColeciona: true,
+            comunidadeVip: true,
             marcaPreferida: true,
             objetivosComunidade: true,
             createdAt: true,
@@ -314,6 +322,39 @@ export const leadVipRouter = router({
       });
 
       return nota;
+    }),
+
+  // ---------- MARCAR / DESMARCAR COMUNIDADE VIP ----------
+  setComunidadeVip: protectedProcedure
+    .input(LeadVipSetComunidadeVipSchema)
+    .mutation(async ({ input, ctx }) => {
+      const lead = await prisma.leadVip.findUnique({
+        where: { id: input.id },
+        select: { comunidadeVip: true },
+      });
+
+      if (!lead) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lead VIP nao encontrado" });
+      }
+
+      if (lead.comunidadeVip === input.comunidadeVip) {
+        return { id: input.id, comunidadeVip: input.comunidadeVip };
+      }
+
+      const atualizado = await prisma.leadVip.update({
+        where: { id: input.id },
+        data: { comunidadeVip: input.comunidadeVip },
+        select: { id: true, comunidadeVip: true },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: input.comunidadeVip ? "MARCAR_COMUNIDADE_VIP" : "DESMARCAR_COMUNIDADE_VIP",
+        entidade: "LEAD_VIP",
+        entidadeId: input.id,
+      });
+
+      return atualizado;
     }),
 
   // ---------- ARQUIVAR ----------

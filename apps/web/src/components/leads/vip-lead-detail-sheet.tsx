@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   MessageCircle,
@@ -103,6 +104,15 @@ export function VipLeadDetailSheet({ leadId, open, onOpenChange }: VipLeadDetail
     }),
   );
 
+  const setComunidadeVipMutation = useMutation(
+    trpc.leadVip.setComunidadeVip.mutationOptions({
+      onSuccess: () => {
+        invalidateLead();
+      },
+      onError: (err) => toast.error(err.message),
+    }),
+  );
+
   const handleAddNota = () => {
     if (!leadId || !novaNota.trim()) return;
     addNotaMutation.mutate({ id: leadId, conteudo: novaNota.trim() });
@@ -170,6 +180,32 @@ export function VipLeadDetailSheet({ leadId, open, onOpenChange }: VipLeadDetail
                   </SelectContent>
                 </Select>
                 {updateStatusMutation.isPending && (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+
+              {/* Toggle Comunidade VIP */}
+              <div className="flex items-center gap-3 mt-3">
+                <Checkbox
+                  id="comunidade-vip-toggle"
+                  checked={lead.comunidadeVip}
+                  onCheckedChange={(v) =>
+                    leadId &&
+                    setComunidadeVipMutation.mutate({
+                      id: leadId,
+                      comunidadeVip: Boolean(v),
+                    })
+                  }
+                  disabled={setComunidadeVipMutation.isPending}
+                  className="border-amber-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                />
+                <label
+                  htmlFor="comunidade-vip-toggle"
+                  className="text-sm cursor-pointer select-none"
+                >
+                  Comunidade VIP
+                </label>
+                {setComunidadeVipMutation.isPending && (
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 )}
               </div>

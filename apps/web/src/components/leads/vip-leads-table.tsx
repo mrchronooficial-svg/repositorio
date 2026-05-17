@@ -13,7 +13,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, Loader2 } from "lucide-react";
 import { StatusBadge } from "./status-badge";
 import {
   OBJETIVO_COMUNIDADE_BADGE_CLASS,
@@ -31,6 +31,7 @@ interface VipLeadRow {
   celular: string;
   profissao: string;
   jaColeciona: boolean;
+  comunidadeVip: boolean;
   objetivosComunidade: ObjetivoComunidadeVip[];
   createdAt: string | Date;
 }
@@ -43,6 +44,8 @@ interface VipLeadsTableProps {
   onToggleTodos: () => void;
   todosSelecionados: boolean;
   onRowClick: (id: string) => void;
+  onToggleComunidadeVip: (id: string, valor: boolean) => void;
+  pendingComunidadeVipId?: string | null;
 }
 
 const MAX_OBJETIVOS_VISIVEIS = 2;
@@ -55,6 +58,8 @@ export function VipLeadsTable({
   onToggleTodos,
   todosSelecionados,
   onRowClick,
+  onToggleComunidadeVip,
+  pendingComunidadeVipId,
 }: VipLeadsTableProps) {
   if (isLoading) {
     return (
@@ -79,6 +84,11 @@ export function VipLeadsTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-14" title="Comunidade VIP">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                VIP
+              </span>
+            </TableHead>
             <TableHead className="w-10">
               <Checkbox
                 checked={todosSelecionados}
@@ -108,9 +118,27 @@ export function VipLeadsTable({
                 className={cn(
                   "cursor-pointer transition-colors",
                   isSelecionado && "bg-amber-50/40 hover:bg-amber-50/60",
+                  lead.comunidadeVip && "bg-amber-50/30",
                 )}
                 onClick={() => onRowClick(lead.id)}
               >
+                <TableCell
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-14"
+                >
+                  {pendingComunidadeVipId === lead.id ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+                  ) : (
+                    <Checkbox
+                      checked={lead.comunidadeVip}
+                      onCheckedChange={(v) =>
+                        onToggleComunidadeVip(lead.id, Boolean(v))
+                      }
+                      aria-label={`Marcar ${lead.nome} como Comunidade VIP`}
+                      className="border-amber-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                    />
+                  )}
+                </TableCell>
                 <TableCell
                   onClick={(e) => e.stopPropagation()}
                   className="w-10"

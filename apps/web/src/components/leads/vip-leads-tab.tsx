@@ -45,6 +45,7 @@ import { StatusBadge } from "@/components/leads/status-badge";
 const LEADS_PER_PAGE = 20;
 
 type ColecionaFiltro = "ALL" | "SIM" | "NAO";
+type ComunidadeVipFiltro = "ALL" | "SIM" | "NAO";
 
 export function VipLeadsTab() {
   const queryClient = useQueryClient();
@@ -53,6 +54,7 @@ export function VipLeadsTab() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusLead | "ALL">("ALL");
   const [coleciona, setColeciona] = useState<ColecionaFiltro>("ALL");
+  const [comunidadeVip, setComunidadeVip] = useState<ComunidadeVipFiltro>("ALL");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [page, setPage] = useState(1);
@@ -75,13 +77,15 @@ export function VipLeadsTab() {
       status: status === "ALL" ? undefined : status,
       jaColeciona:
         coleciona === "ALL" ? undefined : coleciona === "SIM",
+      comunidadeVip:
+        comunidadeVip === "ALL" ? undefined : comunidadeVip === "SIM",
       dataInicio: dataInicio || undefined,
       dataFim: dataFim || undefined,
       incluirArquivados: status === "ARQUIVADO",
       sortBy: "createdAt" as const,
       sortDir: "desc" as const,
     }),
-    [page, search, status, coleciona, dataInicio, dataFim],
+    [page, search, status, coleciona, comunidadeVip, dataInicio, dataFim],
   );
 
   const { data, isLoading, isFetching } = useQuery(
@@ -99,11 +103,21 @@ export function VipLeadsTab() {
     }),
   );
 
+  const setComunidadeVipMutation = useMutation(
+    trpc.leadVip.setComunidadeVip.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [["leadVip", "list"]] });
+      },
+      onError: (err) => toast.error(err.message),
+    }),
+  );
+
   // ---------- Helpers ----------
   const limparFiltros = () => {
     setSearch("");
     setStatus("ALL");
     setColeciona("ALL");
+    setComunidadeVip("ALL");
     setDataInicio("");
     setDataFim("");
     setPage(1);
@@ -113,6 +127,7 @@ export function VipLeadsTab() {
     search ||
     status !== "ALL" ||
     coleciona !== "ALL" ||
+    comunidadeVip !== "ALL" ||
     dataInicio ||
     dataFim;
 
@@ -248,6 +263,23 @@ export function VipLeadsTab() {
           </SelectContent>
         </Select>
 
+        <Select
+          value={comunidadeVip}
+          onValueChange={(v) => {
+            setComunidadeVip(v as ComunidadeVipFiltro);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Comunidade VIP" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Comunidade VIP (todos)</SelectItem>
+            <SelectItem value="SIM">Marcados</SelectItem>
+            <SelectItem value="NAO">Não marcados</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex items-center gap-2">
           <div>
             <label className="text-[11px] uppercase text-muted-foreground block mb-1">
@@ -334,6 +366,14 @@ export function VipLeadsTab() {
         onToggleTodos={toggleTodos}
         todosSelecionados={todosSelecionados}
         onRowClick={(id) => setDetalheId(id)}
+        onToggleComunidadeVip={(id, valor) =>
+          setComunidadeVipMutation.mutate({ id, comunidadeVip: valor })
+        }
+        pendingComunidadeVipId={
+          setComunidadeVipMutation.isPending
+            ? setComunidadeVipMutation.variables?.id ?? null
+            : null
+        }
       />
 
       {/* Paginação */}

@@ -937,6 +937,8 @@ model LeadVip {
   maximoPagoRelogio String?
   // Comunidade
   objetivosComunidade ObjetivoComunidadeVip[] @default([])
+  // Marcação manual da equipe: lead faz parte da Comunidade VIP
+  comunidadeVip       Boolean                 @default(false)
   // Metadados de origem (auditoria/anti-spam)
   ipOrigem  String?
   userAgent String?
@@ -951,6 +953,7 @@ model LeadVip {
   @@index([status])
   @@index([createdAt])
   @@index([email])
+  @@index([comunidadeVip])
   @@map("leads_vip")
 }
 
