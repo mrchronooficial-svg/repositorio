@@ -14,7 +14,9 @@ import {
   Archive,
   Check as CheckIcon,
   Loader2,
+  Download,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -65,6 +67,9 @@ export function VipLeadsTab() {
 
   // ---------- Drawer de detalhe ----------
   const [detalheId, setDetalheId] = useState<string | null>(null);
+
+  // ---------- Export ----------
+  const [isExporting, setIsExporting] = useState(false);
 
   // ---------- Queries ----------
   const { data: stats } = useQuery(trpc.leadVip.stats.queryOptions());
@@ -171,6 +176,57 @@ export function VipLeadsTab() {
     }
   };
 
+  const exportarExcel = async () => {
+    setIsExporting(true);
+    try {
+      const leads = await queryClient.fetchQuery(
+        trpc.leadVip.exportList.queryOptions({
+          search: search.trim() || undefined,
+          status: status === "ALL" ? undefined : status,
+          jaColeciona:
+            coleciona === "ALL" ? undefined : coleciona === "SIM",
+          comunidadeVip:
+            comunidadeVip === "ALL" ? undefined : comunidadeVip === "SIM",
+          dataInicio: dataInicio || undefined,
+          dataFim: dataFim || undefined,
+          incluirArquivados: status === "ARQUIVADO",
+        }),
+      );
+
+      if (!leads || leads.length === 0) {
+        toast.error("Nenhum lead para exportar");
+        return;
+      }
+
+      const rows = leads.map((l) => ({
+        "Nome": l.nome,
+        "Telefone": l.celular,
+        "Marca Preferida": l.marcaPreferida ?? "",
+        "Comunidade VIP": l.comunidadeVip ? "Sim" : "Não",
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws["!cols"] = [
+        { wch: 30 }, // Nome
+        { wch: 20 }, // Telefone
+        { wch: 25 }, // Marca Preferida
+        { wch: 16 }, // Comunidade VIP
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Leads VIP");
+
+      const hoje = new Date().toISOString().split("T")[0];
+      XLSX.writeFile(wb, `leads-vip-mrchrono-${hoje}.xlsx`);
+      toast.success("Planilha exportada com sucesso!");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao exportar";
+      toast.error(msg);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const copiarLinkFormulario = async () => {
     const url = `${window.location.origin}/comunidade-vip`;
     try {
@@ -189,10 +245,24 @@ export function VipLeadsTab() {
         <p className="text-muted-foreground">
           Gerencie os leads captados pelo formulário VIP Chrono
         </p>
-        <Button onClick={copiarLinkFormulario} variant="outline">
-          <Copy className="w-4 h-4 mr-2" />
-          Copiar link do formulário
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={exportarExcel}
+            variant="outline"
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 mr-2" />
+            )}
+            Exportar Excel
+          </Button>
+          <Button onClick={copiarLinkFormulario} variant="outline">
+            <Copy className="w-4 h-4 mr-2" />
+            Copiar link do formulário
+          </Button>
+        </div>
       </div>
 
       {/* Cards de métricas */}

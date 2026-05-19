@@ -76,6 +76,18 @@ const LeadVipListSchema = z.object({
   sortDir: z.enum(["asc", "desc"]).default("desc"),
 });
 
+const LeadVipExportSchema = z.object({
+  search: z.string().optional(),
+  status: StatusLeadEnum.optional(),
+  faixaRendaAnual: FaixaRendaAnualEnum.optional(),
+  jaColeciona: z.boolean().optional(),
+  comunidadeVip: z.boolean().optional(),
+  objetivos: z.array(ObjetivoComunidadeEnum).max(10).optional(),
+  dataInicio: z.string().optional(),
+  dataFim: z.string().optional(),
+  incluirArquivados: z.boolean().default(false),
+});
+
 const LeadVipSetComunidadeVipSchema = z.object({
   id: z.string().cuid(),
   comunidadeVip: z.boolean(),
@@ -177,6 +189,68 @@ export const leadVipRouter = router({
         pages: Math.ceil(total / limit),
         page,
       };
+    }),
+
+  // ---------- EXPORTAR (sem paginacao, mesmos filtros do list) ----------
+  exportList: protectedProcedure
+    .input(LeadVipExportSchema)
+    .query(async ({ input }) => {
+      const {
+        search, status, faixaRendaAnual, jaColeciona, comunidadeVip,
+        objetivos, dataInicio, dataFim, incluirArquivados,
+      } = input;
+
+      const andConditions: Record<string, unknown>[] = [];
+
+      if (search) {
+        andConditions.push({
+          OR: [
+            { nome: { contains: search, mode: "insensitive" as const } },
+            { email: { contains: search, mode: "insensitive" as const } },
+            { celular: { contains: search } },
+            { profissao: { contains: search, mode: "insensitive" as const } },
+          ],
+        });
+      }
+
+      if (objetivos && objetivos.length > 0) {
+        andConditions.push({
+          OR: objetivos.map((obj) => ({
+            objetivosComunidade: { has: obj },
+          })),
+        });
+      }
+
+      const where = {
+        ...(status
+          ? { status }
+          : !incluirArquivados
+            ? { status: { not: "ARQUIVADO" as const } }
+            : {}),
+        ...(faixaRendaAnual && { faixaRendaAnual }),
+        ...(jaColeciona !== undefined && { jaColeciona }),
+        ...(comunidadeVip !== undefined && { comunidadeVip }),
+        ...((dataInicio || dataFim) && {
+          createdAt: {
+            ...(dataInicio && { gte: new Date(dataInicio) }),
+            ...(dataFim && { lte: new Date(dataFim) }),
+          },
+        }),
+        ...(andConditions.length > 0 && { AND: andConditions }),
+      };
+
+      const leads = await prisma.leadVip.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        select: {
+          nome: true,
+          celular: true,
+          marcaPreferida: true,
+          comunidadeVip: true,
+        },
+      });
+
+      return leads;
     }),
 
   // ---------- DETALHE ----------
