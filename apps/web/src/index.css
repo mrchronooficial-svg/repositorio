@@ -158,9 +158,11 @@
   }
   body {
     @apply font-sans bg-background text-foreground antialiased;
+    overscroll-behavior-y: none;
   }
   html {
     @apply font-sans;
+    overscroll-behavior-y: none;
   }
 }
 
