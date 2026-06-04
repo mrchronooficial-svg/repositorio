@@ -3,7 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { router, adminProcedure } from "../index";
 import prisma from "@gestaomrchrono/db";
 import { registrarAuditoria } from "../services/auditoria.service";
-import { gerarDRE, gerarBalanco, gerarDFC } from "../services/demonstrativos.service";
+import { gerarDRE, gerarBalanco, gerarDFC, gerarKpisOperacionais } from "../services/demonstrativos.service";
 import { calcularRBT12, calcularAliquotaEfetiva } from "../services/simples-nacional.service";
 import { criarLancamentosVenda, reverterLancamentosVenda } from "../services/lancamento-venda.service";
 import { brtToday } from "../utils/brt-date";
@@ -1257,6 +1257,36 @@ export const financeiroRouter = router({
     )
     .query(async ({ input }) => {
       return gerarDFC(input.mes, input.ano);
+    }),
+
+  // Exportação dos demonstrativos (DRE + Balanço + DFC + KPIs) de vários meses
+  // para gerar a planilha Excel. Processa um mês por vez para não sobrecarregar o banco.
+  exportDemonstrativos: adminProcedure
+    .input(
+      z.object({
+        meses: z
+          .array(
+            z.object({
+              mes: z.number().int().min(1).max(12),
+              ano: z.number().int().min(2024),
+            })
+          )
+          .min(1, "Selecione pelo menos um mês")
+          .max(36, "Máximo de 36 meses por exportação"),
+      })
+    )
+    .query(async ({ input }) => {
+      const resultados = [];
+      for (const { mes, ano } of input.meses) {
+        const [dre, balanco, dfc, kpis] = await Promise.all([
+          gerarDRE(mes, ano),
+          gerarBalanco(mes, ano),
+          gerarDFC(mes, ano),
+          gerarKpisOperacionais(mes, ano),
+        ]);
+        resultados.push({ mes, ano, periodo: dre.periodo, dre, balanco, dfc, kpis });
+      }
+      return resultados;
     }),
 
   // =========================================

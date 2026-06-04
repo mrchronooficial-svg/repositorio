@@ -92,6 +92,15 @@ export interface DFCResult {
   };
 }
 
+export interface KpisOperacionaisResult {
+  // Vendas no mês
+  unidadesPropriasVendidas: number;
+  unidadesConsignadasVendidas: number;
+  // "Foto" do estoque no último dia do mês
+  estoquePropriasFimMes: number;
+  estoqueConsignadasFimMes: number;
+}
+
 // ==================================================
 // FUNÇÕES AUXILIARES
 // ==================================================
@@ -851,5 +860,75 @@ export async function gerarDFC(mes: number, ano: number): Promise<DFCResult> {
       saldoInicial,
       saldoFinal,
     },
+  };
+}
+
+// ==================================================
+// KPIs OPERACIONAIS (para exportação dos demonstrativos)
+// ==================================================
+
+/**
+ * KPIs operacionais do mês:
+ * - Unidades próprias / consignadas vendidas no mês
+ * - "Foto" do estoque no fim do mês: quantas peças próprias / consignadas
+ *   estavam em estoque (status DISPONIVEL, EM_TRANSITO ou REVISAO) no último
+ *   instante do mês, reconstruído a partir do histórico de status de cada peça.
+ */
+export async function gerarKpisOperacionais(
+  mes: number,
+  ano: number
+): Promise<KpisOperacionaisResult> {
+  const dataInicio = brtMonthStart(ano, mes - 1);
+  const dataFimExclusivo = brtMonthEnd(ano, mes - 1);
+
+  // Unidades vendidas no mês (vendas não canceladas), separadas por origem da peça
+  const [unidadesPropriasVendidas, unidadesConsignadasVendidas] = await Promise.all([
+    prisma.venda.count({
+      where: {
+        cancelada: false,
+        dataVenda: { gte: dataInicio, lt: dataFimExclusivo },
+        peca: { origemTipo: "COMPRA" },
+      },
+    }),
+    prisma.venda.count({
+      where: {
+        cancelada: false,
+        dataVenda: { gte: dataInicio, lt: dataFimExclusivo },
+        peca: { origemTipo: "CONSIGNACAO" },
+      },
+    }),
+  ]);
+
+  // "Foto" do estoque no fim do mês — reconstrói o status de cada peça naquela
+  // data usando o último registro de histórico até o fim do mês (fallback: status atual).
+  const STATUS_EM_ESTOQUE: string[] = ["DISPONIVEL", "EM_TRANSITO", "REVISAO"];
+  const pecas = await prisma.peca.findMany({
+    where: { createdAt: { lt: dataFimExclusivo } },
+    select: {
+      origemTipo: true,
+      status: true,
+      historicoStatus: {
+        where: { createdAt: { lt: dataFimExclusivo } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { statusNovo: true },
+      },
+    },
+  });
+
+  let estoquePropriasFimMes = 0;
+  let estoqueConsignadasFimMes = 0;
+  for (const p of pecas) {
+    const statusNaData = p.historicoStatus[0]?.statusNovo ?? p.status;
+    if (!STATUS_EM_ESTOQUE.includes(statusNaData)) continue;
+    if (p.origemTipo === "COMPRA") estoquePropriasFimMes++;
+    else estoqueConsignadasFimMes++;
+  }
+
+  return {
+    unidadesPropriasVendidas,
+    unidadesConsignadasVendidas,
+    estoquePropriasFimMes,
+    estoqueConsignadasFimMes,
   };
 }
