@@ -274,6 +274,18 @@ export default function PecaDetalhesPage() {
                 <p className="text-sm text-muted-foreground">Material Pulseira</p>
                 <p className="font-medium">{peca.materialPulseira || "-"}</p>
               </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Movimento</p>
+                <p className="font-medium">{peca.movimento || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Referencia</p>
+                <p className="font-medium">{peca.referencia || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Calibre</p>
+                <p className="font-medium">{peca.calibre || "-"}</p>
+              </div>
             </CardContent>
           </Card>
 

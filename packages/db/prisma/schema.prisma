@@ -215,6 +215,9 @@ model Peca {
   tamanhoCaixa     Float // em mm
   materialCaixa    String?
   materialPulseira String?
+  movimento        String? // Ex: Automatico, Corda Manual, Quartzo
+  referencia       String? // Numero de referencia do modelo
+  calibre          String? // Calibre do movimento (Ex: ETA 2824-2)
   // Valores
   valorCompra      Decimal     @db.Decimal(10, 2)
   valorEstimadoVenda Decimal   @db.Decimal(10, 2)

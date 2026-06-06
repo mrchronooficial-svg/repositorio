@@ -30,6 +30,9 @@ interface PecaData {
   tamanhoCaixa: string;
   materialCaixa: string;
   materialPulseira: string;
+  movimento: string;
+  referencia: string;
+  calibre: string;
   valorCompra: string;
   valorEstimadoVenda: string;
   origemTipo: "COMPRA" | "CONSIGNACAO";
@@ -56,6 +59,9 @@ const defaultData: PecaData = {
   tamanhoCaixa: "",
   materialCaixa: "",
   materialPulseira: "",
+  movimento: "",
+  referencia: "",
+  calibre: "",
   valorCompra: "",
   valorEstimadoVenda: "",
   origemTipo: "COMPRA",
@@ -243,6 +249,9 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       tamanhoCaixa: parseFloat(data.tamanhoCaixa),
       materialCaixa: data.materialCaixa || undefined,
       materialPulseira: data.materialPulseira || undefined,
+      movimento: data.movimento || undefined,
+      referencia: data.referencia || undefined,
+      calibre: data.calibre || undefined,
       // Consignacao nao tem valor de compra, usa 0
       valorCompra: data.origemTipo === "CONSIGNACAO" ? 0 : parseFloat(data.valorCompra),
       valorEstimadoVenda: parseFloat(data.valorEstimadoVenda),
@@ -274,6 +283,9 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         tamanhoCaixa: payload.tamanhoCaixa,
         materialCaixa: payload.materialCaixa,
         materialPulseira: payload.materialPulseira,
+        movimento: payload.movimento ?? null,
+        referencia: payload.referencia ?? null,
+        calibre: payload.calibre ?? null,
         localizacao: payload.localizacao,
         dataEstimadaChegada:
           data.origemTipo === "COMPRA" ? payload.dataEstimadaChegada ?? null : null,
@@ -422,6 +434,38 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="movimento">Movimento</Label>
+              <Input
+                id="movimento"
+                value={data.movimento}
+                onChange={(e) => handleChange("movimento", e.target.value)}
+                placeholder="Ex: Automatico, Corda Manual, Quartzo"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="referencia">Referencia</Label>
+              <Input
+                id="referencia"
+                value={data.referencia}
+                onChange={(e) => handleChange("referencia", e.target.value)}
+                placeholder="Ex: 16610"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="calibre">Calibre</Label>
+              <Input
+                id="calibre"
+                value={data.calibre}
+                onChange={(e) => handleChange("calibre", e.target.value)}
+                placeholder="Ex: ETA 2824-2"
+              />
             </div>
           </div>
         </CardContent>
