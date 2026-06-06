@@ -29,6 +29,7 @@ import { WidgetKpiMargemBruta } from "./widgets/widget-kpi-margem-bruta";
 import { WidgetKpiLucroLiquido } from "./widgets/widget-kpi-lucro-liquido";
 import { WidgetKpiEstoqueCusto } from "./widgets/widget-kpi-estoque-custo";
 import { WidgetKpiEstoqueFaturamento } from "./widgets/widget-kpi-estoque-faturamento";
+import { WidgetFaixasLucroBruto } from "./widgets/widget-faixas-lucro-bruto";
 import { WidgetGraficos } from "./widgets/widget-graficos";
 import { WidgetListas } from "./widgets/widget-listas";
 import { WidgetPaceVendas } from "./widgets/widget-pace-vendas";
@@ -113,6 +114,9 @@ export function DashboardPage() {
   const { data: valorEstoque } = useQuery(
     trpc.dashboard.getMetricasValorEstoque.queryOptions()
   );
+  const { data: faixasLucro } = useQuery(
+    trpc.dashboard.getFaixasLucroBruto.queryOptions()
+  );
 
   const verificarAlertasMutation = useMutation(
     trpc.alerta.verificarAlertas.mutationOptions({
@@ -141,6 +145,7 @@ export function DashboardPage() {
     kpiEstoqueFaturamento: podeVerValores && !!valorEstoque,
     kpiClientes: !podeVerValores,
     kpiEmRevisao: !podeVerValores,
+    faixasLucroBruto: podeVerValores && !!faixasLucro,
     paceVendas: true,
     paceLucroBruto: isAdmin,
     graficos: true,
@@ -296,6 +301,16 @@ export function DashboardPage() {
       case "kpiEmRevisao":
         return metricas ? (
           <WidgetKpiEmRevisao emRevisao={metricas.estoque.emRevisao} />
+        ) : null;
+
+      case "faixasLucroBruto":
+        return faixasLucro ? (
+          <WidgetFaixasLucroBruto
+            faixas={faixasLucro.faixas}
+            totalDisponiveis={faixasLucro.totalDisponiveis}
+            totalChegando={faixasLucro.totalChegando}
+            totalGeral={faixasLucro.totalGeral}
+          />
         ) : null;
 
       case "graficos":

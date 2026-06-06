@@ -12,6 +12,7 @@ export const SECTION_IDS = [
   "kpiEstoqueFaturamento",
   "kpiClientes",
   "kpiEmRevisao",
+  "faixasLucroBruto",
   "graficos",
   "listas",
   "recebiveis",
@@ -55,6 +56,7 @@ export const DEFAULT_GRID_LAYOUT: GridItem[] = [
   { i: "paceLucroBruto",      x: 0, y: 11, w: 8, h: 3 },
   { i: "recebiveis",          x: 0, y: 14, w: 8, h: 1 },
   { i: "dividas",             x: 0, y: 15, w: 8, h: 1 },
+  { i: "faixasLucroBruto",    x: 0, y: 16, w: 4, h: 3 },
 ];
 
 export const DEFAULT_LAYOUT: DashboardLayout = {
@@ -76,6 +78,7 @@ export const SECTION_LABELS: Record<SectionId, string> = {
   kpiEstoqueFaturamento: "Estoque (Faturamento)",
   kpiClientes: "Clientes",
   kpiEmRevisao: "Em Revisao",
+  faixasLucroBruto: "Estoque por Faixa de Lucro Bruto",
   graficos: "Graficos",
   listas: "Vendas Recentes / Revisao",
   paceVendas: "Pace de Vendas",

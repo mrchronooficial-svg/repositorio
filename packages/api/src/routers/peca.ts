@@ -791,13 +791,15 @@ export const pecaRouter = router({
   getMetricas: protectedProcedure.query(async ({ ctx }) => {
     const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
 
-    // Contagem por status
+    // Contagem por status — KPIs do estoque consideram apenas peças COMPRADAS
+    // (consignadas continuam visíveis nas listagens, financeiro, etc.)
     const [contagens, contagensOrigem] = await Promise.all([
       prisma.peca.groupBy({
         by: ["status"],
-        where: { arquivado: false },
+        where: { arquivado: false, origemTipo: "COMPRA" },
         _count: true,
       }),
+      // Card "Origem" — mostra propositalmente a divisão compra vs consignação
       prisma.peca.groupBy({
         by: ["origemTipo"],
         where: {
@@ -841,6 +843,7 @@ export const pecaRouter = router({
         where: {
           arquivado: false,
           status: { in: ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] },
+          origemTipo: "COMPRA",
         },
         select: { valorEstimadoVenda: true },
       });

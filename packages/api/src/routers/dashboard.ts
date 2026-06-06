@@ -43,7 +43,8 @@ export const dashboardRouter = router({
     const metaSemanal = configMetaSemanal ? parseInt(configMetaSemanal.valor) : 10;
     const estoqueIdeal = Math.ceil(metaSemanal * (leadTime / 7));
 
-    // Metricas de estoque
+    // Metricas de estoque — KPIs consideram apenas peças COMPRADAS
+    // (consignadas continuam nas listagens, financeiro, etc.)
     const [
       pecasDisponiveis,
       pecasEmTransito,
@@ -52,13 +53,13 @@ export const dashboardRouter = router({
       pecasTotal,
     ] = await Promise.all([
       prisma.peca.count({
-        where: { status: "DISPONIVEL", arquivado: false },
+        where: { status: "DISPONIVEL", arquivado: false, origemTipo: "COMPRA" },
       }),
       prisma.peca.count({
-        where: { status: "EM_TRANSITO", arquivado: false },
+        where: { status: "EM_TRANSITO", arquivado: false, origemTipo: "COMPRA" },
       }),
       prisma.peca.count({
-        where: { status: "REVISAO", arquivado: false },
+        where: { status: "REVISAO", arquivado: false, origemTipo: "COMPRA" },
       }),
       prisma.peca.count({
         where: {
@@ -633,11 +634,13 @@ export const dashboardRouter = router({
     // Status que contam como "em estoque"
     const statusEmEstoque = ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] as const;
 
-    // Total de pecas (todos os status, nao arquivadas)
+    // KPIs de estoque consideram apenas peças COMPRADAS
+    // (consignado não é capital investido pela empresa)
     const totalPecas = await prisma.peca.count({
       where: {
         arquivado: false,
         status: { in: [...statusEmEstoque] },
+        origemTipo: "COMPRA",
       },
     });
 
@@ -651,12 +654,13 @@ export const dashboardRouter = router({
       },
     });
 
-    // Valor em faturamento (soma do valor estimado de venda de todas as pecas em estoque)
+    // Valor em faturamento (soma do valor estimado de venda das pecas COMPRADAS em estoque)
     const faturamentoEstoque = await prisma.peca.aggregate({
       _sum: { valorEstimadoVenda: true },
       where: {
         arquivado: false,
         status: { in: [...statusEmEstoque] },
+        origemTipo: "COMPRA",
       },
     });
 
@@ -664,6 +668,88 @@ export const dashboardRouter = router({
       totalPecas,
       valorCusto: Number(custoEstoque._sum.valorCompra) || 0,
       valorFaturamento: Number(faturamentoEstoque._sum.valorEstimadoVenda) || 0,
+    };
+  }),
+
+  // Distribuição do estoque por faixa de lucro bruto estimado.
+  // Inclui peças PRÓPRIAS e CONSIGNADAS, divididas em "disponíveis" (DISPONIVEL)
+  // e "chegando" (EM_TRANSITO). Peças com lucro bruto < R$ 2.000 são ignoradas.
+  // Lucro bruto estimado por peça = valorEstimadoVenda − custo, onde o custo é
+  // valorCompra (própria) ou o repasse (consignada: valor fixo ou % do estimado).
+  // Mesma fórmula exibida na coluna "Lucro Bruto" da listagem de estoque.
+  getFaixasLucroBruto: protectedProcedure.query(async ({ ctx }) => {
+    const userNivel = ctx.session.user.nivel;
+    if (userNivel === "FUNCIONARIO") {
+      return null;
+    }
+
+    const pecas = await prisma.peca.findMany({
+      where: {
+        arquivado: false,
+        status: { in: ["DISPONIVEL", "EM_TRANSITO"] },
+      },
+      select: {
+        status: true,
+        origemTipo: true,
+        valorEstimadoVenda: true,
+        valorCompra: true,
+        valorRepasse: true,
+        percentualRepasse: true,
+      },
+    });
+
+    // Faixas (min inclusivo, max exclusivo; max null = sem teto)
+    const faixas = [
+      { label: "R$ 2.000 – 2.500", min: 2000, max: 2500, disponiveis: 0, chegando: 0 },
+      { label: "R$ 2.500 – 3.000", min: 2500, max: 3000, disponiveis: 0, chegando: 0 },
+      { label: "R$ 3.000 – 3.500", min: 3000, max: 3500, disponiveis: 0, chegando: 0 },
+      { label: "R$ 3.500 – 4.000", min: 3500, max: 4000, disponiveis: 0, chegando: 0 },
+      { label: "R$ 4.000 – 5.000", min: 4000, max: 5000, disponiveis: 0, chegando: 0 },
+      { label: "Acima de R$ 5.000", min: 5000, max: null as number | null, disponiveis: 0, chegando: 0 },
+    ];
+
+    for (const p of pecas) {
+      const valorVenda = Number(p.valorEstimadoVenda) || 0;
+      if (!valorVenda) continue;
+
+      let custo: number;
+      if (p.origemTipo === "CONSIGNACAO") {
+        if (p.valorRepasse) {
+          custo = Number(p.valorRepasse);
+        } else if (p.percentualRepasse) {
+          custo = valorVenda * (Number(p.percentualRepasse) / 100);
+        } else {
+          custo = 0;
+        }
+      } else {
+        custo = Number(p.valorCompra) || 0;
+      }
+
+      const lucro = valorVenda - custo;
+      if (lucro < 2000) continue; // abaixo de 2k não aparece
+
+      const faixa = faixas.find(
+        (f) => lucro >= f.min && (f.max === null || lucro < f.max)
+      );
+      if (!faixa) continue;
+
+      if (p.status === "DISPONIVEL") faixa.disponiveis++;
+      else if (p.status === "EM_TRANSITO") faixa.chegando++;
+    }
+
+    const totalDisponiveis = faixas.reduce((acc, f) => acc + f.disponiveis, 0);
+    const totalChegando = faixas.reduce((acc, f) => acc + f.chegando, 0);
+
+    return {
+      faixas: faixas.map((f) => ({
+        label: f.label,
+        disponiveis: f.disponiveis,
+        chegando: f.chegando,
+        total: f.disponiveis + f.chegando,
+      })),
+      totalDisponiveis,
+      totalChegando,
+      totalGeral: totalDisponiveis + totalChegando,
     };
   }),
 
