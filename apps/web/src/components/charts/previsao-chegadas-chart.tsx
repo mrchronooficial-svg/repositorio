@@ -99,17 +99,22 @@ function CustomTooltip({
       )}
       {row.tipo === "chegada" && (
         <div className="space-y-1">
-          <p className="font-semibold">
-            {row.name} — {row.valor} chegando
-          </p>
-          <ul className="text-muted-foreground list-disc list-inside max-h-48 overflow-auto">
-            {row.pecas.map((p) => (
-              <li key={p.sku}>
-                {p.marca} {p.modelo}{" "}
-                <span className="text-xs opacity-70">({p.sku})</span>
-              </li>
-            ))}
-          </ul>
+          <p className="font-semibold">{row.name}</p>
+          {row.pecas.length === 0 ? (
+            <p className="text-muted-foreground">Nenhuma chegada neste dia</p>
+          ) : (
+            <>
+              <p className="text-muted-foreground">{row.valor} chegando:</p>
+              <ul className="text-muted-foreground list-disc list-inside max-h-48 overflow-auto">
+                {row.pecas.map((p) => (
+                  <li key={p.sku}>
+                    {p.marca} {p.modelo}{" "}
+                    <span className="text-xs opacity-70">({p.sku})</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -119,28 +124,53 @@ function CustomTooltip({
 export function PrevisaoChegadasChart({ data }: { data: PrevisaoData }) {
   const rows = buildRows(data);
 
+  // Timeline contínua: cada dia tem seu espaço, mesmo sem chegadas.
+  // Em períodos longos (30/60 dias) o gráfico cresce e rola na horizontal.
+  const larguraMinima = Math.max(720, rows.length * 38);
+
   return (
-    <ResponsiveContainer width="100%" height={380}>
-      <BarChart data={rows} margin={{ top: 24, right: 16, left: 0, bottom: 24 }}>
-        <XAxis
-          dataKey="name"
-          tick={{ fontSize: 12 }}
-          interval={0}
-          angle={rows.length > 8 ? -35 : 0}
-          textAnchor={rows.length > 8 ? "end" : "middle"}
-          height={rows.length > 8 ? 60 : 30}
-        />
-        <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-        <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-        {/* Base invisível para criar o efeito cascata */}
-        <Bar dataKey="base" stackId="a" fill="transparent" isAnimationActive={false} />
-        <Bar dataKey="valor" stackId="a" radius={[4, 4, 0, 0]}>
-          {rows.map((row) => (
-            <Cell key={row.name} fill={CORES[row.tipo]} />
-          ))}
-          <LabelList dataKey="valor" position="top" fontSize={12} />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="w-full overflow-x-auto">
+      <div style={{ width: larguraMinima, height: 420 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={rows}
+            margin={{ top: 24, right: 16, left: 0, bottom: 56 }}
+            barCategoryGap="20%"
+          >
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 11 }}
+              interval={0}
+              angle={-45}
+              textAnchor="end"
+              height={64}
+            />
+            <YAxis allowDecimals={false} tick={{ fontSize: 12 }} width={36} />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ fill: "rgba(0,0,0,0.04)" }}
+            />
+            {/* Base invisível para criar o efeito cascata */}
+            <Bar
+              dataKey="base"
+              stackId="a"
+              fill="transparent"
+              isAnimationActive={false}
+            />
+            <Bar dataKey="valor" stackId="a" radius={[4, 4, 0, 0]}>
+              {rows.map((row) => (
+                <Cell key={row.name} fill={CORES[row.tipo]} />
+              ))}
+              <LabelList
+                dataKey="valor"
+                position="top"
+                fontSize={11}
+                formatter={(value) => (Number(value) > 0 ? String(value) : "")}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }

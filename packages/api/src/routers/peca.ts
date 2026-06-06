@@ -988,17 +988,26 @@ export const pecaRouter = router({
         buckets.set(key, lista);
       }
 
-      const chegadas = [...buckets.entries()]
-        .sort((a, b) => (a[0] < b[0] ? -1 : 1))
-        .map(([data, pecas]) => {
-          const [, mes, dia] = data.split("-");
-          return {
-            data,
-            label: data === todayKey ? "Hoje" : `${dia}/${mes}`,
-            quantidade: pecas.length,
-            pecas,
-          };
+      // Gerar TODOS os dias do período (timeline contínua), mesmo sem chegadas
+      const chegadas: {
+        data: string;
+        label: string;
+        quantidade: number;
+        pecas: { sku: string; marca: string; modelo: string }[];
+      }[] = [];
+      for (let i = 0; i <= input.dias; i++) {
+        const data = new Date(todayUTC.getTime() + i * 86400000)
+          .toISOString()
+          .slice(0, 10);
+        const pecas = buckets.get(data) ?? [];
+        const [, mes, dia] = data.split("-");
+        chegadas.push({
+          data,
+          label: data === todayKey ? "Hoje" : `${dia}/${mes}`,
+          quantidade: pecas.length,
+          pecas,
         });
+      }
 
       const totalChegadas = chegadas.reduce((acc, c) => acc + c.quantidade, 0);
 
