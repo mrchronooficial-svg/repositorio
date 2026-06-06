@@ -313,9 +313,11 @@ export default function LogisticaPage() {
                       <TableCell>
                         {venda.statusEnvio === "ENVIADO" ? (
                           venda.codigoRastreio ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800" title={venda.codigoRastreio}>
-                              <Check className="h-3 w-3 mr-1" />
-                              Sim
+                            <span
+                              className="font-mono text-xs font-medium select-all cursor-text break-all"
+                              title="Codigo de rastreio (clique para selecionar)"
+                            >
+                              {venda.codigoRastreio}
                             </span>
                           ) : venda.tipoEntrega ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700" title={venda.tipoEntrega === "RETIRADA_PESSOALMENTE" ? "Retirou pessoalmente" : "Entrega no RJ"}>
