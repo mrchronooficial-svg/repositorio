@@ -75,6 +75,9 @@ export default function EditarPecaPage() {
           percentualRepasse: peca.percentualRepasse ? peca.percentualRepasse.toString() : "",
           revisada: peca.revisada ?? false,
           localizacao: peca.localizacao,
+          dataEstimadaChegada: peca.dataEstimadaChegada
+            ? new Date(peca.dataEstimadaChegada).toISOString().slice(0, 10)
+            : "",
           fornecedorId: peca.fornecedorId,
           fotos: peca.fotos.map((f) => f.url),
         }}

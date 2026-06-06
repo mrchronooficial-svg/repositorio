@@ -39,6 +39,7 @@ interface PecaData {
   percentualRepasse: string;
   revisada: boolean;
   localizacao: string;
+  dataEstimadaChegada: string;
   fornecedorId: string;
   fotos: string[];
 }
@@ -64,6 +65,7 @@ const defaultData: PecaData = {
   percentualRepasse: "",
   revisada: false,
   localizacao: "Fornecedor",
+  dataEstimadaChegada: "",
   fornecedorId: "",
   fotos: [],
 };
@@ -185,6 +187,11 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       newErrors.tamanhoCaixa = "Tamanho da caixa e obrigatorio";
     }
 
+    // Data estimada de chegada e obrigatoria para compras (entra na Previsao)
+    if (data.origemTipo === "COMPRA" && !data.dataEstimadaChegada) {
+      newErrors.dataEstimadaChegada = "Data estimada de chegada e obrigatoria";
+    }
+
     // Validar campos monetarios apenas se o usuario pode ver valores
     // FUNCIONARIO nao ve e nao edita valores — pula validacao
     if (podeVerValores) {
@@ -249,6 +256,11 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         : undefined,
       revisada: data.revisada,
       localizacao: data.localizacao,
+      // So compras tem previsao de chegada; consignacao nao entra na Previsao
+      dataEstimadaChegada:
+        data.origemTipo === "COMPRA" && data.dataEstimadaChegada
+          ? data.dataEstimadaChegada
+          : undefined,
       fornecedorId: data.fornecedorId,
       fotos: data.fotos,
     };
@@ -263,6 +275,8 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         materialCaixa: payload.materialCaixa,
         materialPulseira: payload.materialPulseira,
         localizacao: payload.localizacao,
+        dataEstimadaChegada:
+          data.origemTipo === "COMPRA" ? payload.dataEstimadaChegada ?? null : null,
       };
 
       // Apenas enviar campos monetarios se o usuario tem permissao
@@ -533,6 +547,24 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
                 </SelectContent>
               </Select>
             </div>
+
+            {data.origemTipo === "COMPRA" && (
+              <div className="space-y-2">
+                <Label htmlFor="dataEstimadaChegada">Data Estimada de Chegada *</Label>
+                <Input
+                  id="dataEstimadaChegada"
+                  type="date"
+                  value={data.dataEstimadaChegada}
+                  onChange={(e) => handleChange("dataEstimadaChegada", e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quando a peca deve chegar fisicamente na empresa
+                </p>
+                {errors.dataEstimadaChegada && (
+                  <p className="text-sm text-red-500">{errors.dataEstimadaChegada}</p>
+                )}
+              </div>
+            )}
 
             {podeVerValores && data.origemTipo === "CONSIGNACAO" && (
               <>

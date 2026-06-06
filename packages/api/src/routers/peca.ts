@@ -23,6 +23,7 @@ const PecaCreateSchema = z.object({
   localizacao: z.string().default("Fornecedor"),
   fornecedorId: z.string().cuid("Fornecedor invalido"),
   revisada: z.boolean().optional(),
+  dataEstimadaChegada: z.string().optional(), // ISO date (yyyy-mm-dd) — obrigatória para COMPRA
   fotos: z.array(z.string().min(1)).min(1, "Minimo 1 foto obrigatoria"),
 }).refine(
   (data) => {
@@ -35,6 +36,18 @@ const PecaCreateSchema = z.object({
   {
     message: "Valor de compra deve ser positivo para compras",
     path: ["valorCompra"],
+  }
+).refine(
+  (data) => {
+    // Data estimada de chegada e obrigatoria para peças compradas
+    if (data.origemTipo === "COMPRA" && !data.dataEstimadaChegada) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "Data estimada de chegada e obrigatoria para compras",
+    path: ["dataEstimadaChegada"],
   }
 );
 
@@ -51,6 +64,7 @@ const PecaUpdateSchema = z.object({
   valorRepasse: z.number().positive().optional().nullable(),
   percentualRepasse: z.number().positive().max(100).optional().nullable(),
   localizacao: z.string().optional(),
+  dataEstimadaChegada: z.string().optional().nullable(),
 });
 
 const PecaListSchema = z.object({
@@ -360,6 +374,9 @@ export const pecaRouter = router({
             revisada: input.revisada ?? false,
             localizacao: input.localizacao,
             status: "EM_TRANSITO",
+            dataEstimadaChegada: input.dataEstimadaChegada
+              ? new Date(input.dataEstimadaChegada)
+              : null,
             fornecedorId: input.fornecedorId,
             fotos: {
               create: input.fotos.map((url, index) => ({
@@ -416,6 +433,12 @@ export const pecaRouter = router({
       }
       if (data.percentualRepasse !== undefined && data.percentualRepasse !== null) {
         updateData.valorRepasse = null;
+      }
+      // Converter data estimada de chegada (string ISO) para Date
+      if (data.dataEstimadaChegada !== undefined) {
+        updateData.dataEstimadaChegada = data.dataEstimadaChegada
+          ? new Date(data.dataEstimadaChegada)
+          : null;
       }
 
       const peca = await prisma.peca.update({
@@ -904,5 +927,162 @@ export const pecaRouter = router({
       });
 
       return { success: true };
+    }),
+
+  // ============================================
+  // PREVISÃO DE CHEGADAS
+  // ============================================
+
+  // Dados do gráfico cascata de previsão de chegadas
+  getPrevisaoChegadas: protectedProcedure
+    .input(z.object({ dias: z.union([z.literal(30), z.literal(60)]).default(30) }))
+    .query(async ({ input }) => {
+      // Calendário em horário do Brasil (UTC-3) para evitar erro de "virada de dia"
+      const agoraBR = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      const todayKey = agoraBR.toISOString().slice(0, 10);
+      const todayUTC = new Date(`${todayKey}T00:00:00.000Z`);
+      const lastKey = new Date(todayUTC.getTime() + input.dias * 86400000)
+        .toISOString()
+        .slice(0, 10);
+
+      // Barra inicial: peças COMPRADAS já disponíveis fisicamente
+      const estoqueAtual = await prisma.peca.count({
+        where: { arquivado: false, origemTipo: "COMPRA", status: "DISPONIVEL" },
+      });
+
+      // Peças compradas ainda em trânsito, com data estimada definida
+      const emTransito = await prisma.peca.findMany({
+        where: {
+          arquivado: false,
+          origemTipo: "COMPRA",
+          status: "EM_TRANSITO",
+          dataEstimadaChegada: { not: null },
+        },
+        select: {
+          sku: true,
+          marca: true,
+          modelo: true,
+          dataEstimadaChegada: true,
+        },
+        orderBy: { dataEstimadaChegada: "asc" },
+      });
+
+      // Agrupar por dia. Atrasadas (data já passou) caem no dia de hoje.
+      const buckets = new Map<string, { sku: string; marca: string; modelo: string }[]>();
+      for (const p of emTransito) {
+        if (!p.dataEstimadaChegada) continue;
+        let key = p.dataEstimadaChegada.toISOString().slice(0, 10);
+        if (key < todayKey) key = todayKey; // atrasada → hoje
+        if (key > lastKey) continue; // fora do range visível
+        const lista = buckets.get(key) ?? [];
+        lista.push({ sku: p.sku, marca: p.marca, modelo: p.modelo });
+        buckets.set(key, lista);
+      }
+
+      const chegadas = [...buckets.entries()]
+        .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+        .map(([data, pecas]) => {
+          const [, mes, dia] = data.split("-");
+          return {
+            data,
+            label: data === todayKey ? "Hoje" : `${dia}/${mes}`,
+            quantidade: pecas.length,
+            pecas,
+          };
+        });
+
+      const totalChegadas = chegadas.reduce((acc, c) => acc + c.quantidade, 0);
+
+      return {
+        estoqueAtual,
+        chegadas,
+        totalPrevisto: estoqueAtual + totalChegadas,
+      };
+    }),
+
+  // Peças compradas cuja data estimada já chegou/passou e ainda não foram confirmadas
+  getChegadasPendentes: protectedProcedure.query(async () => {
+    const agoraBR = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const todayKey = agoraBR.toISOString().slice(0, 10);
+    const fimDeHoje = new Date(`${todayKey}T23:59:59.999Z`);
+
+    const pendentes = await prisma.peca.findMany({
+      where: {
+        arquivado: false,
+        origemTipo: "COMPRA",
+        status: "EM_TRANSITO",
+        dataEstimadaChegada: { not: null, lte: fimDeHoje },
+      },
+      select: {
+        id: true,
+        sku: true,
+        marca: true,
+        modelo: true,
+        dataEstimadaChegada: true,
+      },
+      orderBy: { dataEstimadaChegada: "asc" },
+    });
+
+    return pendentes;
+  }),
+
+  // Confirmar chegada física da peça (em trânsito → disponível)
+  confirmarChegada: protectedProcedure
+    .input(z.object({ pecaId: z.string().cuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const peca = await prisma.peca.findUnique({
+        where: { id: input.pecaId },
+        select: { status: true, localizacao: true },
+      });
+
+      if (!peca) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Peca nao encontrada" });
+      }
+
+      const pecaAtualizada = await prisma.peca.update({
+        where: { id: input.pecaId },
+        data: {
+          status: "DISPONIVEL",
+          historicoStatus: {
+            create: {
+              statusAnterior: peca.status,
+              statusNovo: "DISPONIVEL",
+              localizacaoAnterior: peca.localizacao,
+              localizacaoNova: peca.localizacao,
+              userId: ctx.user.id,
+            },
+          },
+        },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "MUDAR_STATUS",
+        entidade: "PECA",
+        entidadeId: input.pecaId,
+        detalhes: { statusAnterior: peca.status, statusNovo: "DISPONIVEL", motivo: "CHEGADA_CONFIRMADA" },
+      });
+
+      return pecaAtualizada;
+    }),
+
+  // Reagendar a data estimada de chegada
+  reagendarChegada: protectedProcedure
+    .input(z.object({ pecaId: z.string().cuid(), novaData: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const peca = await prisma.peca.update({
+        where: { id: input.pecaId },
+        data: { dataEstimadaChegada: new Date(input.novaData) },
+      });
+
+      await registrarAuditoria({
+        userId: ctx.user.id,
+        acao: "EDITAR",
+        entidade: "PECA",
+        entidadeId: input.pecaId,
+        detalhes: { dataEstimadaChegada: input.novaData },
+      });
+
+      return peca;
     }),
 });

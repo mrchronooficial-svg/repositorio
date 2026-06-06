@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Search, Bell } from "lucide-react";
 import { Notifications } from "./notifications";
+import { ChegadasIndicator } from "./chegadas-indicator";
 import { UserMenu } from "./user-menu";
 import { Input } from "@/components/ui/input";
 
@@ -47,6 +48,9 @@ export function Header({ user }: HeaderProps) {
               <p className="text-sm font-semibold text-emerald-600">--</p>
             </div>
           </div>
+
+          {/* Chegadas pendentes */}
+          <ChegadasIndicator />
 
           {/* Notifications */}
           <Notifications />

@@ -228,6 +228,8 @@ model Peca {
   statusPagamentoFornecedor StatusPagamento @default(NAO_PAGO)
   valorPagoFornecedor       Decimal         @default(0) @db.Decimal(10, 2)
   dataPagamentoFornecedor   DateTime?       // Data do último pagamento
+  // Previsão de chegada (peças COMPRA ainda em trânsito)
+  dataEstimadaChegada DateTime?
   // Status e localização
   status           StatusPeca  @default(EM_TRANSITO)
   localizacao      String      @default("Fornecedor")

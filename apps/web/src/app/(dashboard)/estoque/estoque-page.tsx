@@ -21,10 +21,18 @@ import type { ColumnFilters, ColumnFilterCallbacks, PecaPgtoInfo } from "@/compo
 import { StatusDialog } from "@/components/dialogs/status-dialog";
 import { LocationDialog } from "@/components/dialogs/location-dialog";
 import { PagamentoFornecedorDialog } from "@/components/dialogs/pagamento-fornecedor-dialog";
+import { PrevisaoTab } from "./previsao-tab";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+type EstoqueTab = "estoque" | "previsao";
+
+interface EstoquePageProps {
+  initialTab?: EstoqueTab;
+}
 
 interface SelectedPeca {
   id: string;
@@ -54,10 +62,13 @@ const PGTO_LABELS: Record<string, string> = {
   NAO_PAGO: "Nao Pago",
 };
 
-export function EstoquePage() {
+export function EstoquePage({ initialTab }: EstoquePageProps = {}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { podeVerValores, podeExcluir } = usePermissions();
+
+  // Sub-abas: Estoque (tabela atual) e Previsão (chegadas)
+  const [tab, setTab] = useState<EstoqueTab>(initialTab ?? "estoque");
 
   // Global search
   const [search, setSearch] = useState("");
@@ -115,6 +126,9 @@ export function EstoquePage() {
 
   const { data: metricas } = useQuery(trpc.peca.getMetricas.queryOptions());
   const { data: localizacoes } = useQuery(trpc.peca.getLocalizacoes.queryOptions());
+  const { data: chegadasPendentes = [] } = useQuery(
+    trpc.peca.getChegadasPendentes.queryOptions()
+  );
 
   const limparFiltros = () => {
     setSearch("");
@@ -269,6 +283,27 @@ export function EstoquePage() {
 
   return (
     <div className="space-y-6">
+      {/* Sub-abas */}
+      <div className="border-b">
+        <nav className="flex gap-1" role="tablist" aria-label="Visões do estoque">
+          <TabButton
+            label="Estoque"
+            active={tab === "estoque"}
+            onClick={() => setTab("estoque")}
+          />
+          <TabButton
+            label="Previsão"
+            badge={chegadasPendentes.length}
+            active={tab === "previsao"}
+            onClick={() => setTab("previsao")}
+          />
+        </nav>
+      </div>
+
+      {tab === "previsao" ? (
+        <PrevisaoTab />
+      ) : (
+        <>
       {/* Metricas */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
@@ -456,6 +491,8 @@ export function EstoquePage() {
           </Button>
         </div>
       )}
+        </>
+      )}
 
       {/* Dialog de alteracao de status */}
       {selectedPeca && (
@@ -524,5 +561,49 @@ export function EstoquePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function TabButton({
+  label,
+  badge = 0,
+  active,
+  onClick,
+}: {
+  label: string;
+  badge?: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={cn(
+        "relative px-4 py-2.5 text-sm font-medium transition-colors -mb-px border-b-2",
+        active
+          ? "text-foreground border-amber-500"
+          : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
+      )}
+    >
+      <span className="inline-flex items-center gap-2">
+        {label}
+        {badge > 0 && (
+          <span
+            className={cn(
+              "inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full text-[11px] font-semibold",
+              active
+                ? "bg-amber-500 text-white"
+                : "bg-amber-100 text-amber-800 border border-amber-200"
+            )}
+            aria-label={`${badge} pendente(s)`}
+          >
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </span>
+    </button>
   );
 }
