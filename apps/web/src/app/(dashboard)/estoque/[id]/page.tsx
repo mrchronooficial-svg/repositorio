@@ -405,6 +405,16 @@ export default function PecaDetalhesPage() {
                 <p className="text-sm text-muted-foreground">Localizacao</p>
                 <p className="font-medium">{peca.localizacao}</p>
               </div>
+              {peca.dataEstimadaChegada && (
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Previsao de Chegada
+                  </p>
+                  <p className="font-medium">
+                    {formatDate(peca.dataEstimadaChegada)}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
