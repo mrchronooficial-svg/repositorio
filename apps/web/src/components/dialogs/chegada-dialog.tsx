@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/utils/trpc";
+import { formatDateOnly } from "@/lib/formatters";
 import { toast } from "sonner";
 
 interface ChegadaDialogProps {
@@ -21,9 +22,11 @@ interface ChegadaDialogProps {
 }
 
 function isAtrasada(dataIso: string): boolean {
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  return new Date(dataIso) < hoje;
+  // Comparacao por dia-calendario no fuso do Brasil (UTC-3), sem deslocar o dia
+  const agoraBR = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const hojeKey = agoraBR.toISOString().slice(0, 10);
+  const dataKey = new Date(dataIso).toISOString().slice(0, 10);
+  return dataKey < hojeKey;
 }
 
 export function ChegadaDialog({ open, onOpenChange }: ChegadaDialogProps) {
@@ -108,9 +111,9 @@ export function ChegadaDialog({ open, onOpenChange }: ChegadaDialogProps) {
                       }
                     >
                       {peca.dataEstimadaChegada
-                        ? new Date(
+                        ? formatDateOnly(
                             peca.dataEstimadaChegada as unknown as string
-                          ).toLocaleDateString("pt-BR")
+                          )
                         : "-"}
                       {atrasada ? " (atrasada)" : ""}
                     </span>

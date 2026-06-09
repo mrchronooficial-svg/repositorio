@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatDateOnly } from "@/lib/formatters";
 import {
   ColumnFilterHeader,
   TextColumnFilter,
@@ -61,6 +61,7 @@ interface Peca {
   revisada?: boolean;
   origemTipo?: string;
   exibirNoCatalogo?: boolean;
+  dataEstimadaChegada?: string | Date | null;
   fotos: Foto[];
   fornecedor: Fornecedor;
   venda?: Venda | null;
@@ -296,6 +297,9 @@ export function PecasTable({
             ) : "Localizacao"}
           </TableHead>
 
+          {/* Previsao de chegada */}
+          <TableHead>Previsao</TableHead>
+
           {/* Revisao */}
           <TableHead className="text-center">Revisao</TableHead>
 
@@ -446,6 +450,14 @@ export function PecasTable({
               >
                 {peca.localizacao}
               </span>
+            </TableCell>
+            {/* Previsao de chegada */}
+            <TableCell className="text-sm">
+              {peca.dataEstimadaChegada ? (
+                formatDateOnly(peca.dataEstimadaChegada)
+              ) : (
+                <span className="text-muted-foreground">-</span>
+              )}
             </TableCell>
             {/* Revisao */}
             <TableCell className="text-center">

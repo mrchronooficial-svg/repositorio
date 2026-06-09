@@ -79,6 +79,17 @@ export function formatDate(date: Date | string | null | undefined): string {
 }
 
 /**
+ * Formata uma data "apenas dia" (armazenada como meia-noite UTC) sem deslocar
+ * o dia por causa do fuso horario. Use para datas-calendario como a previsao
+ * de chegada, que nao tem horario.
+ */
+export function formatDateOnly(date: Date | string | null | undefined): string {
+  if (!date) return "-";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(d);
+}
+
+/**
  * Formata data e hora no padrão brasileiro
  */
 export function formatDateTime(date: Date | string | null | undefined): string {

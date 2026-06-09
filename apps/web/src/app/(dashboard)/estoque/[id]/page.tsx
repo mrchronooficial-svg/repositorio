@@ -25,7 +25,7 @@ import { StatusDialog } from "@/components/dialogs/status-dialog";
 import { PagamentoFornecedorDialog } from "@/components/dialogs/pagamento-fornecedor-dialog";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
-import { formatCurrency, formatDate } from "@/lib/formatters";
+import { formatCurrency, formatDate, formatDateOnly } from "@/lib/formatters";
 import { ORIGEM_TIPO_LABELS, ORIGEM_CANAL_LABELS } from "@/lib/constants";
 import { toast } from "sonner";
 
@@ -411,7 +411,7 @@ export default function PecaDetalhesPage() {
                     Previsao de Chegada
                   </p>
                   <p className="font-medium">
-                    {formatDate(peca.dataEstimadaChegada)}
+                    {formatDateOnly(peca.dataEstimadaChegada)}
                   </p>
                 </div>
               )}
