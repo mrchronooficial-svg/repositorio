@@ -84,3 +84,51 @@ export function calcularLucroBruto(
 
   return Math.round(lucro * 100) / 100;
 }
+
+export interface LucroBrutoEstoquePeca {
+  valorVenda: number; // valorFinal (se vendida) ou valorEstimadoVenda
+  origemTipo: string; // "COMPRA" | "CONSIGNACAO"
+  valorCompra: number;
+  valorRepasse: number | null;
+  percentualRepasse: number | null;
+}
+
+// Lucro bruto estimado de uma peca de estoque, JA liquido de imposto (Simples).
+// Mesma base da coluna "Lucro Bruto" da listagem (valorVenda - custo), porem
+// descontando o Simples Nacional. NAO desconta MDR (a forma de pagamento so e
+// conhecida na venda) nem custo de manutencao.
+export function calcularLucroBrutoEstoque(
+  p: LucroBrutoEstoquePeca,
+  cfg: ImpostoConfig
+): number {
+  if (!p.valorVenda) return 0;
+  const isConsignacao = p.origemTipo === "CONSIGNACAO";
+
+  let custo: number;
+  if (isConsignacao) {
+    if (p.valorRepasse) {
+      custo = p.valorRepasse;
+    } else if (p.percentualRepasse) {
+      custo = p.valorVenda * (p.percentualRepasse / 100);
+    } else {
+      custo = 0;
+    }
+  } else {
+    custo = p.valorCompra || 0;
+  }
+
+  let lucro = p.valorVenda - custo;
+
+  // Base do Simples: receita cheia (COMPRA) ou margem (CONSIGNACAO)
+  const baseSimples = isConsignacao ? p.valorVenda - custo : p.valorVenda;
+
+  if (cfg.aliquotaConfig !== "auto") {
+    const aliquotaEfetiva = parseFloat(cfg.aliquotaConfig) / 100;
+    lucro -= Math.round(baseSimples * aliquotaEfetiva * 100) / 100;
+  } else if (cfg.rbt12 !== null) {
+    const { valorImposto } = calcularImpostoVenda(baseSimples, cfg.rbt12);
+    lucro -= valorImposto;
+  }
+
+  return Math.round(lucro * 100) / 100;
+}

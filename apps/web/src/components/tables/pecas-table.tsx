@@ -64,6 +64,7 @@ interface Peca {
   fotos: Foto[];
   fornecedor: Fornecedor;
   venda?: Venda | null;
+  lucroBrutoEstimado?: number | null; // lucro bruto liquido de imposto (calculado no backend)
 }
 
 interface PecaStatusInfo {
@@ -520,32 +521,16 @@ export function PecasTable({
             )}
             {podeVerValores && (
               <TableCell className="text-right font-medium">
-                {(() => {
-                  const valorVenda = peca.venda
-                    ? Number(peca.venda.valorFinal) || 0
-                    : Number(peca.valorEstimadoVenda) || 0;
-                  if (!valorVenda) return "-";
-
-                  let custo: number;
-                  if (peca.origemTipo === "CONSIGNACAO") {
-                    if (peca.valorRepasse) {
-                      custo = Number(peca.valorRepasse);
-                    } else if (peca.percentualRepasse) {
-                      custo = valorVenda * (Number(peca.percentualRepasse) / 100);
-                    } else {
-                      custo = 0;
-                    }
-                  } else {
-                    custo = Number(peca.valorCompra) || 0;
-                  }
-
-                  const lucro = valorVenda - custo;
-                  return (
-                    <span className={lucro >= 0 ? "text-green-600" : "text-red-600"}>
-                      {formatCurrency(lucro)}
-                    </span>
-                  );
-                })()}
+                {peca.lucroBrutoEstimado == null ? (
+                  "-"
+                ) : (
+                  <span
+                    className={peca.lucroBrutoEstimado >= 0 ? "text-green-600" : "text-red-600"}
+                    title="Lucro bruto liquido de imposto (Simples Nacional)"
+                  >
+                    {formatCurrency(peca.lucroBrutoEstimado)}
+                  </span>
+                )}
               </TableCell>
             )}
             {podeExcluir && (

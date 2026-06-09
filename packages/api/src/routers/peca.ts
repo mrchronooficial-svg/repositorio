@@ -4,6 +4,7 @@ import { router, protectedProcedure, socioOuAdminProcedure, adminProcedure } fro
 import prisma from "@gestaomrchrono/db";
 import { registrarAuditoria } from "../services/auditoria.service";
 import { gerarProximoSKU } from "../services/sku.service";
+import { carregarImpostoConfig, calcularLucroBrutoEstoque } from "../utils/lucro-bruto";
 
 // Schemas de validacao
 const PecaCreateSchema = z.object({
@@ -186,17 +187,47 @@ export const pecaRouter = router({
         prisma.peca.count({ where }),
       ]);
 
+      // Config de imposto (Simples) carregada uma vez por requisicao,
+      // usada para o lucro bruto liquido de imposto exibido na listagem.
+      const impostoCfg = podeVerValores ? await carregarImpostoConfig() : null;
+
       // Ocultar valores se for funcionario
-      const pecasFormatadas = pecas.map((peca) => ({
-        ...peca,
-        valorCompra: podeVerValores ? peca.valorCompra : null,
-        valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
-        valorRepasse: podeVerValores ? peca.valorRepasse : null,
-        percentualRepasse: podeVerValores ? peca.percentualRepasse : null,
-        valorPagoFornecedor: podeVerValores ? peca.valorPagoFornecedor : null,
-        statusPagamentoFornecedor: podeVerValores ? peca.statusPagamentoFornecedor : null,
-        venda: podeVerValores ? peca.venda : null,
-      }));
+      const pecasFormatadas = pecas.map((peca) => {
+        // Lucro bruto estimado JA liquido de imposto (Simples Nacional).
+        // Usa o valor da venda (se vendida) ou o valor estimado de venda.
+        const valorVenda = peca.venda
+          ? Number(peca.venda.valorFinal) || 0
+          : Number(peca.valorEstimadoVenda) || 0;
+        const lucroBrutoEstimado =
+          podeVerValores && impostoCfg && valorVenda
+            ? calcularLucroBrutoEstoque(
+                {
+                  valorVenda,
+                  origemTipo: peca.origemTipo,
+                  valorCompra: Number(peca.valorCompra) || 0,
+                  valorRepasse:
+                    peca.valorRepasse != null ? Number(peca.valorRepasse) : null,
+                  percentualRepasse:
+                    peca.percentualRepasse != null
+                      ? Number(peca.percentualRepasse)
+                      : null,
+                },
+                impostoCfg
+              )
+            : null;
+
+        return {
+          ...peca,
+          valorCompra: podeVerValores ? peca.valorCompra : null,
+          valorEstimadoVenda: podeVerValores ? peca.valorEstimadoVenda : null,
+          valorRepasse: podeVerValores ? peca.valorRepasse : null,
+          percentualRepasse: podeVerValores ? peca.percentualRepasse : null,
+          valorPagoFornecedor: podeVerValores ? peca.valorPagoFornecedor : null,
+          statusPagamentoFornecedor: podeVerValores ? peca.statusPagamentoFornecedor : null,
+          venda: podeVerValores ? peca.venda : null,
+          lucroBrutoEstimado,
+        };
+      });
 
       return {
         pecas: pecasFormatadas,
