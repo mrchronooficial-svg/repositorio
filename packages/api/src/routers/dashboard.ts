@@ -12,6 +12,7 @@ import {
   NOMES_MESES,
 } from "../utils/historico-vendas";
 import { calcularLucroBruto, carregarImpostoConfig } from "../utils/lucro-bruto";
+import { calcularSaldoDevedor } from "../utils/pagamento";
 
 export const dashboardRouter = router({
   // Metricas principais do dashboard
@@ -242,7 +243,7 @@ export const dashboardRouter = router({
           (sum, p) => sum + Number(p.valor),
           0
         );
-        return total + (Number(venda.valorFinal) - totalPago);
+        return total + calcularSaldoDevedor(Number(venda.valorFinal), totalPago);
       }, 0);
 
       // Calcular repasses pendentes
@@ -955,7 +956,7 @@ export const dashboardRouter = router({
         (sum, p) => sum + Number(p.valor),
         0
       );
-      const saldoDevedor = Number(venda.valorFinal) - totalPago;
+      const saldoDevedor = calcularSaldoDevedor(Number(venda.valorFinal), totalPago);
 
       return {
         id: venda.id,

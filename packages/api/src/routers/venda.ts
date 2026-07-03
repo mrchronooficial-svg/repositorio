@@ -8,6 +8,11 @@ import { gerarSKUDevolucao } from "../services/sku.service";
 import { criarLancamentosVenda, reverterLancamentosVenda } from "../services/lancamento-venda.service";
 import { brtMonthOf, brtMonthStart, brtToday } from "../utils/brt-date";
 import { calcularLucroBruto, carregarImpostoConfig } from "../utils/lucro-bruto";
+import {
+  EPSILON_CENTAVO,
+  calcularSaldoDevedor,
+  calcularStatusPagamento,
+} from "../utils/pagamento";
 
 // Schemas
 const VendaCreateSchema = z.object({
@@ -387,7 +392,7 @@ export const vendaRouter = router({
           : venda.pagamentos.map((p) => ({ ...p, valor: null })),
         _totalPago: podeVerValores ? totalPago : null,
         _saldoDevedor: podeVerValores
-          ? Number(venda.valorFinal) - totalPago
+          ? calcularSaldoDevedor(Number(venda.valorFinal), totalPago)
           : null,
       };
     }),
@@ -496,8 +501,7 @@ export const vendaRouter = router({
         });
 
         // Atualizar status de pagamento
-        const novoStatus =
-          input.pagamentoInicial >= valorFinal ? "PAGO" : "PARCIAL";
+        const novoStatus = calcularStatusPagamento(valorFinal, input.pagamentoInicial);
 
         await prisma.venda.update({
           where: { id: venda.id },
@@ -580,7 +584,7 @@ export const vendaRouter = router({
       // 1. Validar que a venda existe
       const venda = await prisma.venda.findUnique({
         where: { id: input.id },
-        include: { peca: true },
+        include: { peca: true, pagamentos: true },
       });
 
       if (!venda) {
@@ -660,6 +664,13 @@ export const vendaRouter = router({
         : valorFinal;
       updateData.valorDeclarar = valorDeclarar;
 
+      // 5.1 Recalcular status de pagamento — o valorFinal pode ter mudado (ex.: alteracao
+      // de desconto), entao o saldo devedor e o status precisam ser reavaliados com base
+      // no total ja pago. Sem isto, uma venda quitada que tem o valorFinal aumentado
+      // continuaria marcada como PAGO e o novo saldo sumiria de "a receber".
+      const totalPago = venda.pagamentos.reduce((acc, p) => acc + Number(p.valor), 0);
+      updateData.statusPagamento = calcularStatusPagamento(valorFinal, totalPago);
+
       // Atualizar venda
       const vendaAtualizada = await prisma.venda.update({
         where: { id: input.id },
@@ -710,9 +721,10 @@ export const vendaRouter = router({
         (acc, p) => acc + Number(p.valor),
         0
       );
-      const saldoDevedor = Number(venda.valorFinal) - totalPago;
+      const saldoDevedor = calcularSaldoDevedor(Number(venda.valorFinal), totalPago);
 
-      if (input.valor > saldoDevedor) {
+      // Tolerancia de meio centavo para nao bloquear a quitacao por ruido de ponto flutuante
+      if (input.valor - saldoDevedor > EPSILON_CENTAVO) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Valor excede saldo devedor de R$ ${saldoDevedor.toFixed(2)}`,
@@ -729,8 +741,7 @@ export const vendaRouter = router({
 
       // Atualizar status
       const novoTotalPago = totalPago + input.valor;
-      const novoStatus =
-        novoTotalPago >= Number(venda.valorFinal) ? "PAGO" : "PARCIAL";
+      const novoStatus = calcularStatusPagamento(Number(venda.valorFinal), novoTotalPago);
 
       await prisma.venda.update({
         where: { id: input.vendaId },
@@ -774,9 +785,9 @@ export const vendaRouter = router({
         .reduce((acc, p) => acc + Number(p.valor), 0);
 
       const valorFinal = Number(pagamento.venda.valorFinal);
-      const saldoDisponivel = valorFinal - totalPagoSemEste;
+      const saldoDisponivel = calcularSaldoDevedor(valorFinal, totalPagoSemEste);
 
-      if (input.valor > saldoDisponivel) {
+      if (input.valor - saldoDisponivel > EPSILON_CENTAVO) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Valor excede o saldo disponivel de R$ ${saldoDisponivel.toFixed(2)}`,
@@ -790,7 +801,7 @@ export const vendaRouter = router({
 
       // Recalcular status
       const novoTotalPago = totalPagoSemEste + input.valor;
-      const novoStatus = novoTotalPago >= valorFinal ? "PAGO" : novoTotalPago > 0 ? "PARCIAL" : "NAO_PAGO";
+      const novoStatus = calcularStatusPagamento(valorFinal, novoTotalPago);
 
       await prisma.venda.update({
         where: { id: pagamento.vendaId },
@@ -835,7 +846,7 @@ export const vendaRouter = router({
         .reduce((acc, p) => acc + Number(p.valor), 0);
 
       const valorFinal = Number(pagamento.venda.valorFinal);
-      const novoStatus = totalPagoRestante >= valorFinal ? "PAGO" : totalPagoRestante > 0 ? "PARCIAL" : "NAO_PAGO";
+      const novoStatus = calcularStatusPagamento(valorFinal, totalPagoRestante);
 
       await prisma.venda.update({
         where: { id: pagamento.vendaId },
@@ -1136,7 +1147,7 @@ export const vendaRouter = router({
 
     const totalRecebiveis = vendas.reduce((acc, v) => {
       const totalPago = v.pagamentos.reduce((a, p) => a + Number(p.valor), 0);
-      return acc + (Number(v.valorFinal) - totalPago);
+      return acc + calcularSaldoDevedor(Number(v.valorFinal), totalPago);
     }, 0);
 
     const totalRepassesPendentes = await prisma.venda.aggregate({

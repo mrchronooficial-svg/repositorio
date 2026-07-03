@@ -59,7 +59,8 @@ export function PagamentoDialog({
       return;
     }
 
-    if (valorNum > saldoDevedor) {
+    // Tolerancia de meio centavo para nao bloquear a quitacao por arredondamento
+    if (valorNum - saldoDevedor > 0.005) {
       toast.error(`Valor excede o saldo devedor de ${formatCurrency(saldoDevedor)}`);
       return;
     }
