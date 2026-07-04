@@ -90,6 +90,18 @@ export function formatDateOnly(date: Date | string | null | undefined): string {
 }
 
 /**
+ * Formata o dia de um timestamp real no fuso de Brasília.
+ * Diferente de formatDateOnly (que assume UTC, correto para campos date-only
+ * como a previsão de chegada), esta deve ser usada para timestamps como o
+ * createdAt, evitando que uma peça cadastrada à noite apareça com o dia seguinte.
+ */
+export function formatDateBrt(date: Date | string | null | undefined): string {
+  if (!date) return "-";
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo" }).format(d);
+}
+
+/**
  * Formata data e hora no padrão brasileiro
  */
 export function formatDateTime(date: Date | string | null | undefined): string {
