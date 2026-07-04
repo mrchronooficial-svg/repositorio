@@ -547,6 +547,48 @@ async function calcularCaixaReal(
   return { total: round2(totalCaixa), detalhes };
 }
 
+/**
+ * Valor do estoque (a custo) das peças PRÓPRIAS (COMPRA) que estavam em estoque
+ * no último instante do mês, reconstruído a partir do histórico de status de cada
+ * peça — a mesma "foto" usada nos KPIs operacionais (gerarKpisOperacionais).
+ *
+ * Antes, o balanço somava o estoque ATUAL (status de hoje) em todos os meses, então
+ * o balanço de meses passados refletia o estoque de hoje, e não a foto do fim daquele
+ * mês. Aqui reconstruímos o status de cada peça na data-fronteira e somamos o custo
+ * (valorCompra + custoManutencao) apenas das que estavam em estoque naquele momento.
+ */
+async function calcularEstoqueValorFimMes(dataFimExclusivo: Date): Promise<number> {
+  const STATUS_EM_ESTOQUE: string[] = ["DISPONIVEL", "EM_TRANSITO", "REVISAO"];
+
+  const pecas = await prisma.peca.findMany({
+    where: {
+      origemTipo: "COMPRA",
+      createdAt: { lt: dataFimExclusivo },
+    },
+    select: {
+      status: true,
+      valorCompra: true,
+      custoManutencao: true,
+      historicoStatus: {
+        where: { createdAt: { lt: dataFimExclusivo } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { statusNovo: true },
+      },
+    },
+  });
+
+  let total = 0;
+  for (const p of pecas) {
+    // Status no fim do mês: último registro de histórico até a data (fallback: status atual).
+    const statusNaData = p.historicoStatus[0]?.statusNovo ?? p.status;
+    if (!STATUS_EM_ESTOQUE.includes(statusNaData)) continue;
+    total += Number(p.valorCompra || 0) + Number(p.custoManutencao || 0);
+  }
+
+  return round2(total);
+}
+
 export async function gerarBalanco(mes: number, ano: number): Promise<BalancoResult> {
   // Fronteira em BRT: balanço "ao final do mês" significa até o início do mês seguinte BRT.
   const dataFimExclusivo = brtMonthEnd(ano, mes - 1);
@@ -593,20 +635,10 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
   }
   const contasReceber = round2(contasReceberPIX + contasReceberCartao);
 
-  // 3. Estoque — peças compradas em status contabilizável (a custo)
-  const statusEmEstoque = ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] as const;
-  const estoqueData = await prisma.peca.aggregate({
-    _sum: { valorCompra: true, custoManutencao: true },
-    where: {
-      arquivado: false,
-      status: { in: [...statusEmEstoque] },
-      origemTipo: "COMPRA",
-    },
-  });
-  const estoques = round2(
-    Number(estoqueData._sum.valorCompra || 0) +
-    Number(estoqueData._sum.custoManutencao || 0)
-  );
+  // 3. Estoque — peças PRÓPRIAS (COMPRA) em status contabilizável, a custo.
+  //    Reconstruído como a "foto" do estoque no fim do mês (não o estoque de hoje),
+  //    para que balanços de meses passados reflitam o estoque daquela data.
+  const estoques = await calcularEstoqueValorFimMes(dataFimExclusivo);
 
   // Ativo Circulante
   const ativoCirculante = round2(totalCaixa + contasReceber + estoques);
