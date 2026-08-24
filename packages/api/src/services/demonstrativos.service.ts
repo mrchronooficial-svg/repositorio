@@ -12,6 +12,7 @@
 
 import prisma from "@gestaomrchrono/db";
 import { brtMonthStart, brtMonthEnd } from "../utils/brt-date";
+import { filtroOrigemPropria, isOrigemPropria } from "../utils/origem";
 
 // ==================================================
 // TIPOS
@@ -562,7 +563,7 @@ async function calcularEstoqueValorFimMes(dataFimExclusivo: Date): Promise<numbe
 
   const pecas = await prisma.peca.findMany({
     where: {
-      origemTipo: "COMPRA",
+      origemTipo: filtroOrigemPropria,
       createdAt: { lt: dataFimExclusivo },
     },
     select: {
@@ -666,10 +667,10 @@ export async function gerarBalanco(mes: number, ano: number): Promise<BalancoRes
     Number(repassesPendentesAgg._sum.valorRepasseFeito || 0)
   );
 
-  // 2. Fornecedores — compras de peças não pagas
+  // 2. Fornecedores — peças próprias (compra/encomenda) não pagas
   const comprasNaoPagasAgg = await prisma.peca.aggregate({
     where: {
-      origemTipo: "COMPRA",
+      origemTipo: filtroOrigemPropria,
       statusPagamentoFornecedor: { in: ["NAO_PAGO", "PARCIAL"] },
       arquivado: false,
     },
@@ -919,7 +920,7 @@ export async function gerarKpisOperacionais(
       where: {
         cancelada: false,
         dataVenda: { gte: dataInicio, lt: dataFimExclusivo },
-        peca: { origemTipo: "COMPRA" },
+        peca: { origemTipo: filtroOrigemPropria },
       },
     }),
     prisma.venda.count({
@@ -953,7 +954,7 @@ export async function gerarKpisOperacionais(
   for (const p of pecas) {
     const statusNaData = p.historicoStatus[0]?.statusNovo ?? p.status;
     if (!STATUS_EM_ESTOQUE.includes(statusNaData)) continue;
-    if (p.origemTipo === "COMPRA") estoquePropriasFimMes++;
+    if (isOrigemPropria(p.origemTipo)) estoquePropriasFimMes++;
     else estoqueConsignadasFimMes++;
   }
 

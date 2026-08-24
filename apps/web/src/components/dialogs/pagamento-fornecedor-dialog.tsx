@@ -26,12 +26,12 @@ interface PagamentoFornecedorDialogProps {
   sku: string;
   valorCompra: number;
   valorPago: number;
-  origemTipo: "COMPRA" | "CONSIGNACAO";
+  origemTipo: "COMPRA" | "CONSIGNACAO" | "ENCOMENDA";
   statusPeca: string;
   onSuccess?: () => void;
 }
 
-// Este dialog e apenas para pecas COMPRADAS (nao consignadas)
+// Este dialog e apenas para pecas PROPRIAS - compra/encomenda (nao consignadas)
 // Pecas consignadas tem repasse gerenciado na venda
 export function PagamentoFornecedorDialog({
   open,

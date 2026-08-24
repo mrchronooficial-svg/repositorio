@@ -13,6 +13,7 @@ import {
 } from "../utils/historico-vendas";
 import { calcularLucroBruto, carregarImpostoConfig } from "../utils/lucro-bruto";
 import { calcularSaldoDevedor } from "../utils/pagamento";
+import { filtroOrigemPropria } from "../utils/origem";
 
 export const dashboardRouter = router({
   // Metricas principais do dashboard
@@ -54,13 +55,13 @@ export const dashboardRouter = router({
       pecasTotal,
     ] = await Promise.all([
       prisma.peca.count({
-        where: { status: "DISPONIVEL", arquivado: false, origemTipo: "COMPRA" },
+        where: { status: "DISPONIVEL", arquivado: false, origemTipo: filtroOrigemPropria },
       }),
       prisma.peca.count({
-        where: { status: "EM_TRANSITO", arquivado: false, origemTipo: "COMPRA" },
+        where: { status: "EM_TRANSITO", arquivado: false, origemTipo: filtroOrigemPropria },
       }),
       prisma.peca.count({
-        where: { status: "REVISAO", arquivado: false, origemTipo: "COMPRA" },
+        where: { status: "REVISAO", arquivado: false, origemTipo: filtroOrigemPropria },
       }),
       prisma.peca.count({
         where: {
@@ -564,10 +565,10 @@ export const dashboardRouter = router({
       return sum + (devido - feito);
     }, 0);
 
-    // 2. Pagamentos de pecas compradas pendentes (NAO_PAGO ou PARCIAL)
+    // 2. Pagamentos de pecas proprias (compra/encomenda) pendentes (NAO_PAGO ou PARCIAL)
     const pagamentosPendentes = await prisma.peca.findMany({
       where: {
-        origemTipo: "COMPRA",
+        origemTipo: filtroOrigemPropria,
         statusPagamentoFornecedor: { in: ["NAO_PAGO", "PARCIAL"] },
         arquivado: false,
       },
@@ -635,13 +636,13 @@ export const dashboardRouter = router({
     // Status que contam como "em estoque"
     const statusEmEstoque = ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] as const;
 
-    // KPIs de estoque consideram apenas peças COMPRADAS
+    // KPIs de estoque consideram apenas peças PRÓPRIAS (compra + encomenda)
     // (consignado não é capital investido pela empresa)
     const totalPecas = await prisma.peca.count({
       where: {
         arquivado: false,
         status: { in: [...statusEmEstoque] },
-        origemTipo: "COMPRA",
+        origemTipo: filtroOrigemPropria,
       },
     });
 
@@ -651,7 +652,7 @@ export const dashboardRouter = router({
       where: {
         arquivado: false,
         status: { in: [...statusEmEstoque] },
-        origemTipo: "COMPRA",
+        origemTipo: filtroOrigemPropria,
       },
     });
 
@@ -661,7 +662,7 @@ export const dashboardRouter = router({
       where: {
         arquivado: false,
         status: { in: [...statusEmEstoque] },
-        origemTipo: "COMPRA",
+        origemTipo: filtroOrigemPropria,
       },
     });
 

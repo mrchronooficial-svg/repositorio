@@ -24,7 +24,7 @@ export interface LucroBrutoVenda {
   formaPagamento: string;
   taxaMDR: number;
   valorRepasseDevido: number | null;
-  origemTipo: string; // "COMPRA" | "CONSIGNACAO"
+  origemTipo: string; // "COMPRA" | "CONSIGNACAO" | "ENCOMENDA"
   valorCompra: number;
   custoManutencao: number;
 }
@@ -87,7 +87,7 @@ export function calcularLucroBruto(
 
 export interface LucroBrutoEstoquePeca {
   valorVenda: number; // valorFinal (se vendida) ou valorEstimadoVenda
-  origemTipo: string; // "COMPRA" | "CONSIGNACAO"
+  origemTipo: string; // "COMPRA" | "CONSIGNACAO" | "ENCOMENDA"
   valorCompra: number;
   valorRepasse: number | null;
   percentualRepasse: number | null;

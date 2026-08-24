@@ -13,6 +13,7 @@ import {
   RefreshCw,
   DollarSign,
   Wallet,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +27,7 @@ import { PagamentoFornecedorDialog } from "@/components/dialogs/pagamento-fornec
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, formatDate, formatDateOnly } from "@/lib/formatters";
-import { ORIGEM_TIPO_LABELS, ORIGEM_CANAL_LABELS } from "@/lib/constants";
+import { ORIGEM_TIPO_LABELS, ORIGEM_CANAL_LABELS, isOrigemPropria } from "@/lib/constants";
 import { toast } from "sonner";
 
 export default function PecaDetalhesPage() {
@@ -297,8 +298,8 @@ export default function PecaDetalhesPage() {
             <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {podeVerValores ? (
                 <>
-                  {/* Valor de compra so aparece para COMPRA */}
-                  {peca.origemTipo === "COMPRA" && (
+                  {/* Valor de compra so aparece para peca propria (compra/encomenda) */}
+                  {isOrigemPropria(peca.origemTipo) && (
                     <div>
                       <p className="text-sm text-muted-foreground">Valor Compra</p>
                       <p className="font-medium">
@@ -412,6 +413,17 @@ export default function PecaDetalhesPage() {
                   </p>
                   <p className="font-medium">
                     {formatDateOnly(peca.dataEstimadaChegada)}
+                  </p>
+                </div>
+              )}
+              {peca.status === "REVISAO" && peca.servicoRevisao && (
+                <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-yellow-800">
+                    <Wrench className="h-3.5 w-3.5" />
+                    Servico solicitado
+                  </p>
+                  <p className="mt-1 text-sm text-yellow-900 whitespace-pre-wrap">
+                    {peca.servicoRevisao}
                   </p>
                 </div>
               )}
@@ -587,11 +599,12 @@ export default function PecaDetalhesPage() {
         pecaId={id}
         currentStatus={peca.status}
         currentLocalizacao={peca.localizacao}
+        currentServicoRevisao={peca.servicoRevisao}
         onSuccess={refetch}
       />
 
-      {/* Dialog de pagamento ao fornecedor - apenas para COMPRA */}
-      {podeVerValores && peca.origemTipo === "COMPRA" && (
+      {/* Dialog de pagamento ao fornecedor - peca propria (compra/encomenda) */}
+      {podeVerValores && isOrigemPropria(peca.origemTipo) && (
         <PagamentoFornecedorDialog
           open={pagamentoDialogOpen}
           onOpenChange={setPagamentoDialogOpen}

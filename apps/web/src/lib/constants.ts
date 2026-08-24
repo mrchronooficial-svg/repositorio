@@ -75,7 +75,18 @@ export const TIPO_PESSOA_LABELS: Record<string, string> = {
 export const ORIGEM_TIPO_LABELS: Record<string, string> = {
   COMPRA: "Compra",
   CONSIGNACAO: "Consignação",
+  ENCOMENDA: "Encomenda",
 };
+
+/**
+ * Origens de peça PRÓPRIA (a empresa pagou pelo relógio).
+ * Consignação fica de fora: o acerto é repasse sobre a venda.
+ */
+export const ORIGENS_PROPRIAS = ["COMPRA", "ENCOMENDA"] as const;
+
+export function isOrigemPropria(origemTipo?: string | null): boolean {
+  return !!origemTipo && origemTipo !== "CONSIGNACAO";
+}
 
 export const ORIGEM_CANAL_LABELS: Record<string, string> = {
   PESSOA_FISICA: "Pessoa Física",

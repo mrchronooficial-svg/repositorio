@@ -31,6 +31,7 @@ enum TipoPessoa {
 enum OrigemTipo {
   COMPRA
   CONSIGNACAO
+  ENCOMENDA
 }
 
 enum OrigemCanal {
@@ -238,6 +239,7 @@ model Peca {
   localizacao      String      @default("Fornecedor")
   // Revisão
   revisada         Boolean     @default(false)
+  servicoRevisao   String? // O que precisa ser feito enquanto a peça está em REVISAO
   // Controle
   arquivado        Boolean     @default(false)
   createdAt        DateTime    @default(now())
@@ -295,6 +297,7 @@ model HistoricoStatus {
   statusNovo          StatusPeca
   localizacaoAnterior String?
   localizacaoNova     String?
+  observacao          String? // Ex.: serviço solicitado ao entrar em REVISAO
   userId              String?
   user                User?       @relation(fields: [userId], references: [id])
   createdAt           DateTime    @default(now())

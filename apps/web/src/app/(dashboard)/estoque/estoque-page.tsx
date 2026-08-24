@@ -39,6 +39,7 @@ interface SelectedPeca {
   sku: string;
   status: string;
   localizacao: string;
+  servicoRevisao?: string | null;
 }
 
 // Labels for active filter badges
@@ -54,6 +55,7 @@ const STATUS_LABELS: Record<string, string> = {
 const ORIGEM_LABELS: Record<string, string> = {
   COMPRA: "Compra",
   CONSIGNACAO: "Consignacao",
+  ENCOMENDA: "Encomenda",
 };
 
 const PGTO_LABELS: Record<string, string> = {
@@ -112,7 +114,7 @@ export function EstoquePage({ initialTab }: EstoquePageProps = {}) {
       sku: sku || undefined,
       marca: marca || undefined,
       fornecedor: fornecedor || undefined,
-      origemTipo: origemTipo as "COMPRA" | "CONSIGNACAO" | undefined,
+      origemTipo: origemTipo as "COMPRA" | "CONSIGNACAO" | "ENCOMENDA" | undefined,
       status: status as "DISPONIVEL" | "EM_TRANSITO" | "REVISAO" | "VENDIDA" | "DEFEITO" | "PERDA" | undefined,
       localizacao: localizacao || undefined,
       statusPagamentoFornecedor: statusPgtoFornecedor as "PAGO" | "PARCIAL" | "NAO_PAGO" | undefined,
@@ -357,6 +359,9 @@ export function EstoquePage({ initialTab }: EstoquePageProps = {}) {
               <span className="text-2xl font-bold">{(metricas as any)?.origemCount?.COMPRA ?? 0}</span>
               <span className="text-xs text-muted-foreground">compra</span>
               <span className="text-muted-foreground mx-1">/</span>
+              <span className="text-2xl font-bold">{(metricas as any)?.origemCount?.ENCOMENDA ?? 0}</span>
+              <span className="text-xs text-muted-foreground">encom.</span>
+              <span className="text-muted-foreground mx-1">/</span>
               <span className="text-2xl font-bold">{(metricas as any)?.origemCount?.CONSIGNACAO ?? 0}</span>
               <span className="text-xs text-muted-foreground">consig.</span>
             </div>
@@ -502,6 +507,7 @@ export function EstoquePage({ initialTab }: EstoquePageProps = {}) {
           pecaId={selectedPeca.id}
           currentStatus={selectedPeca.status}
           currentLocalizacao={selectedPeca.localizacao}
+          currentServicoRevisao={selectedPeca.servicoRevisao}
           onSuccess={handleStatusSuccess}
         />
       )}
@@ -527,7 +533,7 @@ export function EstoquePage({ initialTab }: EstoquePageProps = {}) {
           sku={selectedPgto.sku}
           valorCompra={selectedPgto.valorCompra}
           valorPago={selectedPgto.valorPago}
-          origemTipo={selectedPgto.origemTipo as "COMPRA" | "CONSIGNACAO"}
+          origemTipo={selectedPgto.origemTipo as "COMPRA" | "CONSIGNACAO" | "ENCOMENDA"}
           statusPeca={selectedPgto.status}
           onSuccess={handlePgtoSuccess}
         />

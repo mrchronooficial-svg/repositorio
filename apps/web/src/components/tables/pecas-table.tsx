@@ -59,6 +59,7 @@ interface Peca {
   valorPagoFornecedor?: Decimal | null;
   statusPagamentoFornecedor?: string | null;
   revisada?: boolean;
+  servicoRevisao?: string | null;
   origemTipo?: string;
   exibirNoCatalogo?: boolean;
   createdAt?: string | Date | null; // Data de cadastro (usada como "Data de Compra")
@@ -74,6 +75,7 @@ interface PecaStatusInfo {
   sku: string;
   status: string;
   localizacao: string;
+  servicoRevisao?: string | null;
 }
 
 export interface PecaPgtoInfo {
@@ -193,6 +195,7 @@ export function PecasTable({
   const origemOptions = [
     { value: "COMPRA", label: "Compra" },
     { value: "CONSIGNACAO", label: "Consignacao" },
+    { value: "ENCOMENDA", label: "Encomenda" },
   ];
 
   const pgtoOptions = [
@@ -412,9 +415,15 @@ export function PecasTable({
               <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                 peca.origemTipo === "CONSIGNACAO"
                   ? "bg-amber-100 text-amber-800"
-                  : "bg-blue-100 text-blue-800"
+                  : peca.origemTipo === "ENCOMENDA"
+                    ? "bg-purple-100 text-purple-800"
+                    : "bg-blue-100 text-blue-800"
               }`}>
-                {peca.origemTipo === "CONSIGNACAO" ? "Consignacao" : "Compra"}
+                {peca.origemTipo === "CONSIGNACAO"
+                  ? "Consignacao"
+                  : peca.origemTipo === "ENCOMENDA"
+                    ? "Encomenda"
+                    : "Compra"}
               </span>
             </TableCell>
             <TableCell>
@@ -428,6 +437,7 @@ export function PecasTable({
                       sku: peca.sku,
                       status: peca.status,
                       localizacao: peca.localizacao,
+                      servicoRevisao: peca.servicoRevisao,
                     });
                   }
                 }}

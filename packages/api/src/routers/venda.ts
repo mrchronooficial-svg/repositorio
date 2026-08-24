@@ -13,6 +13,7 @@ import {
   calcularSaldoDevedor,
   calcularStatusPagamento,
 } from "../utils/pagamento";
+import { isOrigemPropria } from "../utils/origem";
 
 // Schemas
 const VendaCreateSchema = z.object({
@@ -1075,9 +1076,9 @@ export const vendaRouter = router({
           fornecedorId: venda.peca.fornecedorId,
           // Copiar custoManutencao sempre (independente da origem)
           custoManutencao: venda.peca.custoManutencao,
-          // Para COMPRA: copiar dados de pagamento ao fornecedor (já foram pagos)
+          // Para peça própria (COMPRA/ENCOMENDA): copiar dados de pagamento ao fornecedor (já foram pagos)
           // Para CONSIGNAÇÃO: não copiar (repasse é desfeito e será refeito na revenda)
-          ...(venda.peca.origemTipo === "COMPRA" ? {
+          ...(isOrigemPropria(venda.peca.origemTipo) ? {
             statusPagamentoFornecedor: venda.peca.statusPagamentoFornecedor,
             valorPagoFornecedor: venda.peca.valorPagoFornecedor,
             dataPagamentoFornecedor: venda.peca.dataPagamentoFornecedor,

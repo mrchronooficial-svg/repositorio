@@ -5,6 +5,7 @@ import prisma from "@gestaomrchrono/db";
 import { registrarAuditoria } from "../services/auditoria.service";
 import { gerarProximoSKU } from "../services/sku.service";
 import { carregarImpostoConfig, calcularLucroBrutoEstoque } from "../utils/lucro-bruto";
+import { filtroOrigemPropria, isOrigemPropria } from "../utils/origem";
 
 // Schemas de validacao
 const PecaCreateSchema = z.object({
@@ -20,37 +21,37 @@ const PecaCreateSchema = z.object({
   // Valor de compra: positivo para COMPRA, zero permitido para CONSIGNACAO
   valorCompra: z.number().nonnegative("Valor de compra nao pode ser negativo"),
   valorEstimadoVenda: z.number().positive("Valor estimado deve ser positivo"),
-  origemTipo: z.enum(["COMPRA", "CONSIGNACAO"]),
+  origemTipo: z.enum(["COMPRA", "CONSIGNACAO", "ENCOMENDA"]),
   origemCanal: z.enum(["PESSOA_FISICA", "LEILAO_BRASIL", "EBAY"]).optional(),
   valorRepasse: z.number().positive().optional(), // Valor fixo de repasse (consignacao)
   percentualRepasse: z.number().positive().max(100).optional(), // Percentual do valor final (consignacao)
   localizacao: z.string().default("Fornecedor"),
   fornecedorId: z.string().cuid("Fornecedor invalido"),
   revisada: z.boolean().optional(),
-  dataEstimadaChegada: z.string().optional(), // ISO date (yyyy-mm-dd) — obrigatória para COMPRA
+  dataEstimadaChegada: z.string().optional(), // ISO date (yyyy-mm-dd) — obrigatória para COMPRA/ENCOMENDA
   fotos: z.array(z.string().min(1)).min(1, "Minimo 1 foto obrigatoria"),
 }).refine(
   (data) => {
-    // Se for COMPRA, valor de compra deve ser positivo (maior que 0)
-    if (data.origemTipo === "COMPRA" && data.valorCompra <= 0) {
+    // Peca propria (COMPRA ou ENCOMENDA): valor de compra deve ser positivo
+    if (isOrigemPropria(data.origemTipo) && data.valorCompra <= 0) {
       return false;
     }
     return true;
   },
   {
-    message: "Valor de compra deve ser positivo para compras",
+    message: "Valor de compra deve ser positivo para compras e encomendas",
     path: ["valorCompra"],
   }
 ).refine(
   (data) => {
-    // Data estimada de chegada e obrigatoria para peças compradas
-    if (data.origemTipo === "COMPRA" && !data.dataEstimadaChegada) {
+    // Data estimada de chegada e obrigatoria para peças compradas/encomendadas
+    if (isOrigemPropria(data.origemTipo) && !data.dataEstimadaChegada) {
       return false;
     }
     return true;
   },
   {
-    message: "Data estimada de chegada e obrigatoria para compras",
+    message: "Data estimada de chegada e obrigatoria para compras e encomendas",
     path: ["dataEstimadaChegada"],
   }
 );
@@ -83,7 +84,7 @@ const PecaListSchema = z.object({
   fornecedor: z.string().optional(),
   status: z.enum(["DISPONIVEL", "EM_TRANSITO", "REVISAO", "VENDIDA", "DEFEITO", "PERDA"]).optional(),
   localizacao: z.string().optional(),
-  origemTipo: z.enum(["COMPRA", "CONSIGNACAO"]).optional(),
+  origemTipo: z.enum(["COMPRA", "CONSIGNACAO", "ENCOMENDA"]).optional(),
   statusPagamentoFornecedor: z.enum(["PAGO", "PARCIAL", "NAO_PAGO"]).optional(),
   valorMin: z.number().nonnegative().optional(),
   valorMax: z.number().nonnegative().optional(),
@@ -96,6 +97,10 @@ const StatusUpdateSchema = z.object({
   pecaId: z.string().cuid(),
   status: z.enum(["DISPONIVEL", "EM_TRANSITO", "REVISAO", "VENDIDA", "DEFEITO", "PERDA"]),
   localizacao: z.string().optional(),
+  // O que precisa ser feito na revisao (ex: "revisao padrao", "trocar vidro").
+  // Obrigatorio na ENTRADA em revisao — validado na mutation, que conhece o
+  // status anterior (o LocationDialog reenvia o status atual sem esse campo).
+  servicoRevisao: z.string().trim().max(500).optional(),
 });
 
 const PagamentoFornecedorSchema = z.object({
@@ -532,7 +537,7 @@ export const pecaRouter = router({
     .mutation(async ({ input, ctx }) => {
       const peca = await prisma.peca.findUnique({
         where: { id: input.pecaId },
-        select: { status: true, localizacao: true },
+        select: { status: true, localizacao: true, servicoRevisao: true },
       });
 
       if (!peca) {
@@ -542,18 +547,39 @@ export const pecaRouter = router({
         });
       }
 
+      // Ao ENTRAR em revisao e obrigatorio dizer o que precisa ser feito
+      const entrandoEmRevisao =
+        input.status === "REVISAO" && peca.status !== "REVISAO";
+      if (entrandoEmRevisao && !input.servicoRevisao) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Descreva o servico a ser feito na revisao",
+        });
+      }
+
+      // Servico da revisao: preenchido ao entrar/permanecer em REVISAO,
+      // limpo quando a peca sai da revisao.
+      const servicoRevisao =
+        input.status === "REVISAO" ? input.servicoRevisao ?? peca.servicoRevisao : null;
+
+      // Observacao do historico: registra o servico solicitado na entrada em revisao
+      const observacao =
+        input.status === "REVISAO" && input.servicoRevisao ? input.servicoRevisao : null;
+
       // Atualizar peca e criar historico
       const pecaAtualizada = await prisma.peca.update({
         where: { id: input.pecaId },
         data: {
           status: input.status,
           localizacao: input.localizacao || peca.localizacao,
+          servicoRevisao,
           historicoStatus: {
             create: {
               statusAnterior: peca.status,
               statusNovo: input.status,
               localizacaoAnterior: peca.localizacao,
               localizacaoNova: input.localizacao || peca.localizacao,
+              observacao,
               userId: ctx.user.id,
             },
           },
@@ -568,6 +594,7 @@ export const pecaRouter = router({
         detalhes: {
           statusAnterior: peca.status,
           statusNovo: input.status,
+          ...(observacao ? { servicoRevisao: observacao } : {}),
         },
       });
 
@@ -854,15 +881,15 @@ export const pecaRouter = router({
   getMetricas: protectedProcedure.query(async ({ ctx }) => {
     const podeVerValores = ["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel);
 
-    // Contagem por status — KPIs do estoque consideram apenas peças COMPRADAS
-    // (consignadas continuam visíveis nas listagens, financeiro, etc.)
+    // Contagem por status — KPIs do estoque consideram apenas peças PRÓPRIAS
+    // (compra + encomenda; consignadas continuam visíveis nas listagens, financeiro, etc.)
     const [contagens, contagensOrigem] = await Promise.all([
       prisma.peca.groupBy({
         by: ["status"],
-        where: { arquivado: false, origemTipo: "COMPRA" },
+        where: { arquivado: false, origemTipo: filtroOrigemPropria },
         _count: true,
       }),
-      // Card "Origem" — mostra propositalmente a divisão compra vs consignação
+      // Card "Origem" — mostra propositalmente a divisão compra vs encomenda vs consignação
       prisma.peca.groupBy({
         by: ["origemTipo"],
         where: {
@@ -906,7 +933,7 @@ export const pecaRouter = router({
         where: {
           arquivado: false,
           status: { in: ["DISPONIVEL", "EM_TRANSITO", "REVISAO"] },
-          origemTipo: "COMPRA",
+          origemTipo: filtroOrigemPropria,
         },
         select: { valorEstimadoVenda: true },
       });
@@ -987,14 +1014,14 @@ export const pecaRouter = router({
 
       // Barra inicial: peças COMPRADAS já disponíveis fisicamente
       const estoqueAtual = await prisma.peca.count({
-        where: { arquivado: false, origemTipo: "COMPRA", status: "DISPONIVEL" },
+        where: { arquivado: false, origemTipo: filtroOrigemPropria, status: "DISPONIVEL" },
       });
 
       // Peças compradas ainda em trânsito, com data estimada definida
       const emTransito = await prisma.peca.findMany({
         where: {
           arquivado: false,
-          origemTipo: "COMPRA",
+          origemTipo: filtroOrigemPropria,
           status: "EM_TRANSITO",
           dataEstimadaChegada: { not: null },
         },
@@ -1058,7 +1085,7 @@ export const pecaRouter = router({
     const pendentes = await prisma.peca.findMany({
       where: {
         arquivado: false,
-        origemTipo: "COMPRA",
+        origemTipo: filtroOrigemPropria,
         status: "EM_TRANSITO",
         dataEstimadaChegada: { not: null, lte: fimDeHoje },
       },

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -30,8 +31,20 @@ interface StatusDialogProps {
   pecaId: string;
   currentStatus: string;
   currentLocalizacao: string;
+  /** Servico ja registrado, quando a peca ja esta em revisao */
+  currentServicoRevisao?: string | null;
   onSuccess?: () => void;
 }
+
+// Sugestoes de servico para agilizar o preenchimento (o campo continua livre)
+const SUGESTOES_SERVICO = [
+  "Revisao padrao",
+  "Trocar vidro",
+  "Relogio atrasando",
+  "Trocar coroa",
+  "Trocar pulseira",
+  "Polimento",
+];
 
 const TRANSICOES_PERMITIDAS: Record<string, string[]> = {
   DISPONIVEL: ["EM_TRANSITO", "REVISAO", "VENDIDA", "DEFEITO", "PERDA"],
@@ -48,16 +61,21 @@ export function StatusDialog({
   pecaId,
   currentStatus,
   currentLocalizacao,
+  currentServicoRevisao,
   onSuccess,
 }: StatusDialogProps) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState(currentStatus);
   const [localizacao, setLocalizacao] = useState(currentLocalizacao);
+  const [servicoRevisao, setServicoRevisao] = useState(currentServicoRevisao ?? "");
+  const [erroServico, setErroServico] = useState<string | null>(null);
 
   useEffect(() => {
     setStatus(currentStatus);
     setLocalizacao(currentLocalizacao);
-  }, [currentStatus, currentLocalizacao]);
+    setServicoRevisao(currentServicoRevisao ?? "");
+    setErroServico(null);
+  }, [currentStatus, currentLocalizacao, currentServicoRevisao]);
 
   const { data: localizacoes } = useQuery(trpc.peca.getLocalizacoes.queryOptions());
 
@@ -75,9 +93,24 @@ export function StatusDialog({
     })
   );
 
+  const isRevisao = status === "REVISAO";
+  const servicoLimpo = servicoRevisao.trim();
+  const servicoAlterado =
+    isRevisao && servicoLimpo !== (currentServicoRevisao ?? "").trim();
+
   const handleSubmit = () => {
-    if (status === currentStatus && localizacao === currentLocalizacao) {
+    if (
+      status === currentStatus &&
+      localizacao === currentLocalizacao &&
+      !servicoAlterado
+    ) {
       toast.info("Nenhuma alteracao foi feita");
+      return;
+    }
+
+    // Obrigatorio so na ENTRADA em revisao (mesma regra do servidor)
+    if (isRevisao && currentStatus !== "REVISAO" && !servicoLimpo) {
+      setErroServico("Descreva o que precisa ser feito na revisao");
       return;
     }
 
@@ -85,6 +118,8 @@ export function StatusDialog({
       pecaId,
       status: status as "DISPONIVEL" | "EM_TRANSITO" | "REVISAO" | "VENDIDA" | "DEFEITO" | "PERDA",
       localizacao: localizacao !== currentLocalizacao ? localizacao : undefined,
+      // string vazia apagaria o servico ja registrado — envia undefined
+      servicoRevisao: isRevisao ? servicoLimpo || undefined : undefined,
     });
   };
 
@@ -135,6 +170,43 @@ export function StatusDialog({
               </SelectContent>
             </Select>
           </div>
+
+          {isRevisao && (
+            <div className="space-y-2">
+              <Label htmlFor="servicoRevisao">
+                O que precisa ser feito?{currentStatus !== "REVISAO" && " *"}
+              </Label>
+              <Textarea
+                id="servicoRevisao"
+                value={servicoRevisao}
+                onChange={(e) => {
+                  setServicoRevisao(e.target.value);
+                  if (erroServico) setErroServico(null);
+                }}
+                placeholder="Ex: revisao padrao, trocar vidro, relogio atrasando..."
+                rows={3}
+                maxLength={500}
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {SUGESTOES_SERVICO.map((sugestao) => (
+                  <button
+                    key={sugestao}
+                    type="button"
+                    onClick={() => {
+                      setServicoRevisao(sugestao);
+                      setErroServico(null);
+                    }}
+                    className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted"
+                  >
+                    {sugestao}
+                  </button>
+                ))}
+              </div>
+              {erroServico && (
+                <p className="text-sm text-red-500">{erroServico}</p>
+              )}
+            </div>
+          )}
 
           {currentStatus === "VENDIDA" && status === "DISPONIVEL" && (
             <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded">

@@ -22,6 +22,7 @@ import { FornecedorModal } from "./fornecedor-modal";
 import { trpc } from "@/utils/trpc";
 import { toast } from "sonner";
 import { usePermissions } from "@/hooks/use-permissions";
+import { isOrigemPropria } from "@/lib/constants";
 
 interface PecaData {
   marca: string;
@@ -35,7 +36,7 @@ interface PecaData {
   calibre: string;
   valorCompra: string;
   valorEstimadoVenda: string;
-  origemTipo: "COMPRA" | "CONSIGNACAO";
+  origemTipo: "COMPRA" | "CONSIGNACAO" | "ENCOMENDA";
   origemCanal: "PESSOA_FISICA" | "LEILAO_BRASIL" | "EBAY" | "";
   tipoRepasse: "FIXO" | "PERCENTUAL";
   valorRepasse: string;
@@ -193,16 +194,16 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       newErrors.tamanhoCaixa = "Tamanho da caixa e obrigatorio";
     }
 
-    // Data estimada de chegada e obrigatoria para compras (entra na Previsao)
-    if (data.origemTipo === "COMPRA" && !data.dataEstimadaChegada) {
+    // Data estimada de chegada e obrigatoria para compras/encomendas (entra na Previsao)
+    if (isOrigemPropria(data.origemTipo) && !data.dataEstimadaChegada) {
       newErrors.dataEstimadaChegada = "Data estimada de chegada e obrigatoria";
     }
 
     // Validar campos monetarios apenas se o usuario pode ver valores
     // FUNCIONARIO nao ve e nao edita valores — pula validacao
     if (podeVerValores) {
-      // Valor de compra so e obrigatorio se for COMPRA (nao consignacao)
-      if (data.origemTipo === "COMPRA") {
+      // Valor de compra so e obrigatorio para peca propria (compra/encomenda)
+      if (isOrigemPropria(data.origemTipo)) {
         if (!data.valorCompra || isNaN(parseFloat(data.valorCompra))) {
           newErrors.valorCompra = "Valor de compra e obrigatorio";
         }
@@ -265,9 +266,9 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         : undefined,
       revisada: data.revisada,
       localizacao: data.localizacao,
-      // So compras tem previsao de chegada; consignacao nao entra na Previsao
+      // So pecas proprias tem previsao de chegada; consignacao nao entra na Previsao
       dataEstimadaChegada:
-        data.origemTipo === "COMPRA" && data.dataEstimadaChegada
+        isOrigemPropria(data.origemTipo) && data.dataEstimadaChegada
           ? data.dataEstimadaChegada
           : undefined,
       fornecedorId: data.fornecedorId,
@@ -287,8 +288,9 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         referencia: payload.referencia ?? null,
         calibre: payload.calibre ?? null,
         localizacao: payload.localizacao,
-        dataEstimadaChegada:
-          data.origemTipo === "COMPRA" ? payload.dataEstimadaChegada ?? null : null,
+        dataEstimadaChegada: isOrigemPropria(data.origemTipo)
+          ? payload.dataEstimadaChegada ?? null
+          : null,
       };
 
       // Apenas enviar campos monetarios se o usuario tem permissao
@@ -482,7 +484,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
               <>
                 <div className="space-y-2">
                   <Label htmlFor="valorCompra">
-                    Valor de Compra (R$) {data.origemTipo === "COMPRA" && "*"}
+                    Valor de Compra (R$) {isOrigemPropria(data.origemTipo) && "*"}
                   </Label>
                   <Input
                     id="valorCompra"
@@ -571,6 +573,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
                 <SelectContent>
                   <SelectItem value="COMPRA">Compra</SelectItem>
                   <SelectItem value="CONSIGNACAO">Consignacao</SelectItem>
+                  <SelectItem value="ENCOMENDA">Encomenda</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -592,7 +595,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
               </Select>
             </div>
 
-            {data.origemTipo === "COMPRA" && (
+            {isOrigemPropria(data.origemTipo) && (
               <div className="space-y-2">
                 <Label htmlFor="dataEstimadaChegada">Data Estimada de Chegada *</Label>
                 <Input

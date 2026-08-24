@@ -71,7 +71,7 @@ export default function EditarPecaPage() {
           calibre: peca.calibre || "",
           valorCompra: peca.valorCompra ? Number(peca.valorCompra).toString() : "",
           valorEstimadoVenda: peca.valorEstimadoVenda ? Number(peca.valorEstimadoVenda).toString() : "",
-          origemTipo: peca.origemTipo as "COMPRA" | "CONSIGNACAO",
+          origemTipo: peca.origemTipo as "COMPRA" | "CONSIGNACAO" | "ENCOMENDA",
           origemCanal: (peca.origemCanal as "PESSOA_FISICA" | "LEILAO_BRASIL" | "EBAY") || "",
           tipoRepasse: peca.percentualRepasse ? "PERCENTUAL" as const : "FIXO" as const,
           valorRepasse: peca.valorRepasse ? Number(peca.valorRepasse).toString() : "",

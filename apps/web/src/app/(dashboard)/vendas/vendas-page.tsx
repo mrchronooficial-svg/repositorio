@@ -191,6 +191,7 @@ export function VendasPage() {
       const labelOrigem: Record<string, string> = {
         COMPRA: "Compra",
         CONSIGNACAO: "Consignação",
+        ENCOMENDA: "Encomenda",
       };
       const labelPagamento: Record<string, string> = {
         PIX: "PIX",

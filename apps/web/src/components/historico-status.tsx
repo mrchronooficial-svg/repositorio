@@ -2,7 +2,7 @@
 
 import { StatusBadge } from "@/components/status-badge";
 import { formatDateTime } from "@/lib/formatters";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Wrench } from "lucide-react";
 
 interface HistoricoItem {
   id: string;
@@ -10,6 +10,7 @@ interface HistoricoItem {
   statusNovo: string;
   localizacaoAnterior: string | null;
   localizacaoNova: string | null;
+  observacao?: string | null;
   createdAt: Date | string;
   user: { name: string } | null;
 }
@@ -59,6 +60,13 @@ export function HistoricoStatus({ historico }: HistoricoStatusProps) {
                 {item.localizacaoAnterior && item.localizacaoNova
                   ? `${item.localizacaoAnterior} → ${item.localizacaoNova}`
                   : item.localizacaoNova}
+              </p>
+            )}
+
+            {item.observacao && (
+              <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
+                <Wrench className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <span className="whitespace-pre-wrap">{item.observacao}</span>
               </p>
             )}
 
