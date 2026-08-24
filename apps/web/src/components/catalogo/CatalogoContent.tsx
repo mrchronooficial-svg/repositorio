@@ -28,6 +28,12 @@ export function CatalogoContent({ initialTab = 0 }: CatalogoContentProps) {
   const precoMax = searchParams.get("precoMax")
     ? Number(searchParams.get("precoMax"))
     : undefined;
+  const tamanhoMin = searchParams.get("tamanhoMin")
+    ? Number(searchParams.get("tamanhoMin"))
+    : undefined;
+  const tamanhoMax = searchParams.get("tamanhoMax")
+    ? Number(searchParams.get("tamanhoMax"))
+    : undefined;
 
   // Splash screen apenas na primeira visita da sessão
   useEffect(() => {
@@ -56,8 +62,20 @@ export function CatalogoContent({ initialTab = 0 }: CatalogoContentProps) {
         {/* Tab 0: Catálogo */}
         <div className="pb-16">
           <CatalogoHeader />
-          <CatalogoFilters marca={marca} precoMin={precoMin} precoMax={precoMax} />
-          <CatalogoFeed marca={marca} precoMin={precoMin} precoMax={precoMax} />
+          <CatalogoFilters
+            marca={marca}
+            precoMin={precoMin}
+            precoMax={precoMax}
+            tamanhoMin={tamanhoMin}
+            tamanhoMax={tamanhoMax}
+          />
+          <CatalogoFeed
+            marca={marca}
+            precoMin={precoMin}
+            precoMax={precoMax}
+            tamanhoMin={tamanhoMin}
+            tamanhoMax={tamanhoMax}
+          />
         </div>
 
         {/* Tab 1: Drop do Dia */}

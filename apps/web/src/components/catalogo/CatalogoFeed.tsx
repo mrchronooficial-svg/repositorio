@@ -11,9 +11,17 @@ interface CatalogoFeedProps {
   marca?: string;
   precoMin?: number;
   precoMax?: number;
+  tamanhoMin?: number;
+  tamanhoMax?: number;
 }
 
-export function CatalogoFeed({ marca, precoMin, precoMax }: CatalogoFeedProps) {
+export function CatalogoFeed({
+  marca,
+  precoMin,
+  precoMax,
+  tamanhoMin,
+  tamanhoMax,
+}: CatalogoFeedProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -24,7 +32,7 @@ export function CatalogoFeed({ marca, precoMin, precoMax }: CatalogoFeedProps) {
     fetchNextPage,
   } = useInfiniteQuery(
     trpc.catalogo.listarPecas.infiniteQueryOptions(
-      { limit: 12, marca, precoMin, precoMax },
+      { limit: 12, marca, precoMin, precoMax, tamanhoMin, tamanhoMax },
       {
         getNextPageParam: (lastPage) => lastPage.nextCursor,
       }
@@ -50,7 +58,13 @@ export function CatalogoFeed({ marca, precoMin, precoMax }: CatalogoFeedProps) {
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const allItems = data?.pages.flatMap((page) => page.items) ?? [];
-  const isFiltered = !!(marca || precoMin !== undefined || precoMax !== undefined);
+  const isFiltered = !!(
+    marca ||
+    precoMin !== undefined ||
+    precoMax !== undefined ||
+    tamanhoMin !== undefined ||
+    tamanhoMax !== undefined
+  );
 
   // Loading state
   if (isLoading) {

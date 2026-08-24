@@ -24,10 +24,14 @@ export const catalogoRouter = router({
         marca: z.string().optional(),
         precoMin: z.number().optional(),
         precoMax: z.number().optional(),
+        // Tamanho da caixa em mm
+        tamanhoMin: z.number().optional(),
+        tamanhoMax: z.number().optional(),
       })
     )
     .query(async ({ input }) => {
-      const { cursor, limit, marca, precoMin, precoMax } = input;
+      const { cursor, limit, marca, precoMin, precoMax, tamanhoMin, tamanhoMax } =
+        input;
 
       // Peças vendidas há menos de 48h (para mostrar com selo VENDIDO)
       const limite48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
@@ -57,6 +61,15 @@ export const catalogoRouter = router({
         where.valorEstimadoVenda = {
           ...(precoMin !== undefined && { gte: precoMin }),
           ...(precoMax !== undefined && { lte: precoMax }),
+        };
+      }
+
+      // Filtro de tamanho da caixa (mm) — min inclusivo, max exclusivo para
+      // que as faixas do frontend não se sobreponham (ex: 38mm cai só em 38–41)
+      if (tamanhoMin !== undefined || tamanhoMax !== undefined) {
+        where.tamanhoCaixa = {
+          ...(tamanhoMin !== undefined && { gte: tamanhoMin }),
+          ...(tamanhoMax !== undefined && { lt: tamanhoMax }),
         };
       }
 
