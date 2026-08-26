@@ -56,14 +56,23 @@ const CORES = [
   "#ef4444", // red
 ];
 
-const formatCompactTick = (v: number): string => {
-  if (v === 0) return "0";
+// Sempre com uma casa decimal (ex: 3,9k / 911,7)
+const formatUmaCasa = (v: number): string => {
   const abs = Math.abs(v);
   if (abs >= 1_000_000)
-    return `${(v / 1_000_000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}M`;
+    return `${(v / 1_000_000).toLocaleString("pt-BR", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })}M`;
   if (abs >= 1_000)
-    return `${(v / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}k`;
-  return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    return `${(v / 1_000).toLocaleString("pt-BR", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })}k`;
+  return v.toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 };
 
 const formatBRL = (v: number): string =>
@@ -72,7 +81,8 @@ const formatBRL = (v: number): string =>
     maximumFractionDigits: 2,
   })}`;
 
-const LINHA_ALTURA = 30;
+// Largura minima por marca; abaixo disso o grafico rola na horizontal
+const COLUNA_LARGURA = 68;
 
 function Header({
   data,
@@ -151,10 +161,7 @@ export function WidgetLucroMarca({
     );
   }
 
-  const alturaGrafico = Math.max(
-    data.marcas.length * LINHA_ALTURA + 30,
-    120
-  );
+  const larguraGrafico = data.marcas.length * COLUNA_LARGURA;
 
   return (
     <Card className="h-full flex flex-col">
@@ -164,29 +171,29 @@ export function WidgetLucroMarca({
         onMesChange={onMesChange}
       />
       <CardContent className="flex-1 min-h-0 flex flex-col pr-2">
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div style={{ height: alturaGrafico }}>
+        <div className="flex-1 min-h-0 overflow-x-auto">
+          <div className="h-full" style={{ minWidth: larguraGrafico }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={data.marcas}
-                layout="vertical"
-                margin={{ top: 4, right: 56, bottom: 4, left: 4 }}
+                margin={{ top: 18, right: 8, bottom: 4, left: 0 }}
               >
                 <XAxis
-                  type="number"
-                  tick={{ fontSize: 11 }}
+                  dataKey="marca"
+                  tick={{ fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={formatCompactTick}
+                  interval={0}
+                  angle={-35}
+                  textAnchor="end"
+                  height={70}
                 />
                 <YAxis
-                  type="category"
-                  dataKey="marca"
                   tick={{ fontSize: 11 }}
                   tickLine={false}
                   axisLine={false}
-                  width={100}
-                  interval={0}
+                  width={44}
+                  tickFormatter={formatUmaCasa}
                 />
                 <Tooltip
                   cursor={{ fill: "rgba(0,0,0,0.04)" }}
@@ -210,12 +217,12 @@ export function WidgetLucroMarca({
                 />
                 <Bar
                   dataKey="lucroBrutoPorPeca"
-                  radius={[0, 4, 4, 0]}
-                  barSize={18}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={44}
                   label={{
-                    position: "right",
-                    fontSize: 11,
-                    formatter: (v: unknown) => formatCompactTick(Number(v) || 0),
+                    position: "top",
+                    fontSize: 10,
+                    formatter: (v: unknown) => formatUmaCasa(Number(v) || 0),
                   }}
                 >
                   {data.marcas.map((m, idx) => (
