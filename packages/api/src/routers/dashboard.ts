@@ -1,8 +1,10 @@
+import { z } from "zod";
 import { protectedProcedure, router } from "../index";
 import prisma from "@gestaomrchrono/db";
 import { gerarDRE } from "../services/demonstrativos.service";
 import {
   brtMonthEnd,
+  brtMonthOf,
   brtMonthStart,
   brtToday,
 } from "../utils/brt-date";
@@ -930,6 +932,159 @@ export const dashboardRouter = router({
 
     return resultado;
   }),
+
+  // Lucro bruto medio por peca vendida, agrupado por marca, no mes escolhido.
+  // Considera SOMENTE pecas vendidas no mes (nunca estoque nao vendido).
+  getLucroBrutoPorMarca: protectedProcedure
+    .input(
+      z
+        .object({
+          ano: z.number().int().min(2000).max(2100).optional(),
+          mes: z.number().int().min(0).max(11).optional(), // 0 = Janeiro
+        })
+        .optional()
+    )
+    .query(async ({ ctx, input }) => {
+      if (ctx.session.user.nivel !== "ADMINISTRADOR") {
+        return null;
+      }
+
+      // Meses que possuem vendas (em horario de Brasilia)
+      const todasVendas = await prisma.venda.findMany({
+        where: { cancelada: false },
+        select: { dataVenda: true },
+      });
+
+      const mesesSet = new Map<string, { ano: number; mes: number }>();
+      for (const v of todasVendas) {
+        const { year, month } = brtMonthOf(new Date(v.dataVenda));
+        mesesSet.set(`${year}-${String(month).padStart(2, "0")}`, {
+          ano: year,
+          mes: month,
+        });
+      }
+
+      const hojeBrt = brtToday();
+      // Garante que o mes corrente sempre aparece na lista
+      mesesSet.set(
+        `${hojeBrt.year}-${String(hojeBrt.month).padStart(2, "0")}`,
+        { ano: hojeBrt.year, mes: hojeBrt.month }
+      );
+
+      const mesesDisponiveis = Array.from(mesesSet.values())
+        .sort((a, b) => (a.ano !== b.ano ? b.ano - a.ano : b.mes - a.mes))
+        .map((m) => ({
+          ano: m.ano,
+          mes: m.mes,
+          label: `${NOMES_MESES[m.mes]}/${m.ano}`,
+        }));
+
+      // Mes selecionado (default: mes corrente)
+      const anoSel = input?.ano ?? hojeBrt.year;
+      const mesSel = input?.mes ?? hojeBrt.month;
+
+      const vendas = await prisma.venda.findMany({
+        where: {
+          cancelada: false,
+          dataVenda: {
+            gte: brtMonthStart(anoSel, mesSel),
+            lt: brtMonthEnd(anoSel, mesSel),
+          },
+        },
+        select: {
+          valorFinal: true,
+          formaPagamento: true,
+          taxaMDR: true,
+          valorRepasseDevido: true,
+          peca: {
+            select: {
+              marca: true,
+              origemTipo: true,
+              valorCompra: true,
+              custoManutencao: true,
+            },
+          },
+        },
+      });
+
+      if (vendas.length === 0) {
+        return {
+          ano: anoSel,
+          mes: mesSel,
+          label: `${NOMES_MESES[mesSel]}/${anoSel}`,
+          mesesDisponiveis,
+          marcas: [],
+          totalPecas: 0,
+          lucroBrutoTotal: 0,
+          lucroBrutoPorPecaGeral: 0,
+        };
+      }
+
+      const impostoConfig = await carregarImpostoConfig();
+
+      const porMarca = new Map<
+        string,
+        { marca: string; quantidade: number; lucroBrutoTotal: number }
+      >();
+
+      for (const v of vendas) {
+        const marca = (v.peca.marca || "Sem marca").trim() || "Sem marca";
+
+        const lucro = calcularLucroBruto(
+          {
+            valorFinal: Number(v.valorFinal) || 0,
+            formaPagamento: v.formaPagamento,
+            taxaMDR: Number(v.taxaMDR) || 0,
+            valorRepasseDevido: v.valorRepasseDevido
+              ? Number(v.valorRepasseDevido)
+              : null,
+            origemTipo: v.peca.origemTipo,
+            valorCompra: Number(v.peca.valorCompra) || 0,
+            custoManutencao: Number(v.peca.custoManutencao) || 0,
+          },
+          impostoConfig
+        );
+
+        const atual = porMarca.get(marca) ?? {
+          marca,
+          quantidade: 0,
+          lucroBrutoTotal: 0,
+        };
+        atual.quantidade += 1;
+        atual.lucroBrutoTotal += lucro;
+        porMarca.set(marca, atual);
+      }
+
+      const marcas = Array.from(porMarca.values())
+        .map((m) => ({
+          marca: m.marca,
+          quantidade: m.quantidade,
+          lucroBrutoTotal: Math.round(m.lucroBrutoTotal * 100) / 100,
+          lucroBrutoPorPeca:
+            Math.round((m.lucroBrutoTotal / m.quantidade) * 100) / 100,
+        }))
+        .sort((a, b) => b.lucroBrutoPorPeca - a.lucroBrutoPorPeca);
+
+      const lucroBrutoTotal =
+        Math.round(
+          marcas.reduce((sum, m) => sum + m.lucroBrutoTotal, 0) * 100
+        ) / 100;
+      const totalPecas = marcas.reduce((sum, m) => sum + m.quantidade, 0);
+
+      return {
+        ano: anoSel,
+        mes: mesSel,
+        label: `${NOMES_MESES[mesSel]}/${anoSel}`,
+        mesesDisponiveis,
+        marcas,
+        totalPecas,
+        lucroBrutoTotal,
+        lucroBrutoPorPecaGeral:
+          totalPecas > 0
+            ? Math.round((lucroBrutoTotal / totalPecas) * 100) / 100
+            : 0,
+      };
+    }),
 
   // Recebiveis pendentes detalhados
   getRecebiveisPendentes: protectedProcedure.query(async ({ ctx }) => {

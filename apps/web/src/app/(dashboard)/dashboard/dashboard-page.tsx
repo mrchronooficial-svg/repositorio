@@ -30,6 +30,7 @@ import { WidgetKpiLucroLiquido } from "./widgets/widget-kpi-lucro-liquido";
 import { WidgetKpiEstoqueCusto } from "./widgets/widget-kpi-estoque-custo";
 import { WidgetKpiEstoqueFaturamento } from "./widgets/widget-kpi-estoque-faturamento";
 import { WidgetFaixasLucroBruto } from "./widgets/widget-faixas-lucro-bruto";
+import { WidgetLucroMarca } from "./widgets/widget-lucro-marca";
 import { WidgetGraficos } from "./widgets/widget-graficos";
 import { WidgetListas } from "./widgets/widget-listas";
 import { WidgetPaceVendas } from "./widgets/widget-pace-vendas";
@@ -51,6 +52,8 @@ export function DashboardPage() {
   const { podeVerValores, isAdmin } = usePermissions();
   const [showRecebiveisModal, setShowRecebiveisModal] = useState(false);
   const [showDividasModal, setShowDividasModal] = useState(false);
+  // "" = mes corrente (o backend resolve o default)
+  const [mesLucroMarca, setMesLucroMarca] = useState("");
 
   const {
     layout,
@@ -117,6 +120,15 @@ export function DashboardPage() {
   const { data: faixasLucro } = useQuery(
     trpc.dashboard.getFaixasLucroBruto.queryOptions()
   );
+  const [anoLucroMarca, mesIdxLucroMarca] = mesLucroMarca
+    ? mesLucroMarca.split("-").map(Number)
+    : [undefined, undefined];
+  const { data: lucroPorMarca, isLoading: isLoadingLucroMarca } = useQuery(
+    trpc.dashboard.getLucroBrutoPorMarca.queryOptions({
+      ano: anoLucroMarca,
+      mes: mesIdxLucroMarca,
+    })
+  );
 
   const verificarAlertasMutation = useMutation(
     trpc.alerta.verificarAlertas.mutationOptions({
@@ -146,6 +158,7 @@ export function DashboardPage() {
     kpiClientes: !podeVerValores,
     kpiEmRevisao: !podeVerValores,
     faixasLucroBruto: podeVerValores && !!faixasLucro,
+    lucroMarca: isAdmin,
     paceVendas: true,
     paceLucroBruto: isAdmin,
     graficos: true,
@@ -312,6 +325,16 @@ export function DashboardPage() {
             totalGeral={faixasLucro.totalGeral}
           />
         ) : null;
+
+      case "lucroMarca":
+        return (
+          <WidgetLucroMarca
+            data={lucroPorMarca as any}
+            isLoading={isLoadingLucroMarca}
+            mesSelecionado={mesLucroMarca}
+            onMesChange={setMesLucroMarca}
+          />
+        );
 
       case "graficos":
         return metricas ? (
