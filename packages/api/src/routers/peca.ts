@@ -9,7 +9,7 @@ import { filtroOrigemPropria, isOrigemPropria } from "../utils/origem";
 
 // Schemas de validacao
 const PecaCreateSchema = z.object({
-  marca: z.string().min(1, "Marca e obrigatoria"),
+  marca: z.string().trim().min(1, "Marca e obrigatoria"),
   modelo: z.string().min(1, "Modelo e obrigatorio"),
   ano: z.number().int().optional(),
   tamanhoCaixa: z.number().positive("Tamanho deve ser positivo"),
@@ -58,7 +58,7 @@ const PecaCreateSchema = z.object({
 
 const PecaUpdateSchema = z.object({
   id: z.string().cuid(),
-  marca: z.string().min(1).optional(),
+  marca: z.string().trim().min(1).optional(),
   modelo: z.string().min(1).optional(),
   ano: z.number().int().optional().nullable(),
   tamanhoCaixa: z.number().positive().optional(),
