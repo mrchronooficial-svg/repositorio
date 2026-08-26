@@ -934,7 +934,8 @@ export const dashboardRouter = router({
   }),
 
   // Lucro bruto medio por peca vendida, agrupado por marca, no mes escolhido.
-  // Considera SOMENTE pecas vendidas no mes (nunca estoque nao vendido).
+  // Considera SOMENTE pecas vendidas no mes (nunca estoque nao vendido) e
+  // SOMENTE pecas proprias (COMPRA/ENCOMENDA); consignadas ficam de fora.
   getLucroBrutoPorMarca: protectedProcedure
     .input(
       z
@@ -949,9 +950,12 @@ export const dashboardRouter = router({
         return null;
       }
 
-      // Meses que possuem vendas (em horario de Brasilia)
+      // Meses que possuem vendas de pecas proprias (em horario de Brasilia)
       const todasVendas = await prisma.venda.findMany({
-        where: { cancelada: false },
+        where: {
+          cancelada: false,
+          peca: { origemTipo: filtroOrigemPropria },
+        },
         select: { dataVenda: true },
       });
 
@@ -986,6 +990,9 @@ export const dashboardRouter = router({
       const vendas = await prisma.venda.findMany({
         where: {
           cancelada: false,
+          // Somente pecas proprias (compradas/encomendadas); consignadas ficam
+          // de fora, pois o custo delas e um repasse e nao um valor de compra.
+          peca: { origemTipo: filtroOrigemPropria },
           dataVenda: {
             gte: brtMonthStart(anoSel, mesSel),
             lt: brtMonthEnd(anoSel, mesSel),

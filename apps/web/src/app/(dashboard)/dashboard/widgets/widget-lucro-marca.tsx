@@ -154,7 +154,7 @@ export function WidgetLucroMarca({
         />
         <CardContent className="flex-1 min-h-0 flex items-center justify-center">
           <p className="text-muted-foreground text-sm">
-            Nenhuma peca vendida em {data.label}
+            Nenhuma peca propria vendida em {data.label}
           </p>
         </CardContent>
       </Card>
@@ -234,9 +234,11 @@ export function WidgetLucroMarca({
           </div>
         </div>
         <p className="mt-2 text-xs text-muted-foreground flex-none">
-          {data.totalPecas} {data.totalPecas === 1 ? "peca vendida" : "pecas vendidas"}{" "}
-          em {data.label} &middot; media geral{" "}
-          {formatBRL(data.lucroBrutoPorPecaGeral)}/peca
+          {data.totalPecas}{" "}
+          {data.totalPecas === 1 ? "peca vendida" : "pecas vendidas"} em{" "}
+          {data.label} &middot; media geral{" "}
+          {formatBRL(data.lucroBrutoPorPecaGeral)}/peca &middot; consignadas nao
+          entram
         </p>
       </CardContent>
     </Card>
