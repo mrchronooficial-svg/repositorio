@@ -344,6 +344,8 @@ model Venda {
   observacaoLogistica String?
   // NFe / Declaracao Fiscal
   valorDeclarar        Decimal?      @db.Decimal(10, 2)
+  // true = valor definido a mao; impede que as rotinas automaticas sobrescrevam
+  valorDeclararManual  Boolean       @default(false)
   nfeDeclarada         Boolean       @default(false)
   // Datas
   dataVenda DateTime @default(now())

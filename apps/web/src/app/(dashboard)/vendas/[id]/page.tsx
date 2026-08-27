@@ -23,6 +23,7 @@ import { PagamentoDialog } from "@/components/dialogs/pagamento-dialog";
 import { RepasseDialog } from "@/components/dialogs/repasse-dialog";
 import { EditarPagamentoDialog } from "@/components/dialogs/editar-pagamento-dialog";
 import { EditarRepasseDialog } from "@/components/dialogs/editar-repasse-dialog";
+import { EditarValorDeclarar } from "@/components/editar-valor-declarar";
 import { trpc } from "@/utils/trpc";
 import { usePermissions } from "@/hooks/use-permissions";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/formatters";
@@ -279,11 +280,17 @@ export default function VendaDetalhesPage() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Valor a Declarar</p>
-                    <p className="font-medium text-orange-600">
-                      {venda.valorDeclarar
-                        ? formatCurrency(Number(venda.valorDeclarar))
-                        : "-"}
-                    </p>
+                    <EditarValorDeclarar
+                      vendaId={venda.id}
+                      valorDeclarar={
+                        venda.valorDeclarar != null
+                          ? Number(venda.valorDeclarar)
+                          : null
+                      }
+                      manual={venda.valorDeclararManual}
+                      queryKeys={[queryOptions.queryKey]}
+                      variante="bloco"
+                    />
                   </div>
                 </div>
 

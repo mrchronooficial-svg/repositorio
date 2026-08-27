@@ -14,6 +14,7 @@ import {
   calcularStatusPagamento,
 } from "../utils/pagamento";
 import { isOrigemPropria } from "../utils/origem";
+import { calcularValorDeclararAutomatico } from "../utils/valor-declarar";
 
 // Schemas
 const VendaCreateSchema = z.object({
@@ -465,11 +466,11 @@ export const vendaRouter = router({
       }
 
       // 6. Calcular valor a declarar automaticamente
-      // COMPRA: valor a declarar = valor final da venda
-      // CONSIGNACAO: valor a declarar = margem (valorFinal - repasse) — o que entra na conta
-      const valorDeclarar = peca.origemTipo === "CONSIGNACAO" && valorRepasseDevido
-        ? valorFinal - valorRepasseDevido
-        : valorFinal;
+      const valorDeclarar = calcularValorDeclararAutomatico({
+        valorFinal,
+        valorRepasseDevido,
+        origemTipo: peca.origemTipo,
+      });
 
       // 7. Criar venda
       const venda = await prisma.venda.create({
@@ -657,13 +658,16 @@ export const vendaRouter = router({
         }
       }
 
-      // 5. Recalcular valor a declarar automaticamente
-      // COMPRA: valor a declarar = valor final da venda
-      // CONSIGNACAO: valor a declarar = margem (valorFinal - repasse) — o que entra na conta
-      const valorDeclarar = venda.peca.origemTipo === "CONSIGNACAO" && repasseDevidoAtual > 0
-        ? valorFinal - repasseDevidoAtual
-        : valorFinal;
-      updateData.valorDeclarar = valorDeclarar;
+      // 5. Recalcular valor a declarar automaticamente.
+      // Vendas com valor definido a mao (valorDeclararManual) sao preservadas —
+      // editar a venda nao pode desfazer o ajuste manual do valor a declarar.
+      if (!venda.valorDeclararManual) {
+        updateData.valorDeclarar = calcularValorDeclararAutomatico({
+          valorFinal,
+          valorRepasseDevido: repasseDevidoAtual,
+          origemTipo: venda.peca.origemTipo,
+        });
+      }
 
       // 5.1 Recalcular status de pagamento — o valorFinal pode ter mudado (ex.: alteracao
       // de desconto), entao o saldo devedor e o status precisam ser reavaliados com base

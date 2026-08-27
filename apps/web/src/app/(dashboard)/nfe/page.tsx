@@ -29,6 +29,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { StatusBadge } from "@/components/status-badge";
+import { EditarValorDeclarar } from "@/components/editar-valor-declarar";
 import { trpc } from "@/utils/trpc";
 import { formatCurrency } from "@/lib/formatters";
 import { toast } from "sonner";
@@ -240,11 +241,19 @@ export default function NfePage() {
                       {venda.cliente.nome}
                     </TableCell>
                     <TableCell>
-                      <span className="font-medium">
-                        {venda.valorDeclarar
-                          ? formatCurrency(Number(venda.valorDeclarar))
-                          : "-"}
-                      </span>
+                      <EditarValorDeclarar
+                        vendaId={venda.id}
+                        valorDeclarar={
+                          venda.valorDeclarar != null
+                            ? Number(venda.valorDeclarar)
+                            : null
+                        }
+                        manual={venda.valorDeclararManual}
+                        queryKeys={[
+                          queryOptions.queryKey,
+                          metricasOptions.queryKey,
+                        ]}
+                      />
                     </TableCell>
                     <TableCell>
                       <StatusBadge

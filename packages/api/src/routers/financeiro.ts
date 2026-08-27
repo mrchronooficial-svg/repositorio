@@ -7,6 +7,7 @@ import { gerarDRE, gerarBalanco, gerarDFC, gerarKpisOperacionais } from "../serv
 import { calcularRBT12, calcularAliquotaEfetiva } from "../services/simples-nacional.service";
 import { criarLancamentosVenda, reverterLancamentosVenda } from "../services/lancamento-venda.service";
 import { brtToday } from "../utils/brt-date";
+import { calcularValorDeclararAutomatico } from "../utils/valor-declarar";
 
 // ============================================
 // SCHEMAS DE VALIDAÇÃO
@@ -1595,7 +1596,8 @@ export const financeiroRouter = router({
     return { processadas, erros: detalhesErros.length, detalhesErros };
   }),
 
-  // Corrigir valorDeclarar de todas as vendas (consignação: margem; compra: valorFinal)
+  // Corrigir valorDeclarar de todas as vendas (consignação: margem; compra: valorFinal).
+  // Vendas com valor definido a mão (valorDeclararManual) são preservadas.
   corrigirValorDeclarar: adminProcedure.mutation(async ({ ctx }) => {
     // Buscar TODAS as vendas não-canceladas
     const vendas = await prisma.venda.findMany({
@@ -1605,18 +1607,27 @@ export const financeiroRouter = router({
         valorFinal: true,
         valorRepasseDevido: true,
         valorDeclarar: true,
+        valorDeclararManual: true,
         peca: { select: { origemTipo: true } },
       },
     });
 
     let corrigidas = 0;
+    let manuaisPreservadas = 0;
     for (const venda of vendas) {
-      const valorFinal = Number(venda.valorFinal);
-      const repasse = venda.valorRepasseDevido ? Number(venda.valorRepasseDevido) : 0;
-      const isConsignacao = venda.peca.origemTipo === "CONSIGNACAO" && repasse > 0;
+      // Valor definido a mão: não sobrescrever
+      if (venda.valorDeclararManual) {
+        manuaisPreservadas++;
+        continue;
+      }
 
-      // Consignação: margem; Compra: valorFinal
-      const valorCorreto = isConsignacao ? valorFinal - repasse : valorFinal;
+      const valorCorreto = calcularValorDeclararAutomatico({
+        valorFinal: Number(venda.valorFinal),
+        valorRepasseDevido: venda.valorRepasseDevido
+          ? Number(venda.valorRepasseDevido)
+          : null,
+        origemTipo: venda.peca.origemTipo,
+      });
       const declaraAtual = venda.valorDeclarar ? Number(venda.valorDeclarar) : 0;
 
       // Atualizar se NULL ou diferente do correto
@@ -1633,10 +1644,10 @@ export const financeiroRouter = router({
       userId: ctx.user.id,
       acao: "CORRECAO_VALOR_DECLARAR",
       entidade: "VENDA",
-      detalhes: { totalVendas: vendas.length, corrigidas },
+      detalhes: { totalVendas: vendas.length, corrigidas, manuaisPreservadas },
     });
 
-    return { totalVendas: vendas.length, corrigidas };
+    return { totalVendas: vendas.length, corrigidas, manuaisPreservadas };
   }),
 
   // Reparar lançamentos contábeis com valores divergentes
