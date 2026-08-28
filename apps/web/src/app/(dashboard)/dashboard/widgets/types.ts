@@ -58,9 +58,9 @@ export const DEFAULT_GRID_LAYOUT: GridItem[] = [
   { i: "paceLucroBruto",      x: 0, y: 11, w: 8, h: 3 },
   { i: "recebiveis",          x: 0, y: 14, w: 8, h: 1 },
   { i: "dividas",             x: 0, y: 15, w: 8, h: 1 },
-  { i: "faixasLucroBruto",    x: 0, y: 16, w: 4, h: 3 },
+  { i: "diasEstoque",         x: 0, y: 16, w: 4, h: 5 },
   { i: "lucroMarca",          x: 4, y: 16, w: 4, h: 5 },
-  { i: "diasEstoque",         x: 0, y: 21, w: 8, h: 3 },
+  { i: "faixasLucroBruto",    x: 0, y: 21, w: 4, h: 3 },
 ];
 
 export const DEFAULT_LAYOUT: DashboardLayout = {
