@@ -7,7 +7,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/formatters";
 import {
   Area,
-  AreaChart,
+  ComposedChart,
+  Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -18,6 +20,7 @@ interface PontoDiasEstoque {
   data: string; // "YYYY-MM-DD"
   diasEstoque: number | null;
   valorEstoque: number;
+  qtdEstoque: number;
   cmv30: number;
 }
 
@@ -133,6 +136,15 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
             <span className="text-sm text-muted-foreground ml-1">dias</span>
             <p className="text-[10px] text-muted-foreground">
               com +{CRESCIMENTO_CMV_PCT}% de crescimento
+              {atual && (
+                <>
+                  {" "}
+                  &middot;{" "}
+                  <span className="text-red-600">
+                    {atual.qtdEstoque} pecas
+                  </span>
+                </>
+              )}
             </p>
           </div>
         )}
@@ -157,9 +169,9 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
         </div>
         <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
+            <ComposedChart
               data={serieVisivel}
-              margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
+              margin={{ top: 4, right: 4, bottom: 4, left: 0 }}
             >
               <defs>
                 <linearGradient id="gradDiasEstoque" x1="0" y1="0" x2="0" y2="1">
@@ -176,15 +188,25 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
                 tickFormatter={rotuloDia}
               />
               <YAxis
+                yAxisId="dias"
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
-                width={36}
+                width={34}
                 tickFormatter={(v: number) =>
                   Number(v).toLocaleString("pt-BR", {
                     maximumFractionDigits: 0,
                   })
                 }
+              />
+              <YAxis
+                yAxisId="qtd"
+                orientation="right"
+                tick={{ fontSize: 11, fill: "#dc2626" }}
+                tickLine={false}
+                axisLine={false}
+                width={30}
+                allowDecimals={false}
               />
               <Tooltip
                 contentStyle={{
@@ -193,8 +215,16 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
                   border: "1px solid #e5e7eb",
                 }}
                 labelFormatter={(v) => rotuloCompleto(String(v))}
-                formatter={(value, _name, item) => {
+                formatter={(value, name, item) => {
                   const p = item?.payload as PontoDiasEstoque | undefined;
+
+                  if (name === "Pecas em estoque") {
+                    return [
+                      `${Number(value)} ${Number(value) === 1 ? "peca" : "pecas"}`,
+                      name,
+                    ];
+                  }
+
                   const dias =
                     value == null
                       ? "sem vendas na janela"
@@ -210,9 +240,15 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
                   ];
                 }}
               />
+              <Legend
+                wrapperStyle={{ fontSize: 11, paddingTop: 2 }}
+                iconType="plainline"
+              />
               <Area
+                yAxisId="dias"
                 type="monotone"
                 dataKey="diasEstoque"
+                name="Dias de estoque"
                 stroke="#6366f1"
                 strokeWidth={2}
                 fill="url(#gradDiasEstoque)"
@@ -220,7 +256,17 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
                 activeDot={{ r: 4 }}
                 connectNulls={false}
               />
-            </AreaChart>
+              <Line
+                yAxisId="qtd"
+                type="monotone"
+                dataKey="qtdEstoque"
+                name="Pecas em estoque"
+                stroke="#dc2626"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
         <p className="mt-2 text-xs text-muted-foreground flex-none">

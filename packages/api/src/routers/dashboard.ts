@@ -1170,10 +1170,12 @@ export const dashboardRouter = router({
     // Cada peca soma seu custo nos intervalos de dias em que esteve em estoque.
     // +1 no tamanho para absorver o delta de saida do ultimo dia.
     const deltaEstoque = new Array<number>(totalDias + 1).fill(0);
+    // Mesma reconstrucao, contando pecas em vez de somar custo
+    const deltaQtd = new Array<number>(totalDias + 1).fill(0);
 
     for (const p of pecas) {
+      // Peca sem custo registrado ainda conta na quantidade
       const custo = Number(p.valorCompra || 0) + Number(p.custoManutencao || 0);
-      if (custo === 0) continue;
 
       // Status no FIM de cada dia: quando ha mais de uma mudanca no mesmo dia,
       // vale a ultima.
@@ -1196,12 +1198,14 @@ export const dashboardRouter = router({
           inicioIntervalo = dia;
         } else if (!emEstoque && inicioIntervalo !== null) {
           aplicarIntervalo(deltaEstoque, diaBase, totalDias, inicioIntervalo, dia, custo);
+          aplicarIntervalo(deltaQtd, diaBase, totalDias, inicioIntervalo, dia, 1);
           inicioIntervalo = null;
         }
       }
       // Intervalo aberto: a peca continua em estoque ate hoje
       if (inicioIntervalo !== null) {
         aplicarIntervalo(deltaEstoque, diaBase, totalDias, inicioIntervalo, diaFim + 1, custo);
+        aplicarIntervalo(deltaQtd, diaBase, totalDias, inicioIntervalo, diaFim + 1, 1);
       }
     }
 
@@ -1219,14 +1223,17 @@ export const dashboardRouter = router({
       data: string;
       diasEstoque: number | null;
       valorEstoque: number;
+      qtdEstoque: number;
       cmv30: number;
     }> = [];
 
     let valorEstoque = 0;
+    let qtdEstoque = 0;
     let janela30 = 0;
 
     for (let i = 0; i < totalDias; i++) {
       valorEstoque += deltaEstoque[i]!;
+      qtdEstoque += deltaQtd[i]!;
 
       janela30 += cmvPorDia[i]!;
       if (i >= 30) janela30 -= cmvPorDia[i - 30]!;
@@ -1241,6 +1248,7 @@ export const dashboardRouter = router({
             ? Math.round((valorEstoque / cmv30) * 30 * 10) / 10
             : null,
         valorEstoque: Math.round(valorEstoque * 100) / 100,
+        qtdEstoque,
         cmv30,
       });
     }
