@@ -48,3 +48,16 @@ export function brtToday(): { year: number; month: number; day: number } {
   const p = brtParts(new Date());
   return { year: p.year, month: p.month, day: p.day };
 }
+
+// Indice do dia em BRT (dias inteiros desde a epoca, ja deslocados para UTC-3).
+// Dois instantes no mesmo dia de Brasilia retornam o mesmo indice, o que permite
+// agrupar/percorrer series diarias sem criar um Date por dia.
+export function brtDayIndex(date: Date): number {
+  return Math.floor((date.getTime() + BRT_OFFSET_MS) / 86_400_000);
+}
+
+// Data (00:00 UTC) cujo ano/mes/dia corresponde ao dia BRT do indice informado.
+// Use apenas para formatar/rotular a serie — nao e um instante real em BRT.
+export function brtDayIndexToDate(dayIndex: number): Date {
+  return new Date(dayIndex * 86_400_000);
+}

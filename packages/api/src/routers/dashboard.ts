@@ -3,6 +3,8 @@ import { protectedProcedure, router } from "../index";
 import prisma from "@gestaomrchrono/db";
 import { gerarDRE } from "../services/demonstrativos.service";
 import {
+  brtDayIndex,
+  brtDayIndexToDate,
   brtMonthEnd,
   brtMonthOf,
   brtMonthStart,
@@ -1093,6 +1095,161 @@ export const dashboardRouter = router({
       };
     }),
 
+  // Dias de Estoque (Days of Inventory), serie diaria.
+  //
+  //   dias de estoque(D) = valor do estoque em D / CMV dos 30 dias ate D x 30
+  //
+  // Numerador: custo (valorCompra + custoManutencao) das pecas PROPRIAS que
+  // estavam em estoque no fim do dia D — status DISPONIVEL, EM_TRANSITO ou
+  // REVISAO, mesma regra do balanco. O status na data e reconstruido pelo
+  // historico de status de cada peca (toda peca ganha um registro ao ser criada).
+  //
+  // Denominador: custo das pecas proprias vendidas na janela de 30 dias que
+  // termina em D (inclusive). Mesma base de custo do numerador, para que a razao
+  // seja consistente.
+  //
+  // A serie comeca 30 dias apos o inicio dos dados, que e quando a primeira
+  // janela de 30 dias fica inteiramente coberta.
+  getDiasEstoque: protectedProcedure.query(async ({ ctx }) => {
+    const userNivel = ctx.session.user.nivel;
+    if (userNivel === "FUNCIONARIO") {
+      return null;
+    }
+
+    const STATUS_EM_ESTOQUE = new Set(["DISPONIVEL", "EM_TRANSITO", "REVISAO"]);
+
+    const [pecas, vendas] = await Promise.all([
+      prisma.peca.findMany({
+        where: { origemTipo: filtroOrigemPropria },
+        select: {
+          createdAt: true,
+          status: true,
+          valorCompra: true,
+          custoManutencao: true,
+          historicoStatus: {
+            orderBy: { createdAt: "asc" },
+            select: { createdAt: true, statusNovo: true },
+          },
+        },
+      }),
+      prisma.venda.findMany({
+        where: {
+          cancelada: false,
+          peca: { origemTipo: filtroOrigemPropria },
+        },
+        select: {
+          dataVenda: true,
+          peca: { select: { valorCompra: true, custoManutencao: true } },
+        },
+      }),
+    ]);
+
+    if (pecas.length === 0 || vendas.length === 0) {
+      return { serie: [], atual: null };
+    }
+
+    const hojeBrt = brtToday();
+    const diaFim = brtDayIndex(
+      new Date(Date.UTC(hojeBrt.year, hojeBrt.month, hojeBrt.day, 12))
+    );
+
+    // Primeiro dia com dados: precisa de peca cadastrada E venda registrada
+    const primeiroDiaPeca = Math.min(...pecas.map((p) => brtDayIndex(p.createdAt)));
+    const primeiroDiaVenda = Math.min(...vendas.map((v) => brtDayIndex(v.dataVenda)));
+    const diaBase = Math.max(primeiroDiaPeca, primeiroDiaVenda);
+    // A primeira janela de 30 dias so fecha 29 dias depois do inicio
+    const diaInicio = diaBase + 29;
+
+    if (diaInicio > diaFim) {
+      return { serie: [], atual: null };
+    }
+
+    const totalDias = diaFim - diaBase + 1;
+
+    // ── Numerador: valor do estoque por dia, via deltas ──
+    // Cada peca soma seu custo nos intervalos de dias em que esteve em estoque.
+    // +1 no tamanho para absorver o delta de saida do ultimo dia.
+    const deltaEstoque = new Array<number>(totalDias + 1).fill(0);
+
+    for (const p of pecas) {
+      const custo = Number(p.valorCompra || 0) + Number(p.custoManutencao || 0);
+      if (custo === 0) continue;
+
+      // Status no FIM de cada dia: quando ha mais de uma mudanca no mesmo dia,
+      // vale a ultima.
+      const statusPorDia = new Map<number, string>();
+      for (const h of p.historicoStatus) {
+        statusPorDia.set(brtDayIndex(h.createdAt), h.statusNovo);
+      }
+      if (statusPorDia.size === 0) {
+        statusPorDia.set(brtDayIndex(p.createdAt), p.status);
+      }
+
+      const diasTransicao = Array.from(statusPorDia.keys()).sort((a, b) => a - b);
+
+      let inicioIntervalo: number | null = null;
+      for (let i = 0; i < diasTransicao.length; i++) {
+        const dia = diasTransicao[i]!;
+        const emEstoque = STATUS_EM_ESTOQUE.has(statusPorDia.get(dia)!);
+
+        if (emEstoque && inicioIntervalo === null) {
+          inicioIntervalo = dia;
+        } else if (!emEstoque && inicioIntervalo !== null) {
+          aplicarIntervalo(deltaEstoque, diaBase, totalDias, inicioIntervalo, dia, custo);
+          inicioIntervalo = null;
+        }
+      }
+      // Intervalo aberto: a peca continua em estoque ate hoje
+      if (inicioIntervalo !== null) {
+        aplicarIntervalo(deltaEstoque, diaBase, totalDias, inicioIntervalo, diaFim + 1, custo);
+      }
+    }
+
+    // ── Denominador: CMV por dia ──
+    const cmvPorDia = new Array<number>(totalDias).fill(0);
+    for (const v of vendas) {
+      const idx = brtDayIndex(v.dataVenda) - diaBase;
+      if (idx < 0 || idx >= totalDias) continue;
+      cmvPorDia[idx]! +=
+        Number(v.peca.valorCompra || 0) + Number(v.peca.custoManutencao || 0);
+    }
+
+    // ── Serie ──
+    const serie: Array<{
+      data: string;
+      diasEstoque: number | null;
+      valorEstoque: number;
+      cmv30: number;
+    }> = [];
+
+    let valorEstoque = 0;
+    let janela30 = 0;
+
+    for (let i = 0; i < totalDias; i++) {
+      valorEstoque += deltaEstoque[i]!;
+
+      janela30 += cmvPorDia[i]!;
+      if (i >= 30) janela30 -= cmvPorDia[i - 30]!;
+
+      if (i < diaInicio - diaBase) continue;
+
+      const cmv30 = Math.round(janela30 * 100) / 100;
+      serie.push({
+        data: brtDayIndexToDate(diaBase + i).toISOString().slice(0, 10),
+        diasEstoque:
+          cmv30 > 0
+            ? Math.round((valorEstoque / cmv30) * 30 * 10) / 10
+            : null,
+        valorEstoque: Math.round(valorEstoque * 100) / 100,
+        cmv30,
+      });
+    }
+
+    const atual = serie.length > 0 ? serie[serie.length - 1]! : null;
+
+    return { serie, atual };
+  }),
+
   // Recebiveis pendentes detalhados
   getRecebiveisPendentes: protectedProcedure.query(async ({ ctx }) => {
     const userNivel = ctx.session.user.nivel;
@@ -1134,3 +1291,20 @@ export const dashboardRouter = router({
     });
   }),
 });
+
+// Soma `custo` nos dias [diaIni, diaFimExclusivo) do array de deltas.
+// Recorta o intervalo para dentro da serie antes de aplicar.
+function aplicarIntervalo(
+  delta: number[],
+  diaBase: number,
+  totalDias: number,
+  diaIni: number,
+  diaFimExclusivo: number,
+  custo: number
+): void {
+  const ini = Math.max(diaIni - diaBase, 0);
+  const fim = Math.min(diaFimExclusivo - diaBase, totalDias);
+  if (fim <= ini) return;
+  delta[ini] = (delta[ini] ?? 0) + custo;
+  delta[fim] = (delta[fim] ?? 0) - custo;
+}

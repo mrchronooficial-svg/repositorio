@@ -31,6 +31,7 @@ import { WidgetKpiEstoqueCusto } from "./widgets/widget-kpi-estoque-custo";
 import { WidgetKpiEstoqueFaturamento } from "./widgets/widget-kpi-estoque-faturamento";
 import { WidgetFaixasLucroBruto } from "./widgets/widget-faixas-lucro-bruto";
 import { WidgetLucroMarca } from "./widgets/widget-lucro-marca";
+import { WidgetDiasEstoque } from "./widgets/widget-dias-estoque";
 import { WidgetGraficos } from "./widgets/widget-graficos";
 import { WidgetListas } from "./widgets/widget-listas";
 import { WidgetPaceVendas } from "./widgets/widget-pace-vendas";
@@ -129,6 +130,9 @@ export function DashboardPage() {
       mes: mesIdxLucroMarca,
     })
   );
+  const { data: diasEstoque, isLoading: isLoadingDiasEstoque } = useQuery(
+    trpc.dashboard.getDiasEstoque.queryOptions()
+  );
 
   const verificarAlertasMutation = useMutation(
     trpc.alerta.verificarAlertas.mutationOptions({
@@ -159,6 +163,7 @@ export function DashboardPage() {
     kpiEmRevisao: !podeVerValores,
     faixasLucroBruto: podeVerValores && !!faixasLucro,
     lucroMarca: isAdmin,
+    diasEstoque: podeVerValores && !!diasEstoque,
     paceVendas: true,
     paceLucroBruto: isAdmin,
     graficos: true,
@@ -333,6 +338,14 @@ export function DashboardPage() {
             isLoading={isLoadingLucroMarca}
             mesSelecionado={mesLucroMarca}
             onMesChange={setMesLucroMarca}
+          />
+        );
+
+      case "diasEstoque":
+        return (
+          <WidgetDiasEstoque
+            data={diasEstoque as any}
+            isLoading={isLoadingDiasEstoque}
           />
         );
 
