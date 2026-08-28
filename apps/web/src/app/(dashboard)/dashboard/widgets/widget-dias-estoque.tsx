@@ -49,8 +49,9 @@ const PERIODOS: Array<{ label: string; dias: number | null }> = [
 const CRESCIMENTO_CMV_PCT = 20;
 const FATOR_CMV = 1 + CRESCIMENTO_CMV_PCT / 100;
 
-// Referencia de cobertura de estoque considerada segura
+// Referencias consideradas seguras: cobertura em dias e tamanho do estoque
 const MARGEM_SEGURANCA_DIAS = 26;
+const MARGEM_SEGURANCA_PECAS = 50;
 
 const COR_DIAS = "#6366f1";
 const COR_PECAS = "#dc2626";
@@ -265,6 +266,20 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
                   position: "insideTopLeft",
                   fontSize: 10,
                   fill: COR_DIAS,
+                }}
+              />
+              <ReferenceLine
+                yAxisId="qtd"
+                y={MARGEM_SEGURANCA_PECAS}
+                stroke={COR_PECAS}
+                strokeDasharray="5 4"
+                strokeWidth={1.5}
+                ifOverflow="extendDomain"
+                label={{
+                  value: `mg de seguranca (${MARGEM_SEGURANCA_PECAS} pecas)`,
+                  position: "insideBottomRight",
+                  fontSize: 10,
+                  fill: COR_PECAS,
                 }}
               />
               <Area
