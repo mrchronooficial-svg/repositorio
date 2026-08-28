@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/formatters";
 import {
@@ -29,6 +31,14 @@ interface WidgetDiasEstoqueProps {
   isLoading: boolean;
 }
 
+// null = serie inteira
+const PERIODOS: Array<{ label: string; dias: number | null }> = [
+  { label: "30d", dias: 30 },
+  { label: "90d", dias: 90 },
+  { label: "180d", dias: 180 },
+  { label: "Tudo", dias: null },
+];
+
 // "2026-08-28" -> "28/08" (sem passar por Date, para nao pegar fuso)
 function rotuloDia(iso: string): string {
   const [, mes, dia] = iso.split("-");
@@ -41,6 +51,9 @@ function rotuloCompleto(iso: string): string {
 }
 
 export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
+  // null = serie inteira (padrao)
+  const [periodoDias, setPeriodoDias] = useState<number | null>(null);
+
   if (isLoading || !data) {
     return (
       <Card className="h-full flex flex-col">
@@ -71,6 +84,14 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
 
   const atual = data.atual;
 
+  // Periodos maiores que a serie disponivel nao sao oferecidos — evita botoes
+  // que nao mudam nada quando ainda ha poucos dias de historico.
+  const periodosDisponiveis = PERIODOS.filter(
+    (p, i) => p.dias === null || p.dias < data.serie.length || i === 0
+  );
+  const serieVisivel =
+    periodoDias === null ? data.serie : data.serie.slice(-periodoDias);
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-baseline justify-between gap-2 pb-2 flex-none">
@@ -88,10 +109,27 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
         )}
       </CardHeader>
       <CardContent className="flex-1 min-h-0 flex flex-col pr-2">
+        <div className="flex items-center gap-1 pb-2 flex-none">
+          {periodosDisponiveis.map((p) => (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => setPeriodoDias(p.dias)}
+              className={cn(
+                "px-2 py-0.5 rounded text-xs transition-colors",
+                periodoDias === p.dias
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted"
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
         <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={data.serie}
+              data={serieVisivel}
               margin={{ top: 4, right: 8, bottom: 4, left: 0 }}
             >
               <defs>
