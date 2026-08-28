@@ -10,6 +10,7 @@ import {
   ComposedChart,
   Legend,
   Line,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -47,6 +48,12 @@ const PERIODOS: Array<{ label: string; dias: number | null }> = [
 // proporcao — a leitura ja embute a expectativa de crescimento das vendas.
 const CRESCIMENTO_CMV_PCT = 20;
 const FATOR_CMV = 1 + CRESCIMENTO_CMV_PCT / 100;
+
+// Referencia de cobertura de estoque considerada segura
+const MARGEM_SEGURANCA_DIAS = 26;
+
+const COR_DIAS = "#6366f1";
+const COR_PECAS = "#dc2626";
 
 // "2026-08-28" -> "28/08" (sem passar por Date, para nao pegar fuso)
 function rotuloDia(iso: string): string {
@@ -175,8 +182,8 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
             >
               <defs>
                 <linearGradient id="gradDiasEstoque" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.28} />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
+                  <stop offset="0%" stopColor={COR_DIAS} stopOpacity={0.28} />
+                  <stop offset="100%" stopColor={COR_DIAS} stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -202,7 +209,7 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
               <YAxis
                 yAxisId="qtd"
                 orientation="right"
-                tick={{ fontSize: 11, fill: "#dc2626" }}
+                tick={{ fontSize: 11, fill: COR_PECAS }}
                 tickLine={false}
                 axisLine={false}
                 width={30}
@@ -244,12 +251,28 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
                 wrapperStyle={{ fontSize: 11, paddingTop: 2 }}
                 iconType="plainline"
               />
+              <ReferenceLine
+                yAxisId="dias"
+                y={MARGEM_SEGURANCA_DIAS}
+                stroke={COR_DIAS}
+                strokeDasharray="5 4"
+                strokeWidth={1.5}
+                // Garante que a linha apareca mesmo quando a serie inteira
+                // estiver acima ou abaixo dela
+                ifOverflow="extendDomain"
+                label={{
+                  value: `mg de seguranca (${MARGEM_SEGURANCA_DIAS}d)`,
+                  position: "insideTopLeft",
+                  fontSize: 10,
+                  fill: COR_DIAS,
+                }}
+              />
               <Area
                 yAxisId="dias"
                 type="monotone"
                 dataKey="diasEstoque"
                 name="Dias de estoque"
-                stroke="#6366f1"
+                stroke={COR_DIAS}
                 strokeWidth={2}
                 fill="url(#gradDiasEstoque)"
                 dot={false}
@@ -261,7 +284,7 @@ export function WidgetDiasEstoque({ data, isLoading }: WidgetDiasEstoqueProps) {
                 type="monotone"
                 dataKey="qtdEstoque"
                 name="Pecas em estoque"
-                stroke="#dc2626"
+                stroke={COR_PECAS}
                 strokeWidth={2}
                 dot={false}
                 activeDot={{ r: 4 }}
