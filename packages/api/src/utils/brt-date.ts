@@ -61,3 +61,13 @@ export function brtDayIndex(date: Date): number {
 export function brtDayIndexToDate(dayIndex: number): Date {
   return new Date(dayIndex * 86_400_000);
 }
+
+// Diferenca em dias de CALENDARIO (BRT) entre duas datas.
+// Compara o dia civil, nao o intervalo de 24h: cadastro em 10/06 as 23h e
+// venda em 11/06 as 01h resultam em 1 dia (e nao 0).
+export function diasEntreBRT(inicio: Date, fim: Date): number {
+  const MS_DIA = 24 * 60 * 60 * 1000;
+  const diaInicio = Math.floor((inicio.getTime() + BRT_OFFSET_MS) / MS_DIA);
+  const diaFim = Math.floor((fim.getTime() + BRT_OFFSET_MS) / MS_DIA);
+  return diaFim - diaInicio;
+}

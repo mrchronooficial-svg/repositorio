@@ -6,10 +6,11 @@ import { registrarAuditoria } from "../services/auditoria.service";
 import { criarAlertaRepassePendente } from "../services/alerta.service";
 import { gerarSKUDevolucao } from "../services/sku.service";
 import { criarLancamentosVenda, reverterLancamentosVenda } from "../services/lancamento-venda.service";
-import { brtMonthOf, brtMonthStart, brtToday } from "../utils/brt-date";
+import { brtMonthOf, brtMonthStart, brtToday, diasEntreBRT } from "../utils/brt-date";
 import { calcularLucroBruto, carregarImpostoConfig } from "../utils/lucro-bruto";
 import {
   EPSILON_CENTAVO,
+  arredondar2,
   calcularSaldoDevedor,
   calcularStatusPagamento,
 } from "../utils/pagamento";
@@ -287,6 +288,7 @@ export const vendaRouter = router({
                 origemTipo: true,
                 valorCompra: true,
                 custoManutencao: true,
+                createdAt: true,
                 fotos: { take: 1, select: { url: true } },
               },
             },
@@ -323,6 +325,12 @@ export const vendaRouter = router({
               )
             : null;
 
+        // Dias que a peca ficou em estoque ate ser vendida (congelado na venda).
+        // null quando a venda e anterior ao cadastro da peca — caso das pecas
+        // registradas retroativamente na implantacao do sistema.
+        const dias = diasEntreBRT(v.peca.createdAt, v.dataVenda);
+        const diasEmEstoque = dias >= 0 ? dias : null;
+
         return {
           ...v,
           valorOriginal: podeVerValores ? v.valorOriginal : null,
@@ -336,6 +344,7 @@ export const vendaRouter = router({
             custoManutencao: podeVerValores ? v.peca.custoManutencao : null,
           },
           lucroBruto,
+          diasEmEstoque,
         };
       });
 
@@ -891,19 +900,26 @@ export const vendaRouter = router({
         });
       }
 
-      const repasseFeito = Number(venda.valorRepasseFeito) || 0;
-      const saldoRepasse = Number(venda.valorRepasseDevido) - repasseFeito;
+      // Valores monetarios sao Decimal(10,2) no banco, mas a subtracao em ponto
+      // flutuante deixa residuo (4155.32 - 4155.31 = 0.009999...). Sem arredondar,
+      // o repasse do saldo exato era recusado com "Valor excede saldo de R$ 0,01"
+      // e o saldo ficava impossivel de quitar. Mesma regra ja usada nos
+      // pagamentos de venda (utils/pagamento.ts).
+      const repasseDevido = arredondar2(Number(venda.valorRepasseDevido));
+      const repasseFeito = arredondar2(Number(venda.valorRepasseFeito) || 0);
+      const saldoRepasse = arredondar2(repasseDevido - repasseFeito);
+      const valorInformado = arredondar2(input.valor);
 
-      if (input.valor > saldoRepasse) {
+      if (valorInformado - saldoRepasse > EPSILON_CENTAVO) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Valor excede saldo de repasse de R$ ${saldoRepasse.toFixed(2)}`,
         });
       }
 
-      const novoRepasseFeito = repasseFeito + input.valor;
+      const novoRepasseFeito = arredondar2(repasseFeito + valorInformado);
       const novoStatus =
-        novoRepasseFeito >= Number(venda.valorRepasseDevido)
+        repasseDevido - novoRepasseFeito <= EPSILON_CENTAVO
           ? "FEITO"
           : "PARCIAL";
 

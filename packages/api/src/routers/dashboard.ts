@@ -16,7 +16,7 @@ import {
   NOMES_MESES,
 } from "../utils/historico-vendas";
 import { calcularLucroBruto, carregarImpostoConfig } from "../utils/lucro-bruto";
-import { calcularSaldoDevedor } from "../utils/pagamento";
+import { EPSILON_CENTAVO, arredondar2, calcularSaldoDevedor } from "../utils/pagamento";
 import { filtroOrigemPropria } from "../utils/origem";
 
 export const dashboardRouter = router({
@@ -563,7 +563,17 @@ export const dashboardRouter = router({
       orderBy: { dataVenda: "asc" },
     });
 
-    const totalRepassePendente = repassesPendentes.reduce((sum, v) => {
+    // Descarta quem nao deve mais nada. O status pode ficar desatualizado
+    // (ex.: peca legada com valor de compra zero, presa em NAO_PAGO) e o item
+    // aparecia como pendente com saldo R$ 0,00, sem forma de ser quitado pela tela.
+    const repassesPendentesReais = repassesPendentes.filter(
+      (v) =>
+        arredondar2(
+          (Number(v.valorRepasseDevido) || 0) - (Number(v.valorRepasseFeito) || 0)
+        ) > EPSILON_CENTAVO
+    );
+
+    const totalRepassePendente = repassesPendentesReais.reduce((sum, v) => {
       const devido = Number(v.valorRepasseDevido) || 0;
       const feito = Number(v.valorRepasseFeito) || 0;
       return sum + (devido - feito);
@@ -589,7 +599,14 @@ export const dashboardRouter = router({
       orderBy: { createdAt: "asc" },
     });
 
-    const totalPagamentoPendente = pagamentosPendentes.reduce((sum, p) => {
+    const pagamentosPendentesReais = pagamentosPendentes.filter(
+      (p) =>
+        arredondar2(
+          (Number(p.valorCompra) || 0) - (Number(p.valorPagoFornecedor) || 0)
+        ) > EPSILON_CENTAVO
+    );
+
+    const totalPagamentoPendente = pagamentosPendentesReais.reduce((sum, p) => {
       const compra = Number(p.valorCompra) || 0;
       const pago = Number(p.valorPagoFornecedor) || 0;
       return sum + (compra - pago);
@@ -598,8 +615,8 @@ export const dashboardRouter = router({
     return {
       repasses: {
         total: totalRepassePendente,
-        quantidade: repassesPendentes.length,
-        itens: repassesPendentes.slice(0, 5).map((v) => ({
+        quantidade: repassesPendentesReais.length,
+        itens: repassesPendentesReais.slice(0, 5).map((v) => ({
           id: v.id,
           sku: v.peca.sku,
           marca: v.peca.marca,
@@ -613,8 +630,8 @@ export const dashboardRouter = router({
       },
       pagamentos: {
         total: totalPagamentoPendente,
-        quantidade: pagamentosPendentes.length,
-        itens: pagamentosPendentes.slice(0, 5).map((p) => ({
+        quantidade: pagamentosPendentesReais.length,
+        itens: pagamentosPendentesReais.slice(0, 5).map((p) => ({
           id: p.id,
           sku: p.sku,
           marca: p.marca,

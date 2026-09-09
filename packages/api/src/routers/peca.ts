@@ -6,6 +6,7 @@ import { registrarAuditoria } from "../services/auditoria.service";
 import { gerarProximoSKU } from "../services/sku.service";
 import { carregarImpostoConfig, calcularLucroBrutoEstoque } from "../utils/lucro-bruto";
 import { filtroOrigemPropria, isOrigemPropria } from "../utils/origem";
+import { EPSILON_CENTAVO, arredondar2 } from "../utils/pagamento";
 
 // Schemas de validacao
 const PecaCreateSchema = z.object({
@@ -737,22 +738,27 @@ export const pecaRouter = router({
         });
       }
 
-      const valorDevido = Number(peca.valorCompra);
-      const valorJaPago = Number(peca.valorPagoFornecedor);
-      const novoValorPago = valorJaPago + input.valor;
+      // Arredonda a centavos antes de comparar. Sem isso, o residuo de ponto
+      // flutuante (ex.: 4155.32 - 4155.31 = 0.009999...) fazia o sistema recusar
+      // o pagamento do saldo exato dizendo que ele excedia o devido, deixando a
+      // peca presa em NAO_PAGO/PARCIAL. Mesma regra dos pagamentos de venda.
+      const valorDevido = arredondar2(Number(peca.valorCompra));
+      const valorJaPago = arredondar2(Number(peca.valorPagoFornecedor));
+      const valorInformado = arredondar2(input.valor);
+      const novoValorPago = arredondar2(valorJaPago + valorInformado);
 
-      if (novoValorPago > valorDevido) {
+      if (novoValorPago - valorDevido > EPSILON_CENTAVO) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Valor excede o devido. Devido: R$ ${valorDevido.toFixed(2)}, Ja pago: R$ ${valorJaPago.toFixed(2)}, Restante: R$ ${(valorDevido - valorJaPago).toFixed(2)}`,
+          message: `Valor excede o devido. Devido: R$ ${valorDevido.toFixed(2)}, Ja pago: R$ ${valorJaPago.toFixed(2)}, Restante: R$ ${arredondar2(valorDevido - valorJaPago).toFixed(2)}`,
         });
       }
 
       // Determinar novo status
       let novoStatus: "PAGO" | "PARCIAL" | "NAO_PAGO" = "PARCIAL";
-      if (novoValorPago >= valorDevido) {
+      if (valorDevido - novoValorPago <= EPSILON_CENTAVO) {
         novoStatus = "PAGO";
-      } else if (novoValorPago === 0) {
+      } else if (novoValorPago <= EPSILON_CENTAVO) {
         novoStatus = "NAO_PAGO";
       }
 
@@ -839,14 +845,16 @@ export const pecaRouter = router({
         });
       }
 
-      const novoValorPago = Number(peca.valorPagoFornecedor) - Number(pagamento.valor);
-      const valorDevido = Number(peca.valorCompra);
+      const novoValorPago = arredondar2(
+        Number(peca.valorPagoFornecedor) - Number(pagamento.valor)
+      );
+      const valorDevido = arredondar2(Number(peca.valorCompra));
 
       // Determinar novo status
       let novoStatus: "PAGO" | "PARCIAL" | "NAO_PAGO" = "PARCIAL";
-      if (novoValorPago >= valorDevido) {
+      if (valorDevido - novoValorPago <= EPSILON_CENTAVO) {
         novoStatus = "PAGO";
-      } else if (novoValorPago <= 0) {
+      } else if (novoValorPago <= EPSILON_CENTAVO) {
         novoStatus = "NAO_PAGO";
       }
 

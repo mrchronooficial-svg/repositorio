@@ -52,6 +52,7 @@ interface Venda {
   peca: Peca;
   cliente: Cliente;
   lucroBruto?: number | null;
+  diasEmEstoque?: number | null;
 }
 
 interface VendasTableProps {
@@ -114,6 +115,7 @@ export function VendasTable({
             <TableHead className="w-24">Foto</TableHead>
             <TableHead>Data</TableHead>
             <TableHead>Peca</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Dias em Estoque</TableHead>
             <TableHead>Cliente</TableHead>
             <TableHead>Pagamento</TableHead>
             <TableHead>Repasse</TableHead>
@@ -154,6 +156,23 @@ export function VendasTable({
                 <div className="text-xs text-muted-foreground">
                   {venda.peca.marca} {venda.peca.modelo}
                 </div>
+              </TableCell>
+              <TableCell className="text-right">
+                {venda.diasEmEstoque == null ? (
+                  <span
+                    className="text-muted-foreground text-sm"
+                    title="Peca cadastrada depois da venda (registro retroativo)"
+                  >
+                    -
+                  </span>
+                ) : (
+                  <span className="text-sm tabular-nums">
+                    {venda.diasEmEstoque}{" "}
+                    <span className="text-muted-foreground">
+                      {venda.diasEmEstoque === 1 ? "dia" : "dias"}
+                    </span>
+                  </span>
+                )}
               </TableCell>
               <TableCell>{venda.cliente.nome}</TableCell>
               <TableCell>
