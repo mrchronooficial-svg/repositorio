@@ -205,11 +205,25 @@ async function calcularSaldosAcumulados(dataFimExclusivo: Date): Promise<SaldoCo
 }
 
 /**
- * Soma saldos de contas que começam com um prefixo
+ * Verifica se um código de conta pertence a um prefixo do plano de contas.
+ *
+ * Comparação por segmento, NAO por texto puro: o código precisa ser igual ao
+ * prefixo ou ser um descendente dele (prefixo seguido de ponto).
+ *
+ * Sem isso, "4.2.10" e "4.2.11" seriam capturados pelo prefixo "4.2.1"
+ * (Marketing e Publicidade), inflando a linha de Ads e contando as contas
+ * duas vezes no detalhamento da DRE.
+ */
+function pertenceAoPrefixo(codigo: string, prefixo: string): boolean {
+  return codigo === prefixo || codigo.startsWith(prefixo + ".");
+}
+
+/**
+ * Soma saldos de contas que pertencem a um prefixo
  */
 function somarPorPrefixo(saldos: SaldoConta[], prefixo: string): number {
   return saldos
-    .filter((s) => s.codigo.startsWith(prefixo))
+    .filter((s) => pertenceAoPrefixo(s.codigo, prefixo))
     .reduce((acc, s) => acc + s.saldo, 0);
 }
 
@@ -217,7 +231,7 @@ function somarPorPrefixo(saldos: SaldoConta[], prefixo: string): number {
  * Filtra contas por prefixo
  */
 function filtrarPorPrefixo(saldos: SaldoConta[], prefixo: string): SaldoConta[] {
-  return saldos.filter((s) => s.codigo.startsWith(prefixo));
+  return saldos.filter((s) => pertenceAoPrefixo(s.codigo, prefixo));
 }
 
 function round2(n: number): number {
