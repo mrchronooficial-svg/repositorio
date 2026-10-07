@@ -288,10 +288,16 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         referencia: payload.referencia ?? null,
         calibre: payload.calibre ?? null,
         localizacao: payload.localizacao,
+        origemCanal: payload.origemCanal,
         dataEstimadaChegada: isOrigemPropria(data.origemTipo)
           ? payload.dataEstimadaChegada ?? null
           : null,
       };
+
+      // Compra <-> Encomenda pode ser trocada na edicao (mesma contabilidade)
+      if (isOrigemPropria(data.origemTipo) && data.origemTipo !== initialData.origemTipo) {
+        updatePayload.origemTipo = data.origemTipo;
+      }
 
       // Apenas enviar campos monetarios se o usuario tem permissao
       // FUNCIONARIO nao pode ver/editar valores — nao envia para nao zerar
@@ -559,6 +565,8 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
               <Label htmlFor="origemTipo">Tipo de Origem *</Label>
               <Select
                 value={data.origemTipo}
+                // Na edicao so da para alternar Compra <-> Encomenda; consignacao fica travada
+                disabled={isEditing && !isOrigemPropria(initialData?.origemTipo)}
                 onValueChange={(value) => {
                   handleChange("origemTipo", value);
                   // Limpar valor de compra se for consignacao
@@ -572,7 +580,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="COMPRA">Compra</SelectItem>
-                  <SelectItem value="CONSIGNACAO">Consignacao</SelectItem>
+                  <SelectItem value="CONSIGNACAO" disabled={isEditing}>Consignacao</SelectItem>
                   <SelectItem value="ENCOMENDA">Encomenda</SelectItem>
                 </SelectContent>
               </Select>

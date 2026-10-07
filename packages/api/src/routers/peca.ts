@@ -74,6 +74,10 @@ const PecaUpdateSchema = z.object({
   percentualRepasse: z.number().positive().max(100).optional().nullable(),
   localizacao: z.string().optional(),
   dataEstimadaChegada: z.string().optional().nullable(),
+  // Só a troca Compra <-> Encomenda é editável (tratamento contábil idêntico).
+  // Entrar/sair de consignação muda o acerto com o fornecedor — não é permitido aqui.
+  origemTipo: z.enum(["COMPRA", "ENCOMENDA"]).optional(),
+  origemCanal: z.enum(["PESSOA_FISICA", "LEILAO_BRASIL", "EBAY"]).optional(),
 });
 
 const PecaListSchema = z.object({
@@ -471,6 +475,22 @@ export const pecaRouter = router({
     .input(PecaUpdateSchema)
     .mutation(async ({ input, ctx }) => {
       const { id, ...data } = input;
+
+      if (data.origemTipo) {
+        const atual = await prisma.peca.findUnique({
+          where: { id },
+          select: { origemTipo: true },
+        });
+        if (!atual) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Peca nao encontrada" });
+        }
+        if (!isOrigemPropria(atual.origemTipo)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Peca consignada nao pode ser alterada para compra ou encomenda",
+          });
+        }
+      }
 
       // Garantir exclusividade mutua entre valorRepasse e percentualRepasse
       const updateData: Record<string, unknown> = { ...data };
