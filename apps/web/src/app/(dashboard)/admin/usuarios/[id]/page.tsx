@@ -7,6 +7,7 @@ import { ArrowLeft, Save, UserX, UserCheck, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -42,6 +43,7 @@ export default function EditarUsuarioPage() {
   const [nivel, setNivel] = useState<"ADMINISTRADOR" | "SOCIO" | "FUNCIONARIO">(
     "FUNCIONARIO"
   );
+  const [acessoFinanceiro, setAcessoFinanceiro] = useState(false);
 
   const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [newPassword, setNewPassword] = useState("");
@@ -58,6 +60,7 @@ export default function EditarUsuarioPage() {
       setName(user.name);
       setEmail(user.email);
       setNivel(user.nivel);
+      setAcessoFinanceiro(user.acessoFinanceiro);
     }
   }, [user]);
 
@@ -123,6 +126,7 @@ export default function EditarUsuarioPage() {
       name,
       email,
       nivel,
+      acessoFinanceiro,
     });
   };
 
@@ -289,6 +293,25 @@ export default function EditarUsuarioPage() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {nivel !== "ADMINISTRADOR" && (
+                    <div className="flex items-start gap-3">
+                      <Switch
+                        id="acessoFinanceiro"
+                        checked={acessoFinanceiro}
+                        onCheckedChange={setAcessoFinanceiro}
+                      />
+                      <div className="space-y-1">
+                        <Label htmlFor="acessoFinanceiro" className="cursor-pointer">
+                          Visualizar modulo financeiro
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Acesso somente leitura ao Financeiro e aos indicadores de lucro do
+                          dashboard. Administradores sempre tem acesso completo.
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex justify-end gap-4">
                     <Button

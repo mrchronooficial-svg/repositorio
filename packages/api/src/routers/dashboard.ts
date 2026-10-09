@@ -24,6 +24,8 @@ export const dashboardRouter = router({
   getMetricas: protectedProcedure.query(async ({ ctx }) => {
     const userNivel = ctx.session.user.nivel;
     const podeVerValores = userNivel === "ADMINISTRADOR" || userNivel === "SOCIO";
+    // Lucro bruto/margem: Admin ou usuario com acesso ao financeiro
+    const podeVerLucroBruto = userNivel === "ADMINISTRADOR" || ctx.user.acessoFinanceiro;
 
     // Datas para filtros (em horario de Brasilia)
     const hojeBrt = brtToday();
@@ -269,7 +271,7 @@ export const dashboardRouter = router({
       let margemBrutaMes: number | null = null;
       let lucroBrutoPorPeca: number | null = null;
 
-      if (userNivel === "ADMINISTRADOR") {
+      if (podeVerLucroBruto) {
         const somaValorFinal = vendasMesResult.reduce(
           (sum, v) => sum + (Number(v.valorFinal) || 0),
           0
@@ -853,13 +855,13 @@ export const dashboardRouter = router({
   }),
 
   // Pace de Lucro Bruto diario por mes (cumulativo, em R$)
-  // Apenas para ADMINISTRADOR (igual ao KPI Lucro Bruto).
+  // Apenas para ADMINISTRADOR ou acesso ao financeiro (igual ao KPI Lucro Bruto).
   // Considera vendas a partir de Fev/2026 em diante (em BRT).
   // IMPORTANTE: para esse grafico, custoManutencao (relojoeiro/restauro) e
   // ignorado, pois e input manual e gerenciado a parte. Demais deducoes
   // (CMV/repasse, MDR, Simples Nacional) seguem a formula padrao.
   getPaceLucroBruto: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.session.user.nivel !== "ADMINISTRADOR") {
+    if (ctx.user.nivel !== "ADMINISTRADOR" && !ctx.user.acessoFinanceiro) {
       return [] as Array<{
         mes: string;
         ano: number;
@@ -965,7 +967,7 @@ export const dashboardRouter = router({
         .optional()
     )
     .query(async ({ ctx, input }) => {
-      if (ctx.session.user.nivel !== "ADMINISTRADOR") {
+      if (ctx.user.nivel !== "ADMINISTRADOR" && !ctx.user.acessoFinanceiro) {
         return null;
       }
 

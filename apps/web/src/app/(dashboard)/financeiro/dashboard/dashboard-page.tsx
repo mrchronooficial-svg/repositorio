@@ -21,10 +21,12 @@ import { trpc } from "@/utils/trpc";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export function DashboardFinanceiroPage() {
   const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
+  const { podeEditarFinanceiro } = usePermissions();
 
   const { data: dashboard, isLoading } = useQuery(
     trpc.financeiro.getDashboard.queryOptions()
@@ -143,18 +145,20 @@ export function DashboardFinanceiroPage() {
             Visão rápida da saúde financeira da Mr. Chrono
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleSyncLancamentos}
-          disabled={syncing}
-        >
-          {syncing ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          {syncing ? "Sincronizando..." : "Sincronizar Lançamentos"}
-        </Button>
+        {podeEditarFinanceiro && (
+          <Button
+            variant="outline"
+            onClick={handleSyncLancamentos}
+            disabled={syncing}
+          >
+            {syncing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            {syncing ? "Sincronizando..." : "Sincronizar Lançamentos"}
+          </Button>
+        )}
       </div>
 
       {/* Saldo de Caixa */}

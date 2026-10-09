@@ -28,6 +28,7 @@ export default async function DashboardLayout({
       name: true,
       email: true,
       nivel: true,
+      acessoFinanceiro: true,
     },
   });
 
@@ -38,7 +39,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <div className="flex">
-        <Sidebar userLevel={user.nivel} />
+        <Sidebar userLevel={user.nivel} acessoFinanceiro={user.acessoFinanceiro} />
         <div className="flex-1 flex flex-col min-h-screen">
           <Header user={user} />
           <main className="flex-1 p-8 animate-fade-in">

@@ -18,6 +18,7 @@ export interface Permissions {
   podeEditarVendida: boolean;
   podeAcessarAdmin: boolean;
   podeAcessarFinanceiro: boolean;
+  podeEditarFinanceiro: boolean;
   podeCancelarVenda: boolean;
   podeRegistrarPagamento: boolean;
   podeRegistrarRepasse: boolean;
@@ -34,7 +35,11 @@ export function usePermissions(): Permissions {
   const { data: session, isPending } = useSession();
 
   // O nível vem do campo customizado que adicionamos ao User
-  const nivel = (session?.user as { nivel?: NivelAcesso } | undefined)?.nivel;
+  const sessionUser = session?.user as
+    | { nivel?: NivelAcesso; acessoFinanceiro?: boolean }
+    | undefined;
+  const nivel = sessionUser?.nivel;
+  const acessoFinanceiro = sessionUser?.acessoFinanceiro === true;
 
   const isAdmin = nivel === "ADMINISTRADOR";
   const isSocio = nivel === "SOCIO";
@@ -52,8 +57,11 @@ export function usePermissions(): Permissions {
   // Apenas Admin acessa painel admin
   const podeAcessarAdmin = isAdmin;
 
-  // Apenas Admin acessa módulo financeiro
-  const podeAcessarFinanceiro = isAdmin;
+  // Admin ou usuário com acesso liberado visualiza o módulo financeiro
+  const podeAcessarFinanceiro = isAdmin || acessoFinanceiro;
+
+  // Apenas Admin cria/edita/estorna no módulo financeiro
+  const podeEditarFinanceiro = isAdmin;
 
   // Sócio e Admin podem cancelar vendas
   const podeCancelarVenda = isAdmin || isSocio;
@@ -76,6 +84,7 @@ export function usePermissions(): Permissions {
     podeEditarVendida,
     podeAcessarAdmin,
     podeAcessarFinanceiro,
+    podeEditarFinanceiro,
     podeCancelarVenda,
     podeRegistrarPagamento,
     podeRegistrarRepasse,

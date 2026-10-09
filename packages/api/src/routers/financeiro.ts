@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { router, adminProcedure } from "../index";
+import { router, adminProcedure, financeiroLeituraProcedure } from "../index";
 import prisma from "@gestaomrchrono/db";
 import { registrarAuditoria } from "../services/auditoria.service";
 import { gerarDRE, gerarBalanco, gerarDFC, gerarKpisOperacionais } from "../services/demonstrativos.service";
@@ -62,7 +62,7 @@ export const financeiroRouter = router({
   // =========================================
 
   // Listar todas as contas (árvore hierárquica)
-  listContas: adminProcedure.query(async () => {
+  listContas: financeiroLeituraProcedure.query(async () => {
     const contas = await prisma.contaContabil.findMany({
       orderBy: [{ codigo: "asc" }],
       include: {
@@ -80,7 +80,7 @@ export const financeiroRouter = router({
   }),
 
   // Buscar conta por ID
-  getContaById: adminProcedure
+  getContaById: financeiroLeituraProcedure
     .input(z.object({ id: z.string().cuid() }))
     .query(async ({ input }) => {
       const conta = await prisma.contaContabil.findUnique({
@@ -295,7 +295,7 @@ export const financeiroRouter = router({
     }),
 
   // Listar contas analíticas (para selects em formulários)
-  listContasAnaliticas: adminProcedure.query(async () => {
+  listContasAnaliticas: financeiroLeituraProcedure.query(async () => {
     const contas = await prisma.contaContabil.findMany({
       where: { tipo: "ANALITICA", ativa: true },
       orderBy: { codigo: "asc" },
@@ -314,7 +314,7 @@ export const financeiroRouter = router({
   // =========================================
 
   // Listar contas bancárias
-  listContasBancarias: adminProcedure.query(async () => {
+  listContasBancarias: financeiroLeituraProcedure.query(async () => {
     const contas = await prisma.contaBancaria.findMany({
       orderBy: { nome: "asc" },
       include: {
@@ -327,7 +327,7 @@ export const financeiroRouter = router({
   }),
 
   // Buscar conta bancária por ID
-  getContaBancariaById: adminProcedure
+  getContaBancariaById: financeiroLeituraProcedure
     .input(z.object({ id: z.string().cuid() }))
     .query(async ({ input }) => {
       const conta = await prisma.contaBancaria.findUnique({
@@ -433,7 +433,7 @@ export const financeiroRouter = router({
   // =========================================
 
   // Listar lançamentos com filtros
-  listLancamentos: adminProcedure
+  listLancamentos: financeiroLeituraProcedure
     .input(
       z.object({
         page: z.number().int().positive().default(1),
@@ -490,7 +490,7 @@ export const financeiroRouter = router({
     }),
 
   // Buscar lançamento por ID
-  getLancamentoById: adminProcedure
+  getLancamentoById: financeiroLeituraProcedure
     .input(z.object({ id: z.string().cuid() }))
     .query(async ({ input }) => {
       const lancamento = await prisma.lancamento.findUnique({
@@ -759,7 +759,7 @@ export const financeiroRouter = router({
   // =========================================
 
   // Listar despesas recorrentes
-  listDespesasRecorrentes: adminProcedure.query(async () => {
+  listDespesasRecorrentes: financeiroLeituraProcedure.query(async () => {
     const despesas = await prisma.despesaRecorrente.findMany({
       orderBy: { nome: "asc" },
       include: {
@@ -980,7 +980,7 @@ export const financeiroRouter = router({
   // =========================================
 
   // Listar transferências
-  listTransferencias: adminProcedure
+  listTransferencias: financeiroLeituraProcedure
     .input(
       z.object({
         page: z.number().int().positive().default(1),
@@ -1098,7 +1098,7 @@ export const financeiroRouter = router({
   // =========================================
 
   // Listar distribuições
-  listDistribuicoes: adminProcedure
+  listDistribuicoes: financeiroLeituraProcedure
     .input(
       z.object({
         page: z.number().int().positive().default(1),
@@ -1225,7 +1225,7 @@ export const financeiroRouter = router({
   // =========================================
 
   // DRE — Demonstração do Resultado do Exercício
-  getDRE: adminProcedure
+  getDRE: financeiroLeituraProcedure
     .input(
       z.object({
         mes: z.number().int().min(1).max(12),
@@ -1237,7 +1237,7 @@ export const financeiroRouter = router({
     }),
 
   // Balanço Patrimonial
-  getBalanco: adminProcedure
+  getBalanco: financeiroLeituraProcedure
     .input(
       z.object({
         mes: z.number().int().min(1).max(12),
@@ -1249,7 +1249,7 @@ export const financeiroRouter = router({
     }),
 
   // DFC — Fluxo de Caixa (Método Indireto)
-  getDFC: adminProcedure
+  getDFC: financeiroLeituraProcedure
     .input(
       z.object({
         mes: z.number().int().min(1).max(12),
@@ -1262,7 +1262,7 @@ export const financeiroRouter = router({
 
   // Exportação dos demonstrativos (DRE + Balanço + DFC + KPIs) de vários meses
   // para gerar a planilha Excel. Processa um mês por vez para não sobrecarregar o banco.
-  exportDemonstrativos: adminProcedure
+  exportDemonstrativos: financeiroLeituraProcedure
     .input(
       z.object({
         meses: z
@@ -1295,7 +1295,7 @@ export const financeiroRouter = router({
   // =========================================
 
   // Listar recebíveis disponíveis para antecipação
-  listRecebiveisParaAntecipar: adminProcedure.query(async () => {
+  listRecebiveisParaAntecipar: financeiroLeituraProcedure.query(async () => {
     // Buscar vendas com pagamento em cartão (não canceladas) que ainda têm saldo a receber
     const vendas = await prisma.venda.findMany({
       where: {
@@ -1332,7 +1332,7 @@ export const financeiroRouter = router({
   }),
 
   // Listar antecipações registradas
-  listAntecipacoes: adminProcedure
+  listAntecipacoes: financeiroLeituraProcedure
     .input(
       z.object({
         page: z.number().int().positive().default(1),
@@ -1840,7 +1840,7 @@ export const financeiroRouter = router({
   // DASHBOARD FINANCEIRO
   // =========================================
 
-  getDashboard: adminProcedure.query(async () => {
+  getDashboard: financeiroLeituraProcedure.query(async () => {
     // "Hoje" em horário de Brasília — evita virar para o mês seguinte quando
     // o servidor (Vercel UTC) já passou da meia-noite UTC mas no Brasil ainda é dia anterior.
     const hoje = brtToday();

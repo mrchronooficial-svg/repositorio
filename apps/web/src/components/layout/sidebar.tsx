@@ -24,6 +24,7 @@ import { trpc } from "@/utils/trpc";
 
 interface SidebarProps {
   userLevel: string;
+  acessoFinanceiro?: boolean;
 }
 
 const menuItems = [
@@ -101,9 +102,10 @@ const adminItems = [
   },
 ];
 
-export function Sidebar({ userLevel }: SidebarProps) {
+export function Sidebar({ userLevel, acessoFinanceiro = false }: SidebarProps) {
   const pathname = usePathname();
   const isAdmin = userLevel === "ADMINISTRADOR";
+  const podeVerFinanceiro = isAdmin || acessoFinanceiro;
 
   const items = isAdmin ? [...menuItems, ...adminItems] : menuItems;
 
@@ -195,7 +197,7 @@ export function Sidebar({ userLevel }: SidebarProps) {
           );
         })}
 
-        {isAdmin && (
+        {podeVerFinanceiro && (
           <>
             <div className="my-4 border-t border-white/[0.06]" />
             <p className="text-[10px] text-white/30 uppercase tracking-[0.2em] font-semibold mb-3 px-3">

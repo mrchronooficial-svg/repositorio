@@ -27,9 +27,11 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/utils/trpc";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export function AntecipacaoPage() {
   const queryClient = useQueryClient();
+  const { podeEditarFinanceiro } = usePermissions();
   const [selectedVendas, setSelectedVendas] = useState<string[]>([]);
   const [taxa, setTaxa] = useState("3.5");
   const [contaBancariaId, setContaBancariaId] = useState("");
@@ -113,7 +115,7 @@ export function AntecipacaoPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg">Recebíveis Disponíveis</CardTitle>
-            {recebiveis && recebiveis.length > 0 && (
+            {podeEditarFinanceiro && recebiveis && recebiveis.length > 0 && (
               <Button variant="outline" size="sm" onClick={selectAll}>
                 {selectedVendas.length === recebiveis.length ? "Desmarcar Todos" : "Selecionar Todos"}
               </Button>
@@ -137,13 +139,14 @@ export function AntecipacaoPage() {
                 recebiveis.map((r) => (
                   <TableRow
                     key={r.vendaId}
-                    className="cursor-pointer"
-                    onClick={() => toggleVenda(r.vendaId)}
+                    className={podeEditarFinanceiro ? "cursor-pointer" : undefined}
+                    onClick={() => podeEditarFinanceiro && toggleVenda(r.vendaId)}
                   >
                     <TableCell>
                       <Checkbox
                         checked={selectedVendas.includes(r.vendaId)}
                         onCheckedChange={() => toggleVenda(r.vendaId)}
+                        disabled={!podeEditarFinanceiro}
                       />
                     </TableCell>
                     <TableCell className="font-medium">
@@ -174,7 +177,7 @@ export function AntecipacaoPage() {
       </Card>
 
       {/* Formulário de antecipação */}
-      {selectedVendas.length > 0 && (
+      {podeEditarFinanceiro && selectedVendas.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Registrar Antecipação</CardTitle>

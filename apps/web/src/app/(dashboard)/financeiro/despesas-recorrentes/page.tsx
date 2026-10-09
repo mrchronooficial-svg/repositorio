@@ -14,10 +14,10 @@ export default async function Page() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { nivel: true },
+    select: { nivel: true, acessoFinanceiro: true },
   });
 
-  if (user?.nivel !== "ADMINISTRADOR") redirect("/dashboard");
+  if (user?.nivel !== "ADMINISTRADOR" && !user?.acessoFinanceiro) redirect("/dashboard");
 
   return (
     <div>

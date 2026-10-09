@@ -80,6 +80,7 @@ export const adminRouter = router({
           email: true,
           nivel: true,
           ativo: true,
+          acessoFinanceiro: true,
           createdAt: true,
           ultimoAcesso: true,
           _count: {
@@ -163,6 +164,7 @@ export const adminRouter = router({
         email: z.string().email().optional(),
         nivel: z.enum(["ADMINISTRADOR", "SOCIO", "FUNCIONARIO"]).optional(),
         ativo: z.boolean().optional(),
+        acessoFinanceiro: z.boolean().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

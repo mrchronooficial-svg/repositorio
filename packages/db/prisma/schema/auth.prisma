@@ -13,6 +13,8 @@ model User {
   nivel        NivelAcesso  @default(FUNCIONARIO)
   ativo        Boolean      @default(true)
   ultimoAcesso DateTime?
+  // Permite visualizar o módulo financeiro (somente leitura) sem ser ADMINISTRADOR
+  acessoFinanceiro Boolean @default(false)
 
   // Relações de negócio
   auditorias      Auditoria[]

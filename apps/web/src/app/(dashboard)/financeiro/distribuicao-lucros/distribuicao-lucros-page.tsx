@@ -27,9 +27,11 @@ import {
 import { trpc } from "@/utils/trpc";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { SOCIOS } from "@/lib/constants";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export function DistribuicaoLucrosPage() {
   const queryClient = useQueryClient();
+  const { podeEditarFinanceiro } = usePermissions();
   const [socio, setSocio] = useState("");
   const [valor, setValor] = useState("");
   const [data, setData] = useState(new Date().toISOString().split("T")[0]);
@@ -108,89 +110,91 @@ export function DistribuicaoLucrosPage() {
       </div>
 
       {/* Formulário */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Nova Distribuicao</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <Label>Socio</Label>
-                <Select value={socio} onValueChange={setSocio}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SOCIOS.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      {podeEditarFinanceiro && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Nova Distribuicao</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Socio</Label>
+                  <Select value={socio} onValueChange={setSocio}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SOCIOS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Valor (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    placeholder="0,00"
+                    value={valor}
+                    onChange={(e) => setValor(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data</Label>
+                  <Input
+                    type="date"
+                    value={data}
+                    onChange={(e) => setData(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Conta de Saida</Label>
+                  <Select value={contaBancariaId} onValueChange={setContaBancariaId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contas.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
               <div className="space-y-2">
-                <Label>Valor (R$)</Label>
+                <Label>Descricao (opcional)</Label>
                 <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="0,00"
-                  value={valor}
-                  onChange={(e) => setValor(e.target.value)}
-                  required
+                  placeholder="Ex: Retirada mensal"
+                  value={descricao}
+                  onChange={(e) => setDescricao(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Data</Label>
-                <Input
-                  type="date"
-                  value={data}
-                  onChange={(e) => setData(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Conta de Saida</Label>
-                <Select value={contaBancariaId} onValueChange={setContaBancariaId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {contas.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>Descricao (opcional)</Label>
-              <Input
-                placeholder="Ex: Retirada mensal"
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-              />
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                disabled={createMutation.isPending || !socio || !valor || !contaBancariaId}
-              >
-                {createMutation.isPending && (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                )}
-                Registrar Distribuicao
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending || !socio || !valor || !contaBancariaId}
+                >
+                  {createMutation.isPending && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Registrar Distribuicao
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Histórico */}
       <Card>

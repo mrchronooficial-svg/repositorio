@@ -44,6 +44,17 @@ export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   return next({ ctx });
 });
 
+// Procedure para leitura do módulo financeiro: Admin ou usuário com acessoFinanceiro
+export const financeiroLeituraProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.nivel !== "ADMINISTRADOR" && !ctx.user.acessoFinanceiro) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Você não tem permissão para acessar o módulo financeiro",
+    });
+  }
+  return next({ ctx });
+});
+
 // Procedure para Admin ou Sócio (pode ver valores)
 export const socioOuAdminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (!["ADMINISTRADOR", "SOCIO"].includes(ctx.user.nivel)) {

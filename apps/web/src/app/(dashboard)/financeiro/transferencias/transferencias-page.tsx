@@ -26,9 +26,11 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/utils/trpc";
 import { formatCurrency, formatDate } from "@/lib/formatters";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export function TransferenciasPage() {
   const queryClient = useQueryClient();
+  const { podeEditarFinanceiro } = usePermissions();
   const [contaOrigemId, setContaOrigemId] = useState("");
   const [contaDestinoId, setContaDestinoId] = useState("");
   const [valor, setValor] = useState("");
@@ -84,101 +86,103 @@ export function TransferenciasPage() {
       </div>
 
       {/* Formulário */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Nova Transferencia</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div className="space-y-2">
-                <Label>Conta Origem</Label>
-                <Select value={contaOrigemId} onValueChange={setContaOrigemId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {contas.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome} ({c.banco})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+      {podeEditarFinanceiro && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Nova Transferencia</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label>Conta Origem</Label>
+                  <Select value={contaOrigemId} onValueChange={setContaOrigemId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contas.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome} ({c.banco})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center justify-center">
+                  <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Conta Destino</Label>
+                  <Select value={contaDestinoId} onValueChange={setContaDestinoId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contas.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.nome} ({c.banco})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="flex items-center justify-center">
-                <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Valor (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    placeholder="0,00"
+                    value={valor}
+                    onChange={(e) => setValor(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data</Label>
+                  <Input
+                    type="date"
+                    value={data}
+                    onChange={(e) => setData(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Descricao (opcional)</Label>
+                  <Input
+                    placeholder="Ex: Consolidacao de saldo"
+                    value={descricao}
+                    onChange={(e) => setDescricao(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Conta Destino</Label>
-                <Select value={contaDestinoId} onValueChange={setContaDestinoId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {contas.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.nome} ({c.banco})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={
+                    createMutation.isPending ||
+                    !contaOrigemId ||
+                    !contaDestinoId ||
+                    !valor
+                  }
+                >
+                  {createMutation.isPending && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Registrar Transferencia
+                </Button>
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Valor (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="0,00"
-                  value={valor}
-                  onChange={(e) => setValor(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Data</Label>
-                <Input
-                  type="date"
-                  value={data}
-                  onChange={(e) => setData(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Descricao (opcional)</Label>
-                <Input
-                  placeholder="Ex: Consolidacao de saldo"
-                  value={descricao}
-                  onChange={(e) => setDescricao(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                disabled={
-                  createMutation.isPending ||
-                  !contaOrigemId ||
-                  !contaDestinoId ||
-                  !valor
-                }
-              >
-                {createMutation.isPending && (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                )}
-                Registrar Transferencia
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Histórico */}
       <Card>

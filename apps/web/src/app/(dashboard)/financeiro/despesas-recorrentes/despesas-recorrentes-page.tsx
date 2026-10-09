@@ -35,11 +35,13 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/utils/trpc";
 import { formatCurrency } from "@/lib/formatters";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export function DespesasRecorrentesPage() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [executeDialogOpen, setExecuteDialogOpen] = useState(false);
+  const { podeEditarFinanceiro } = usePermissions();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Form state
@@ -221,19 +223,21 @@ export function DespesasRecorrentesPage() {
             Despesas fixas com lancamento automatico no ultimo dia do mes
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setExecuteDialogOpen(true)}
-          >
-            <Play className="h-4 w-4 mr-2" />
-            Executar Mes
-          </Button>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Despesa
-          </Button>
-        </div>
+        {podeEditarFinanceiro && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setExecuteDialogOpen(true)}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Executar Mes
+            </Button>
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Despesa
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Taxas e Impostos */}
@@ -261,6 +265,7 @@ export function DespesasRecorrentesPage() {
                 value={taxaMDR}
                 onChange={(e) => setTaxaMDR(e.target.value)}
                 placeholder="4"
+                disabled={!podeEditarFinanceiro}
               />
               <p className="text-xs text-muted-foreground">
                 Cobrada apenas em vendas com cartao de credito (a vista ou parcelado)
@@ -280,7 +285,7 @@ export function DespesasRecorrentesPage() {
                   value={aliquotaSimples}
                   onChange={(e) => setAliquotaSimples(e.target.value)}
                   placeholder={simplesAutomatico ? "Automatico (RBT12)" : "Ex: 6"}
-                  disabled={simplesAutomatico}
+                  disabled={simplesAutomatico || !podeEditarFinanceiro}
                   className={simplesAutomatico ? "opacity-50" : ""}
                 />
               </div>
@@ -288,6 +293,7 @@ export function DespesasRecorrentesPage() {
                 <Switch
                   id="simples-auto"
                   checked={simplesAutomatico}
+                  disabled={!podeEditarFinanceiro}
                   onCheckedChange={(checked) => {
                     setSimplesAutomatico(checked);
                     if (checked) setAliquotaSimples("");
@@ -303,6 +309,7 @@ export function DespesasRecorrentesPage() {
             </div>
           </div>
 
+          {podeEditarFinanceiro && (
           <div className="flex justify-end mt-4">
             <Button
               onClick={handleSalvarTaxas}
@@ -317,6 +324,7 @@ export function DespesasRecorrentesPage() {
               {recalcularSimplesMutation.isPending ? "Recalculando..." : "Salvar Taxas"}
             </Button>
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -371,6 +379,7 @@ export function DespesasRecorrentesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
+                      {podeEditarFinanceiro && (
                       <div className="flex gap-1">
                         <Button
                           variant="ghost"
@@ -400,6 +409,7 @@ export function DespesasRecorrentesPage() {
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))

@@ -19,6 +19,7 @@ export async function createContext(req: NextRequest) {
         name: true,
         nivel: true,
         ativo: true,
+        acessoFinanceiro: true,
       },
     });
   }

@@ -50,7 +50,7 @@ const freeFormCompactor = getCompactor(null, false, true);
 
 export function DashboardPage() {
   const queryClient = useQueryClient();
-  const { podeVerValores, isAdmin } = usePermissions();
+  const { podeVerValores, podeAcessarFinanceiro } = usePermissions();
   const [showRecebiveisModal, setShowRecebiveisModal] = useState(false);
   const [showDividasModal, setShowDividasModal] = useState(false);
   // "" = mes corrente (o backend resolve o default)
@@ -152,8 +152,8 @@ export function DashboardPage() {
     kpiEstoque: true,
     kpiVendas: true,
     kpiFaturamento: podeVerValores,
-    kpiLucroBruto: isAdmin,
-    kpiMargemBruta: isAdmin,
+    kpiLucroBruto: podeAcessarFinanceiro,
+    kpiMargemBruta: podeAcessarFinanceiro,
     kpiLucroLiquido: podeVerValores,
     kpiReceber: podeVerValores,
     kpiPagar: podeVerValores && !!dividasFornecedores,
@@ -162,10 +162,10 @@ export function DashboardPage() {
     kpiClientes: !podeVerValores,
     kpiEmRevisao: !podeVerValores,
     faixasLucroBruto: podeVerValores && !!faixasLucro,
-    lucroMarca: isAdmin,
+    lucroMarca: podeAcessarFinanceiro,
     diasEstoque: podeVerValores && !!diasEstoque,
     paceVendas: true,
-    paceLucroBruto: isAdmin,
+    paceLucroBruto: podeAcessarFinanceiro,
     graficos: true,
     listas: true,
     recebiveis: podeVerValores && !!recebiveis && recebiveis.length > 0,

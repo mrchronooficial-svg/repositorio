@@ -49,12 +49,14 @@ interface ContaBancariaSectionProps {
   contasBancarias: ContaBancaria[];
   isLoading: boolean;
   contasContabeis: ContaContabil[];
+  somenteLeitura?: boolean;
 }
 
 export function ContaBancariaSection({
   contasBancarias,
   isLoading,
   contasContabeis,
+  somenteLeitura = false,
 }: ContaBancariaSectionProps) {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -194,13 +196,15 @@ export function ContaBancariaSection({
                   <p className="text-xs text-muted-foreground">Saldo inicial</p>
                   <p className="font-medium">{formatCurrency(cb.saldoInicial)}</p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => openEdit(cb)}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                {!somenteLeitura && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => openEdit(cb)}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           ))}
@@ -211,10 +215,12 @@ export function ContaBancariaSection({
         </p>
       )}
 
-      <Button variant="outline" size="sm" onClick={openCreate}>
-        <Plus className="h-4 w-4 mr-2" />
-        Nova Conta Bancaria
-      </Button>
+      {!somenteLeitura && (
+        <Button variant="outline" size="sm" onClick={openCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Conta Bancaria
+        </Button>
+      )}
 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) closeDialog(); else setDialogOpen(open); }}>

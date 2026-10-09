@@ -11,6 +11,7 @@ import { trpc } from "@/utils/trpc";
 import { ContaTree } from "@/components/financeiro/conta-tree";
 import { ContaFormDialog } from "@/components/financeiro/conta-form-dialog";
 import { ContaBancariaSection } from "@/components/financeiro/conta-bancaria-section";
+import { usePermissions } from "@/hooks/use-permissions";
 
 type ContaFormData = {
   codigo: string;
@@ -34,6 +35,7 @@ export function PlanoDeContasPage() {
     ordem: number;
   } | null>(null);
   const [parentForNew, setParentForNew] = useState<string | null>(null);
+  const { podeEditarFinanceiro } = usePermissions();
 
   const { data: contas, isLoading } = useQuery(
     trpc.financeiro.listContas.queryOptions()
@@ -139,10 +141,12 @@ export function PlanoDeContasPage() {
             Estrutura hierarquica de contas contabeis (padrao CPC/CFC)
           </p>
         </div>
-        <Button onClick={handleNewRoot}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nova Conta
-        </Button>
+        {podeEditarFinanceiro && (
+          <Button onClick={handleNewRoot}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Conta
+          </Button>
+        )}
       </div>
 
       {/* Arvore do plano de contas */}
@@ -157,6 +161,7 @@ export function PlanoDeContasPage() {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onAddChild={handleAddChild}
+              somenteLeitura={!podeEditarFinanceiro}
             />
           ) : (
             <div className="text-center py-8 text-muted-foreground">
@@ -180,6 +185,7 @@ export function PlanoDeContasPage() {
             contasBancarias={contasBancarias ?? []}
             isLoading={isLoadingBancos}
             contasContabeis={contas ?? []}
+            somenteLeitura={!podeEditarFinanceiro}
           />
         </CardContent>
       </Card>

@@ -49,6 +49,7 @@ interface ContaTreeProps {
   }) => void;
   onDelete: (id: string) => void;
   onAddChild: (parentId: string) => void;
+  somenteLeitura?: boolean;
 }
 
 interface TreeNode extends ContaData {
@@ -92,12 +93,14 @@ function TreeItem({
   onEdit,
   onDelete,
   onAddChild,
+  somenteLeitura,
 }: {
   node: TreeNode;
   level: number;
   onEdit: ContaTreeProps["onEdit"];
   onDelete: ContaTreeProps["onDelete"];
   onAddChild: ContaTreeProps["onAddChild"];
+  somenteLeitura: boolean;
 }) {
   const [expanded, setExpanded] = useState(level < 2);
   const hasChildren = node.children.length > 0;
@@ -181,6 +184,7 @@ function TreeItem({
         )}
 
         {/* Actions (visible on hover) */}
+        {!somenteLeitura && (
         <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {node.tipo !== "ANALITICA" && (
             <Button
@@ -233,6 +237,7 @@ function TreeItem({
             </Button>
           )}
         </div>
+        )}
       </div>
 
       {/* Children */}
@@ -245,13 +250,20 @@ function TreeItem({
             onEdit={onEdit}
             onDelete={onDelete}
             onAddChild={onAddChild}
+            somenteLeitura={somenteLeitura}
           />
         ))}
     </div>
   );
 }
 
-export function ContaTree({ contas, onEdit, onDelete, onAddChild }: ContaTreeProps) {
+export function ContaTree({
+  contas,
+  onEdit,
+  onDelete,
+  onAddChild,
+  somenteLeitura = false,
+}: ContaTreeProps) {
   const tree = useMemo(() => buildTree(contas), [contas]);
 
   return (
@@ -264,6 +276,7 @@ export function ContaTree({ contas, onEdit, onDelete, onAddChild }: ContaTreePro
           onEdit={onEdit}
           onDelete={onDelete}
           onAddChild={onAddChild}
+          somenteLeitura={somenteLeitura}
         />
       ))}
     </div>

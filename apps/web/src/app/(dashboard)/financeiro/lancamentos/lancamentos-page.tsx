@@ -39,6 +39,7 @@ import {
 import { trpc } from "@/utils/trpc";
 import { formatCurrency, formatDate } from "@/lib/formatters";
 import { TIPO_LANCAMENTO_LABELS } from "@/lib/constants";
+import { usePermissions } from "@/hooks/use-permissions";
 
 // ============================================
 // TIPOS E HELPERS PARA IMPORTAÇÃO
@@ -205,6 +206,7 @@ export function LancamentosPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const { podeEditarFinanceiro } = usePermissions();
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("all");
 
@@ -356,16 +358,18 @@ export function LancamentosPage() {
             Historico de todos os lancamentos (manuais e automaticos)
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setImportOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
-            Importar Planilha
-          </Button>
-          <Button onClick={() => router.push("/financeiro/lancamentos/novo" as Route)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Lancamento
-          </Button>
-        </div>
+        {podeEditarFinanceiro && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Importar Planilha
+            </Button>
+            <Button onClick={() => router.push("/financeiro/lancamentos/novo" as Route)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Lancamento
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filtros */}
@@ -462,7 +466,7 @@ export function LancamentosPage() {
                         {l.linhas.length}
                       </TableCell>
                       <TableCell>
-                        {!l.estornado && (
+                        {podeEditarFinanceiro && !l.estornado && (
                           <Button
                             variant="ghost"
                             size="sm"
