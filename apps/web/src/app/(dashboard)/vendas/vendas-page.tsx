@@ -68,6 +68,7 @@ export function VendasPage() {
   const [showNFeDialog, setShowNFeDialog] = useState(false);
   const [selectedMeses, setSelectedMeses] = useState<string[]>([]);
   const [isExportingNFe, setIsExportingNFe] = useState(false);
+  const [apenasPendentesNFe, setApenasPendentesNFe] = useState(false);
 
   const { data: mesesDisponiveis } = useQuery(
     trpc.venda.mesesComVendas.queryOptions(undefined, {
@@ -99,11 +100,18 @@ export function VendasPage() {
     setIsExportingNFe(true);
     try {
       const vendas = await queryClient.fetchQuery(
-        trpc.venda.exportarNFe.queryOptions({ meses: selectedMeses })
+        trpc.venda.exportarNFe.queryOptions({
+          meses: selectedMeses,
+          apenasPendentes: apenasPendentesNFe,
+        })
       );
 
       if (!vendas || vendas.length === 0) {
-        toast.error("Nenhuma venda encontrada nos meses selecionados");
+        toast.error(
+          apenasPendentesNFe
+            ? "Nenhuma venda pendente de NFe nos meses selecionados"
+            : "Nenhuma venda encontrada nos meses selecionados"
+        );
         return;
       }
 
@@ -528,6 +536,25 @@ export function VendasPage() {
               {selectedMeses.length} mês(es) selecionado(s)
             </p>
           )}
+
+          <div className="flex items-start space-x-3 rounded-md border p-3">
+            <Checkbox
+              id="nfe-apenas-pendentes"
+              checked={apenasPendentesNFe}
+              onCheckedChange={(checked) => setApenasPendentesNFe(checked === true)}
+            />
+            <div className="space-y-1">
+              <Label
+                htmlFor="nfe-apenas-pendentes"
+                className="text-sm font-medium cursor-pointer"
+              >
+                Exportar apenas pendentes (não emitidas)
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Ignora as vendas marcadas como emitidas na aba NFe.
+              </p>
+            </div>
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNFeDialog(false)}>

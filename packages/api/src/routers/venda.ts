@@ -67,6 +67,7 @@ const ExportListSchema = z.object({
 
 const ExportNFeSchema = z.object({
   meses: z.array(z.string().regex(/^\d{4}-\d{2}$/, "Formato deve ser YYYY-MM")).min(1, "Selecione ao menos um mês"),
+  apenasPendentes: z.boolean().optional().default(false),
 });
 
 export const vendaRouter = router({
@@ -93,7 +94,7 @@ export const vendaRouter = router({
   exportarNFe: socioOuAdminProcedure
     .input(ExportNFeSchema)
     .query(async ({ input }) => {
-      const { meses } = input;
+      const { meses, apenasPendentes } = input;
 
       // Construir filtro de datas para os meses selecionados (em BRT)
       const dateFilters = meses.map((mes) => {
@@ -107,6 +108,8 @@ export const vendaRouter = router({
         where: {
           cancelada: false,
           OR: dateFilters,
+          // Quando marcado, exclui vendas cuja NFe já foi emitida (aba NFe)
+          ...(apenasPendentes && { nfeDeclarada: false }),
         },
         orderBy: { dataVenda: "asc" },
         include: {
