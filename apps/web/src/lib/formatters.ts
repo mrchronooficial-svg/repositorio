@@ -47,6 +47,15 @@ export function formatCPFCNPJ(value: string): string {
 }
 
 /**
+ * Detecta o tipo de pessoa pela quantidade de digitos do documento:
+ * ate 11 digitos = CPF (Pessoa Fisica), mais de 11 = CNPJ (Pessoa Juridica)
+ */
+export function detectarTipoPessoa(documento: string): "PESSOA_FISICA" | "PESSOA_JURIDICA" {
+  const cleaned = documento.replace(/\D/g, "");
+  return cleaned.length > 11 ? "PESSOA_JURIDICA" : "PESSOA_FISICA";
+}
+
+/**
  * Formata telefone brasileiro
  */
 export function formatPhone(phone: string): string {

@@ -7,13 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -23,7 +16,7 @@ import {
 import { EnderecoFields } from "./endereco-fields";
 import { trpc } from "@/utils/trpc";
 import { toast } from "sonner";
-import { formatCPF, formatCNPJ } from "@/lib/formatters";
+import { formatCPFCNPJ, detectarTipoPessoa } from "@/lib/formatters";
 
 interface ClienteData {
   tipo: "PESSOA_FISICA" | "PESSOA_JURIDICA";
@@ -100,12 +93,19 @@ export function ClienteModal({ open, onOpenChange, onSuccess }: ClienteModalProp
     return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7, 11)}`;
   };
 
-  const formatCpfCnpj = (value: string) => {
-    const cleaned = value.replace(/\D/g, "");
-    if (data.tipo === "PESSOA_FISICA") {
-      return formatCPF(cleaned);
+  // Detecta automaticamente PF/PJ pela quantidade de digitos (11 = CPF, 14 = CNPJ)
+  const handleCpfCnpjChange = (value: string) => {
+    const digitos = value.replace(/\D/g, "").slice(0, 14);
+    const tipo = detectarTipoPessoa(digitos);
+    setData((prev) => ({
+      ...prev,
+      cpfCnpj: digitos,
+      tipo,
+      dataNascimento: tipo === "PESSOA_JURIDICA" ? "" : prev.dataNascimento,
+    }));
+    if (errors.cpfCnpj || errors.dataNascimento) {
+      setErrors((prev) => ({ ...prev, cpfCnpj: undefined, dataNascimento: undefined }));
     }
-    return formatCNPJ(cleaned);
   };
 
   const validate = (): boolean => {
@@ -116,11 +116,8 @@ export function ClienteModal({ open, onOpenChange, onSuccess }: ClienteModalProp
     }
 
     const cpfCnpjLimpo = data.cpfCnpj.replace(/\D/g, "");
-    if (data.tipo === "PESSOA_FISICA" && cpfCnpjLimpo.length !== 11) {
-      newErrors.cpfCnpj = "CPF deve ter 11 digitos";
-    }
-    if (data.tipo === "PESSOA_JURIDICA" && cpfCnpjLimpo.length !== 14) {
-      newErrors.cpfCnpj = "CNPJ deve ter 14 digitos";
+    if (cpfCnpjLimpo.length !== 11 && cpfCnpjLimpo.length !== 14) {
+      newErrors.cpfCnpj = "Informe um CPF (11 digitos) ou CNPJ (14 digitos)";
     }
 
     if (data.tipo === "PESSOA_FISICA" && !data.dataNascimento) {
@@ -201,40 +198,37 @@ export function ClienteModal({ open, onOpenChange, onSuccess }: ClienteModalProp
           {/* Dados Basicos */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="tipo">Tipo *</Label>
-              <Select
-                value={data.tipo}
-                onValueChange={(value) => {
-                  handleChange("tipo", value);
-                  handleChange("cpfCnpj", "");
-                  handleChange("dataNascimento", "");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PESSOA_FISICA">Pessoa Fisica</SelectItem>
-                  <SelectItem value="PESSOA_JURIDICA">Pessoa Juridica</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cpfCnpj">
-                {data.tipo === "PESSOA_FISICA" ? "CPF *" : "CNPJ *"}
-              </Label>
+              <Label htmlFor="cpfCnpj">CPF ou CNPJ *</Label>
               <Input
                 id="cpfCnpj"
-                value={formatCpfCnpj(data.cpfCnpj)}
-                onChange={(e) => handleChange("cpfCnpj", e.target.value)}
-                placeholder={data.tipo === "PESSOA_FISICA" ? "000.000.000-00" : "00.000.000/0000-00"}
-                maxLength={data.tipo === "PESSOA_FISICA" ? 14 : 18}
+                value={formatCPFCNPJ(data.cpfCnpj)}
+                onChange={(e) => handleCpfCnpjChange(e.target.value)}
+                placeholder="Digite o CPF ou CNPJ"
+                maxLength={18}
               />
-              {errors.cpfCnpj && (
+              {errors.cpfCnpj ? (
                 <p className="text-sm text-red-500">{errors.cpfCnpj}</p>
-              )}
+              ) : data.cpfCnpj.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {data.tipo === "PESSOA_FISICA" ? "Pessoa Fisica (CPF)" : "Pessoa Juridica (CNPJ)"}
+                </p>
+              ) : null}
             </div>
+
+            {data.tipo === "PESSOA_FISICA" && (
+              <div className="space-y-2">
+                <Label htmlFor="dataNascimento">Data de Nascimento *</Label>
+                <Input
+                  id="dataNascimento"
+                  type="date"
+                  value={data.dataNascimento}
+                  onChange={(e) => handleChange("dataNascimento", e.target.value)}
+                />
+                {errors.dataNascimento && (
+                  <p className="text-sm text-red-500">{errors.dataNascimento}</p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -251,21 +245,6 @@ export function ClienteModal({ open, onOpenChange, onSuccess }: ClienteModalProp
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {data.tipo === "PESSOA_FISICA" && (
-              <div className="space-y-2">
-                <Label htmlFor="dataNascimento">Data de Nascimento *</Label>
-                <Input
-                  id="dataNascimento"
-                  type="date"
-                  value={data.dataNascimento}
-                  onChange={(e) => handleChange("dataNascimento", e.target.value)}
-                />
-                {errors.dataNascimento && (
-                  <p className="text-sm text-red-500">{errors.dataNascimento}</p>
-                )}
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="telefone">Telefone *</Label>
               <Input
