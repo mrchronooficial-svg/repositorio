@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { nanoid } from "nanoid";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -33,6 +35,15 @@ export async function POST(request: NextRequest) {
 
     const ext = file.name.split(".").pop();
     const uniqueName = `${nanoid()}.${ext}`;
+
+    // Desenvolvimento local sem token do Vercel Blob: salva em public/uploads-local
+    // para nao gravar fotos de teste no armazenamento de producao.
+    if (!process.env.BLOB_READ_WRITE_TOKEN && process.env.NODE_ENV !== "production") {
+      const dir = path.join(process.cwd(), "public", "uploads-local");
+      await mkdir(dir, { recursive: true });
+      await writeFile(path.join(dir, uniqueName), Buffer.from(await file.arrayBuffer()));
+      return NextResponse.json({ url: `/uploads-local/${uniqueName}` });
+    }
 
     const blob = await put(`uploads/${uniqueName}`, file, {
       access: "public",

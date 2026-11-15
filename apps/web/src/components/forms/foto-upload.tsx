@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useDropzone } from "react-dropzone";
 import { X, Upload, Loader2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const EXTENSOES_PERMITIDAS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
 
 interface FotoUploadProps {
   fotos: string[];
@@ -75,9 +82,59 @@ export function FotoUpload({ fotos, onChange, maxFotos = 10 }: FotoUploadProps) 
       "image/png": [".png"],
       "image/webp": [".webp"],
     },
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: MAX_SIZE,
     disabled: uploading || fotos.length >= maxFotos,
   });
+
+  // Colar imagem com Ctrl+V em qualquer lugar da pagina
+  const colarRef = useRef<(files: File[]) => void>(() => {});
+  colarRef.current = (files: File[]) => {
+    if (uploading) {
+      toast.error("Aguarde o envio atual terminar");
+      return;
+    }
+    if (fotos.length >= maxFotos) {
+      toast.error(`Maximo de ${maxFotos} fotos permitidas`);
+      return;
+    }
+    const validas: File[] = [];
+    for (const file of files) {
+      const ext = EXTENSOES_PERMITIDAS[file.type];
+      if (!ext) {
+        toast.error("Formato nao suportado. Use JPG, PNG ou WebP.");
+        continue;
+      }
+      if (file.size > MAX_SIZE) {
+        toast.error("Imagem muito grande (maximo 5MB)");
+        continue;
+      }
+      // Imagens coladas costumam vir como "image.png" ou sem nome: padroniza com a extensao certa
+      validas.push(new File([file], `colada-${Date.now()}-${validas.length}.${ext}`, { type: file.type }));
+    }
+    if (validas.length > 0) {
+      void onDrop(validas);
+    }
+  };
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      const files: File[] = [];
+      for (const item of Array.from(items)) {
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) files.push(file);
+        }
+      }
+      // Sem imagem na area de transferencia: deixa o colar normal de texto funcionar
+      if (files.length === 0) return;
+      event.preventDefault();
+      colarRef.current(files);
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, []);
 
   const removeFoto = (index: number) => {
     const newFotos = [...fotos];
@@ -130,7 +187,7 @@ export function FotoUpload({ fotos, onChange, maxFotos = 10 }: FotoUploadProps) 
             <p className="text-sm text-muted-foreground">
               {isDragActive
                 ? "Solte as imagens aqui..."
-                : "Arraste imagens ou clique para selecionar"}
+                : "Arraste imagens, clique para selecionar ou cole com Ctrl+V"}
             </p>
             <p className="text-xs text-muted-foreground">
               JPG, PNG ou WebP (max 5MB) - {fotos.length}/{maxFotos}

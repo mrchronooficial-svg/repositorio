@@ -49,3 +49,6 @@ coverage
 tmp
 temp
 .vercel
+
+# Fotos enviadas no localhost (sem Vercel Blob)
+apps/web/public/uploads-local/
