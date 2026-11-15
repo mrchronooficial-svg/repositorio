@@ -30,6 +30,7 @@ const PecaCreateSchema = z.object({
   fornecedorId: z.string().cuid("Fornecedor invalido"),
   revisada: z.boolean().optional(),
   dataEstimadaChegada: z.string().optional(), // ISO date (yyyy-mm-dd) — obrigatória para COMPRA/ENCOMENDA
+  linkCompra: z.url({ protocol: /^https?$/, message: "Link de compra invalido" }).max(2000).optional(),
   fotos: z.array(z.string().min(1)).min(1, "Minimo 1 foto obrigatoria"),
 }).refine(
   (data) => {
@@ -74,6 +75,7 @@ const PecaUpdateSchema = z.object({
   percentualRepasse: z.number().positive().max(100).optional().nullable(),
   localizacao: z.string().optional(),
   dataEstimadaChegada: z.string().optional().nullable(),
+  linkCompra: z.url({ protocol: /^https?$/, message: "Link de compra invalido" }).max(2000).optional().nullable(),
   // Só a troca Compra <-> Encomenda é editável (tratamento contábil idêntico).
   // Entrar/sair de consignação muda o acerto com o fornecedor — não é permitido aqui.
   origemTipo: z.enum(["COMPRA", "ENCOMENDA"]).optional(),
@@ -427,6 +429,7 @@ export const pecaRouter = router({
             dataEstimadaChegada: input.dataEstimadaChegada
               ? new Date(input.dataEstimadaChegada)
               : null,
+            linkCompra: input.linkCompra ?? null,
             fornecedorId: input.fornecedorId,
             fotos: {
               create: input.fotos.map((url, index) => ({

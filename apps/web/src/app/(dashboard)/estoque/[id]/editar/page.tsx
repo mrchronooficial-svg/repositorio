@@ -81,6 +81,7 @@ export default function EditarPecaPage() {
           dataEstimadaChegada: peca.dataEstimadaChegada
             ? new Date(peca.dataEstimadaChegada).toISOString().slice(0, 10)
             : "",
+          linkCompra: peca.linkCompra ?? "",
           fornecedorId: peca.fornecedorId,
           fotos: peca.fotos.map((f) => f.url),
         }}

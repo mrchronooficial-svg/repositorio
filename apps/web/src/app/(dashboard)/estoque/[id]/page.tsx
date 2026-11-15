@@ -360,6 +360,19 @@ export default function PecaDetalhesPage() {
                 <p className="text-sm text-muted-foreground">Data Cadastro</p>
                 <p className="font-medium">{formatDate(peca.createdAt)}</p>
               </div>
+              {peca.linkCompra && (
+                <div className="col-span-full min-w-0">
+                  <p className="text-sm text-muted-foreground">Link de Compra</p>
+                  <a
+                    href={peca.linkCompra}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary underline-offset-4 hover:underline break-all"
+                  >
+                    {peca.linkCompra}
+                  </a>
+                </div>
+              )}
             </CardContent>
           </Card>
 

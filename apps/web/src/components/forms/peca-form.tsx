@@ -44,6 +44,7 @@ interface PecaData {
   revisada: boolean;
   localizacao: string;
   dataEstimadaChegada: string;
+  linkCompra: string;
   fornecedorId: string;
   fotos: string[];
 }
@@ -73,6 +74,7 @@ const defaultData: PecaData = {
   revisada: false,
   localizacao: "Fornecedor",
   dataEstimadaChegada: "",
+  linkCompra: "",
   fornecedorId: "",
   fotos: [],
 };
@@ -199,6 +201,11 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
       newErrors.dataEstimadaChegada = "Data estimada de chegada e obrigatoria";
     }
 
+    // Link de compra e opcional, mas se preenchido precisa ser http(s)
+    if (data.linkCompra.trim() && !/^https?:\/\/\S+$/i.test(data.linkCompra.trim())) {
+      newErrors.linkCompra = "Informe um link valido comecando com http:// ou https://";
+    }
+
     // Validar campos monetarios apenas se o usuario pode ver valores
     // FUNCIONARIO nao ve e nao edita valores — pula validacao
     if (podeVerValores) {
@@ -271,6 +278,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         isOrigemPropria(data.origemTipo) && data.dataEstimadaChegada
           ? data.dataEstimadaChegada
           : undefined,
+      linkCompra: data.linkCompra.trim() || undefined,
       fornecedorId: data.fornecedorId,
       fotos: data.fotos,
     };
@@ -292,6 +300,7 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
         dataEstimadaChegada: isOrigemPropria(data.origemTipo)
           ? payload.dataEstimadaChegada ?? null
           : null,
+        linkCompra: payload.linkCompra ?? null,
       };
 
       // Compra <-> Encomenda pode ser trocada na edicao (mesma contabilidade)
@@ -684,6 +693,24 @@ export function PecaForm({ initialData, isEditing }: PecaFormProps) {
                   </div>
                 )}
               </>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="linkCompra">Link de Compra</Label>
+            <Input
+              id="linkCompra"
+              type="url"
+              inputMode="url"
+              value={data.linkCompra}
+              onChange={(e) => handleChange("linkCompra", e.target.value)}
+              placeholder="https://..."
+            />
+            <p className="text-xs text-muted-foreground">
+              Opcional — link do anuncio ou leilao onde a peca foi comprada
+            </p>
+            {errors.linkCompra && (
+              <p className="text-sm text-red-500">{errors.linkCompra}</p>
             )}
           </div>
         </CardContent>
