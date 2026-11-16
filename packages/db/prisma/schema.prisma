@@ -78,6 +78,17 @@ enum TipoAlerta {
   ESTOQUE_BAIXO
   RELOJOEIRO_DEMORADO
   REPASSE_PENDENTE
+  NFE_PROBLEMA
+}
+
+// Status de uma nota fiscal emitida via integração eNotas
+enum StatusNotaFiscal {
+  PROCESSANDO              // enviada ao eNotas, aguardando emissão
+  EMITIDA                  // autorizada pela SEFAZ
+  ERRO                     // falha ao enviar ou emitir
+  CANCELAMENTO_PROCESSANDO // cancelamento (ou devolução) solicitado ao eNotas
+  CANCELADA                // cancelada (ou anulada por NF-e de devolução)
+  FALHA_CANCELAMENTO       // eNotas não conseguiu cancelar
 }
 
 // ============================================
@@ -354,14 +365,54 @@ model Venda {
   updatedAt DateTime @updatedAt
 
   // Relações
-  pagamentos Pagamento[]
-  dropItem   DropItem?
+  pagamentos    Pagamento[]
+  dropItem      DropItem?
+  notasFiscais  NotaFiscal[]
 
   @@index([clienteId])
   @@index([dataVenda])
   @@index([statusPagamento])
   @@index([cancelada])
   @@map("vendas")
+}
+
+// ============================================
+// NOTAS FISCAIS (integração eNotas)
+// ============================================
+// Uma venda pode ter várias notas: vendas acima do limite do eNotas são
+// divididas em partes, e mudanças de valor geram uma nova "emissão" (as notas
+// antigas ficam com ativa = false). Cada nota corresponde a uma venda no eNotas.
+
+model NotaFiscal {
+  id                String           @id @default(cuid())
+  vendaId           String
+  venda             Venda            @relation(fields: [vendaId], references: [id])
+  emissao           Int              @default(1) // 1 = primeira emissão, 2+ = reemissões
+  parte             Int              @default(1) // parte da divisão (limite por nota)
+  totalPartes       Int              @default(1)
+  valor             Decimal          @db.Decimal(10, 2)
+  ativa             Boolean          @default(true)
+  status            StatusNotaFiscal @default(PROCESSANDO)
+  // Identificadores no eNotas
+  idExterno         String           @unique // enviado ao eNotas: <vendaId>-<emissao>-<parte>
+  enotasVendaId     String?          @unique
+  enotasNfeId       String?
+  situacaoEnotas    Int? // situação bruta da NF no eNotas (diagnóstico)
+  // Dados da nota emitida
+  numero            String?
+  pdfUrl            String?
+  xmlUrl            String?
+  mensagemErro      String?
+  emitidaEm         DateTime?
+  canceladaEm       DateTime?
+  ultimaConsultaEm  DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([vendaId])
+  @@index([status])
+  @@index([ativa])
+  @@map("notas_fiscais")
 }
 
 // ============================================

@@ -107,7 +107,9 @@ export function Sidebar({ userLevel, acessoFinanceiro = false }: SidebarProps) {
   const isAdmin = userLevel === "ADMINISTRADOR";
   const podeVerFinanceiro = isAdmin || acessoFinanceiro;
 
-  const items = isAdmin ? [...menuItems, ...adminItems] : menuItems;
+  const podeVerNfe = isAdmin || userLevel === "SOCIO";
+  const itensBase = podeVerNfe ? menuItems : menuItems.filter((item) => item.href !== "/nfe");
+  const items = isAdmin ? [...itensBase, ...adminItems] : itensBase;
 
   // Contador de leads novos — soma Watch Fit + VIP Chrono (refresca a cada minuto)
   const { data: leadStats } = useQuery(

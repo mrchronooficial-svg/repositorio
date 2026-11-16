@@ -1,6 +1,6 @@
 import prisma from "@gestaomrchrono/db";
 
-type TipoAlerta = "ESTOQUE_BAIXO" | "RELOJOEIRO_DEMORADO" | "REPASSE_PENDENTE";
+type TipoAlerta = "ESTOQUE_BAIXO" | "RELOJOEIRO_DEMORADO" | "REPASSE_PENDENTE" | "NFE_PROBLEMA";
 
 interface CriarAlertaParams {
   tipo: TipoAlerta;

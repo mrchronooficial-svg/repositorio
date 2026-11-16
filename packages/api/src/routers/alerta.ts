@@ -21,7 +21,7 @@ export const alertaRouter = router({
       z.object({
         page: z.number().min(1).default(1),
         limit: z.number().min(1).max(100).default(20),
-        tipo: z.enum(["ESTOQUE_BAIXO", "RELOJOEIRO_DEMORADO", "REPASSE_PENDENTE"]).optional(),
+        tipo: z.enum(["ESTOQUE_BAIXO", "RELOJOEIRO_DEMORADO", "REPASSE_PENDENTE", "NFE_PROBLEMA"]).optional(),
         lido: z.boolean().optional(),
       })
     )

@@ -4,6 +4,7 @@ import { auth } from "@gestaomrchrono/auth";
 import prisma from "@gestaomrchrono/db";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
+import { NfeAlertaBanner } from "@/components/layout/nfe-alerta-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function DashboardLayout({
         <Sidebar userLevel={user.nivel} acessoFinanceiro={user.acessoFinanceiro} />
         <div className="flex-1 flex flex-col min-h-screen">
           <Header user={user} />
+          {(user.nivel === "ADMINISTRADOR" || user.nivel === "SOCIO") && <NfeAlertaBanner />}
           <main className="flex-1 p-8 animate-fade-in">
             {children}
           </main>

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { Route } from "next";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, Check, AlertTriangle, Package, Clock, Banknote } from "lucide-react";
+import { Bell, Check, AlertTriangle, Package, Clock, Banknote, FileWarning } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -16,18 +16,20 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-type TipoAlerta = "ESTOQUE_BAIXO" | "RELOJOEIRO_DEMORADO" | "REPASSE_PENDENTE";
+type TipoAlerta = "ESTOQUE_BAIXO" | "RELOJOEIRO_DEMORADO" | "REPASSE_PENDENTE" | "NFE_PROBLEMA";
 
 const ALERTA_ICONS: Record<TipoAlerta, typeof AlertTriangle> = {
   ESTOQUE_BAIXO: Package,
   RELOJOEIRO_DEMORADO: Clock,
   REPASSE_PENDENTE: Banknote,
+  NFE_PROBLEMA: FileWarning,
 };
 
 const ALERTA_COLORS: Record<TipoAlerta, string> = {
   ESTOQUE_BAIXO: "text-amber-600 bg-amber-50",
   RELOJOEIRO_DEMORADO: "text-orange-600 bg-orange-50",
   REPASSE_PENDENTE: "text-blue-600 bg-blue-50",
+  NFE_PROBLEMA: "text-red-600 bg-red-50",
 };
 
 export function Notifications() {

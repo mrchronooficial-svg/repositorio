@@ -28,24 +28,27 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-type TipoAlerta = "ESTOQUE_BAIXO" | "RELOJOEIRO_DEMORADO" | "REPASSE_PENDENTE";
+type TipoAlerta = "ESTOQUE_BAIXO" | "RELOJOEIRO_DEMORADO" | "REPASSE_PENDENTE" | "NFE_PROBLEMA";
 
 const ALERTA_ICONS: Record<TipoAlerta, typeof AlertTriangle> = {
   ESTOQUE_BAIXO: Package,
   RELOJOEIRO_DEMORADO: Clock,
   REPASSE_PENDENTE: Banknote,
+  NFE_PROBLEMA: AlertTriangle,
 };
 
 const ALERTA_COLORS: Record<TipoAlerta, string> = {
   ESTOQUE_BAIXO: "text-amber-600 bg-amber-50 border-amber-200",
   RELOJOEIRO_DEMORADO: "text-orange-600 bg-orange-50 border-orange-200",
   REPASSE_PENDENTE: "text-blue-600 bg-blue-50 border-blue-200",
+  NFE_PROBLEMA: "text-red-600 bg-red-50 border-red-200",
 };
 
 const TIPO_LABELS: Record<TipoAlerta, string> = {
   ESTOQUE_BAIXO: "Estoque Baixo",
   RELOJOEIRO_DEMORADO: "Relojoeiro Demorado",
   REPASSE_PENDENTE: "Repasse Pendente",
+  NFE_PROBLEMA: "Problema na NF-e",
 };
 
 export default function AlertasPage() {
@@ -153,6 +156,7 @@ export default function AlertasPage() {
               <SelectItem value="ESTOQUE_BAIXO">Estoque Baixo</SelectItem>
               <SelectItem value="RELOJOEIRO_DEMORADO">Relojoeiro Demorado</SelectItem>
               <SelectItem value="REPASSE_PENDENTE">Repasse Pendente</SelectItem>
+              <SelectItem value="NFE_PROBLEMA">Problema na NF-e</SelectItem>
             </SelectContent>
           </Select>
 

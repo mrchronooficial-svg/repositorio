@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Pencil, RotateCcw, Check, X } from "lucide-react";
+import { Pencil, RotateCcw, Check, X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,27 @@ interface EditarValorDeclararProps {
   queryKeys?: readonly unknown[][];
   /** "inline" para celula de tabela, "bloco" para card de detalhe */
   variante?: "inline" | "bloco";
+  /**
+   * true quando a venda ja tem NF-e emitida (ou em emissao) pela integracao eNotas.
+   * Nesse caso, salvar um valor diferente cancela a nota atual e emite outra.
+   */
+  temNfe?: boolean;
+}
+
+type ResultadoReemissao = {
+  cancelamento: { solicitadas: number; falhas: string[] };
+  emissao: { emitidas: number; erros: string[]; ignorada?: string };
+} | null;
+
+function avisarReemissao(reemissao: ResultadoReemissao) {
+  if (!reemissao) return;
+  if (reemissao.cancelamento.falhas.length > 0) {
+    toast.error("Nao foi possivel cancelar a NF-e anterior. A nova nota NAO foi emitida.");
+  } else if (reemissao.emissao.erros.length > 0) {
+    toast.error("Nota anterior cancelada, mas houve erro ao emitir a nova NF-e.");
+  } else {
+    toast.success("NF-e anterior cancelada e nova NF-e enviada para emissao.");
+  }
 }
 
 // Aceita "3.500,00", "3500.00", "3500"
@@ -44,6 +65,7 @@ export function EditarValorDeclarar({
   manual,
   queryKeys = [],
   variante = "inline",
+  temNfe = false,
 }: EditarValorDeclararProps) {
   const queryClient = useQueryClient();
   const [aberto, setAberto] = useState(false);
@@ -71,8 +93,9 @@ export function EditarValorDeclarar({
 
   const definirMutation = useMutation(
     trpc.nfe.definirValorDeclarar.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (data) => {
         toast.success("Valor a declarar atualizado!");
+        avisarReemissao(data.reemissao);
         setAberto(false);
         invalidar();
       },
@@ -82,8 +105,9 @@ export function EditarValorDeclarar({
 
   const voltarMutation = useMutation(
     trpc.nfe.voltarValorAutomatico.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (data) => {
         toast.success("Valor a declarar voltou ao calculo automatico!");
+        avisarReemissao(data.reemissao);
         setAberto(false);
         invalidar();
       },
@@ -100,7 +124,7 @@ export function EditarValorDeclarar({
       toast.error("Valor invalido");
       return;
     }
-    definirMutation.mutate({ vendaId, valor: valorParseado });
+    definirMutation.mutate({ vendaId, valor: valorParseado, reemitirNfe: temNfe });
   }
 
   return (
@@ -161,6 +185,17 @@ export function EditarValorDeclarar({
               inputMode="decimal"
             />
 
+            {temNfe && (
+              <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>
+                  Esta venda ja tem NF-e. Se o valor mudar, a nota atual sera cancelada
+                  (ou anulada por nota de devolucao, se passou de 24h) e uma nova NF-e
+                  sera emitida com o novo valor.
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -169,7 +204,7 @@ export function EditarValorDeclarar({
                 disabled={!podeSalvar}
               >
                 <Check className="h-3.5 w-3.5 mr-1" />
-                Salvar
+                {temNfe ? "Salvar e reemitir" : "Salvar"}
               </Button>
               <Button
                 size="sm"
@@ -186,7 +221,7 @@ export function EditarValorDeclarar({
                 size="sm"
                 variant="outline"
                 className="w-full"
-                onClick={() => voltarMutation.mutate({ vendaId })}
+                onClick={() => voltarMutation.mutate({ vendaId, reemitirNfe: temNfe })}
                 disabled={salvando}
               >
                 <RotateCcw className="h-3.5 w-3.5 mr-1" />

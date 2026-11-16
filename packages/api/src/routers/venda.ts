@@ -16,6 +16,7 @@ import {
 } from "../utils/pagamento";
 import { isOrigemPropria } from "../utils/origem";
 import { calcularValorDeclararAutomatico } from "../utils/valor-declarar";
+import { aoAtualizarStatusPagamento, cancelarNotasVenda } from "../services/enotas.service";
 
 // Schemas
 const VendaCreateSchema = z.object({
@@ -109,7 +110,13 @@ export const vendaRouter = router({
           cancelada: false,
           OR: dateFilters,
           // Quando marcado, exclui vendas cuja NFe já foi emitida (aba NFe)
-          ...(apenasPendentes && { nfeDeclarada: false }),
+          // e vendas que ja estao sendo emitidas pela integracao eNotas (evita nota em duplicidade)
+          ...(apenasPendentes && {
+            nfeDeclarada: false,
+            notasFiscais: {
+              none: { ativa: true, status: { in: ["PROCESSANDO", "EMITIDA"] } },
+            },
+          }),
         },
         orderBy: { dataVenda: "asc" },
         include: {
@@ -588,6 +595,15 @@ export const vendaRouter = router({
         console.error(`[Financeiro] Erro ao gerar lancamentos para venda ${venda.id}`);
       }
 
+      // 13. Emitir NF-e no eNotas se a venda ja nasceu paga (emissao automatica)
+      if (input.pagamentoInicial && input.pagamentoInicial > 0) {
+        await aoAtualizarStatusPagamento(
+          venda.id,
+          "NAO_PAGO",
+          calcularStatusPagamento(valorFinal, input.pagamentoInicial)
+        );
+      }
+
       return venda;
     }),
 
@@ -707,6 +723,12 @@ export const vendaRouter = router({
         },
       });
 
+      await aoAtualizarStatusPagamento(
+        input.id,
+        venda.statusPagamento,
+        String(updateData.statusPagamento)
+      );
+
       return vendaAtualizada;
     }),
 
@@ -773,6 +795,8 @@ export const vendaRouter = router({
         detalhes: { valor: input.valor },
       });
 
+      await aoAtualizarStatusPagamento(input.vendaId, venda.statusPagamento, novoStatus);
+
       return pagamento;
     }),
 
@@ -832,6 +856,12 @@ export const vendaRouter = router({
         entidadeId: pagamento.vendaId,
         detalhes: { pagamentoId: input.pagamentoId, valorAnterior: Number(pagamento.valor), valorNovo: input.valor },
       });
+
+      await aoAtualizarStatusPagamento(
+        pagamento.vendaId,
+        pagamento.venda.statusPagamento,
+        novoStatus
+      );
 
       return { success: true };
     }),
@@ -1150,7 +1180,17 @@ export const vendaRouter = router({
         console.error(`[Financeiro] Erro ao estornar lancamentos da venda ${input.vendaId}`);
       }
 
-      return { success: true, novoSku };
+      // Cancelar a(s) NF-e no eNotas (ate 24h cancela; depois o eNotas emite a NF-e de devolucao).
+      // Falhas nao impedem o cancelamento da venda: viram alerta no topo do sistema.
+      let nfe: { solicitadas: number; falhas: string[] } = { solicitadas: 0, falhas: [] };
+      try {
+        nfe = await cancelarNotasVenda(input.vendaId);
+      } catch (error) {
+        console.error(`[eNotas] Erro ao cancelar NF-e da venda ${input.vendaId}`, error);
+        nfe = { solicitadas: 0, falhas: ["Erro inesperado ao cancelar a NF-e"] };
+      }
+
+      return { success: true, novoSku, nfe };
     }),
 
   // Total a receber
