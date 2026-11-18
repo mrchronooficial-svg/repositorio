@@ -3,28 +3,24 @@ import prisma from "@gestaomrchrono/db";
 /**
  * Gera o proximo SKU sequencial
  * Formato: MRC-0001, MRC-0002, etc.
- * Busca o maior skuBase existente (incluindo devolucoes) para evitar duplicatas.
+ * Busca o maior numero entre os skuBase existentes (incluindo devolucoes) para evitar duplicatas.
+ * A comparacao e numerica e ignora SKUs fora do padrao (ex: MRC-TESTE), que nao entram na sequencia.
  */
 export async function gerarProximoSKU(): Promise<string> {
-  const ultimaPeca = await prisma.peca.findFirst({
+  const pecas = await prisma.peca.findMany({
     where: {
       skuBase: { startsWith: "MRC-" },
     },
-    orderBy: { skuBase: "desc" },
+    distinct: ["skuBase"],
     select: { skuBase: true },
   });
 
-  let proximoNumero = 1;
+  const maiorNumero = pecas.reduce((maior, peca) => {
+    const match = peca.skuBase.match(/^MRC-(\d+)$/);
+    return match?.[1] ? Math.max(maior, parseInt(match[1], 10)) : maior;
+  }, 0);
 
-  if (ultimaPeca?.skuBase) {
-    const match = ultimaPeca.skuBase.match(/MRC-(\d+)/);
-    if (match && match[1]) {
-      proximoNumero = parseInt(match[1], 10) + 1;
-    }
-  }
-
-  const sku = `MRC-${proximoNumero.toString().padStart(4, "0")}`;
-  return sku;
+  return `MRC-${(maiorNumero + 1).toString().padStart(4, "0")}`;
 }
 
 /**
